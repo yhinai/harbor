@@ -82,3 +82,9 @@ The repository is [yhinai/harbor](https://github.com/yhinai/harbor), branch `mai
 ## Remote private configuration — 8 October 2026
 
 **Verified:** `matrix:/Users/matrix/projects/harbor/.env` now holds the requested `SUDO_PASSWORD` and `FIREWORKS_API_KEY` entries. The file has permissions `0600`, is ignored by Git, and is not tracked or included in any artifact manifest. Values were not displayed or committed. Existing unrelated configuration entries were preserved. Creating this file did not invoke sudo, enable paid execution, or start a model request. The frozen submission and harness v1.3.0 amendment remain unchanged.
+
+## Supervised offline run v1.3.1 — 8 October 2026
+
+**Verified:** A one-shot system launchd job ran as `matrix` on host `mini`, independently of the SSH session, and completed the offline checks and all five canonical Harbor oracles. Separate evidence is under `analysis/harness-v1.3.1/runs/mini-offline-20261008T180938Z/`. Existing v1.3.0 and Day 1 artifacts were checked and preserved. Sudo was used only to register the job; no credentials were passed to the validation child. No paid model calls were made in this milestone.
+
+**Verified:** User-domain launchd registration failed on the headless account; the system job with `UserName=matrix` succeeded. The job used caffeinate during execution, durable status/logs, and no automatic retries. The reusable launch helper is documented under `tools/harness-v1.3.1/`. This is completed offline validation, not model-difficulty evidence.
