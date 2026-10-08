@@ -1,0 +1,157 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[left=24mm,right=24mm,top=27mm,bottom=24mm,headheight=15pt,headsep=9mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{newtxtext,newtxmath}
+\usepackage[scaled=0.92]{helvet}
+\usepackage{microtype,enumitem,fancyhdr,hyperref,tabularx,booktabs,needspace}
+\hypersetup{hidelinks,pdftitle={Predict Frontier Difficulty: Challenge Questions}}
+\setlength{\parindent}{1em}
+\setlength{\parskip}{3pt}
+\setlength{\emergencystretch}{3em}
+\linespread{1.03}
+\setlist[itemize]{leftmargin=14pt,labelsep=5pt,itemsep=1pt,parsep=0pt,topsep=4pt}
+\setlist[enumerate]{leftmargin=18pt,itemsep=1pt,parsep=0pt,topsep=4pt}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[C]{\normalfont\scshape Predict Frontier Difficulty: Latent Reasoning Portfolio}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+\newcommand{\question}[3]{%
+  \par\addvspace{12pt}\Needspace{5\baselineskip}%
+  \noindent{\sffamily\large\bfseries #1.\enspace #3.}\par\nobreak
+  \noindent{\small\textit{Task:}\enspace\texttt{#2}}\par\nobreak\vspace{3pt}}
+\newcommand{\labelhead}[1]{%
+  \par\addvspace{8pt}\Needspace{3\baselineskip}%
+  \noindent{\sffamily\bfseries #1.}\par\nobreak\vspace{1pt}}
+\newcommand{\code}[1]{\texttt{#1}}
+\begin{document}
+\begin{center}
+{\Large\bfseries Predict Frontier Difficulty}\par
+\vspace{3pt}
+{\normalsize Latent Reasoning Portfolio}\par
+\vspace{3pt}
+{\small\itshape Research Engineer Take-Home / Two Days}
+\end{center}
+\vspace{2pt}
+
+\labelhead{The assignment}
+Build five agent tasks in Harbor format. Forecast which tasks will be hard before frontier evaluation, then revise the tasks and forecasts using proxy results.
+
+A successful submission includes at least one \textbf{valid, hard task} and defensible forecasts. A hard task must have a passing canonical solution, a fair verifier, meaningful agent work, and \textbf{at most two target-model passes in eight trials}. Infrastructure and harness failures do not count as model failures.
+
+\labelhead{Model restriction}
+\textbf{Never run Fable or GPT-5.6 Sol}, including for authoring or critique. Other models, including Claude Opus/Sonnet and open models, may be used for authoring, red-teaming, and pilots.
+
+\labelhead{Shared requirements}
+Use tiny models with $d_{\rm model}=32$--$64$, one or two layers, and short sequences. Use float64, fixed seeds, deterministic algorithms, and one CPU thread. Tests must finish in seconds on CPU. Bake all dependencies into the environment; verification must not require network access. Keep a private reference implementation in \code{/tests}. Every hidden check must follow an explicit instruction.
+
+\question{1}{batched-halting}{Implement correct batched inference}
+\textbf{Given:} A looped model with shared weights, a sigmoid halting head, correct \code{infer\_single(x, mask)}, and an incomplete or naive \code{infer\_batched(X, mask)}. Visible tests use uniform-depth, unpadded batches.
+
+\textbf{Task:} Implement \code{infer\_batched} so that each sample matches isolated \code{infer\_single} execution.
+\begin{itemize}
+\item Match outputs, loop counts $N_i$, remainders $R_i$, and ponder cost within absolute tolerance $10^{-10}$ in float64.
+\item Stop at cumulative halting probability $\geq1-\epsilon$, or at \code{max\_loops}. Specify the exact weighted-output formula, with the remainder on the final step.
+\item Keep halted states and accumulators unchanged in later iterations. Padding must not affect non-padding outputs.
+\item Do not modify \code{infer\_single}, model weights, or architecture.
+\end{itemize}
+\textbf{Required coverage:} Mixed halting depths, immediate halting, maximum-loop termination, batch size one, large batches, padded variable lengths, and new seeds and shapes. Accept materially equivalent correct implementations.
+
+\newpage
+\question{2}{tbptt-gradient-bug}{Repair truncated backpropagation}
+\textbf{Given:} A looped model and \code{train.py} for a toy task requiring several loops. The truncated-backpropagation window is $W$, but the current detach placement allows gradients through only the last loop. The reported symptom is that accuracy does not improve when inference loops increase.
+
+\textbf{Task:} Fix the training code to implement the intended truncated BPTT semantics.
+\begin{itemize}
+\item In an unroll of $L$ loops, gradients must flow through the last $W$ loops; states from earlier loops must be detached. State the precise definition.
+\item Do not change model architecture, data, loss, or optimizer hyperparameters.
+\item Parameter gradients must match a float64 reference on fixed batches for $W\in\{1,2,4\}$ and $L\in\{4,8\}$, within a tight tolerance.
+\item In a short seeded training run of under 60 CPU seconds, accuracy at $L=8$ must exceed accuracy at $L=2$ by the specified margin.
+\end{itemize}
+\textbf{Restrictions:} Increasing the learning rate, training longer, removing all detaches, or changing loop counts or architecture does not satisfy the task.
+
+\vspace{3mm}
+\question{3}{latent-kvcache}{Repair cached latent-step generation}
+\textbf{Given:} A tiny decoder language model supporting \code{inputs\_embeds}, a correct \code{generate\_full} with arguments \code{prompt}, \code{n\_latent}, and \code{n\_tokens}, and a buggy \code{generate\_cached}. The full version recomputes the sequence at each step.
+
+During latent steps, the final hidden state \textbf{after the final layer normalization and before the language-model head} becomes the next input embedding. The model then decodes \code{n\_tokens} greedy tokens.
+
+\textbf{Task:} Make cached generation match full generation.
+\begin{itemize}
+\item Return identical tokens and matching logits within absolute tolerance $10^{-9}$ for all supported inputs.
+\item Define the feedback state precisely. Latent steps must occupy positions, advance position IDs, and be included in the cache.
+\item Support left-padded batches of different prompt lengths. State the attention-mask and position-ID conventions exactly.
+\item Cover $n_{\rm latent}\in\{0,1,5\}$, long prompts, mixed prompt lengths, and $n_{\rm tokens}>1$.
+\end{itemize}
+\textbf{Specification decision:} State whether full recomputation is allowed. If KV-cache use is compulsory, make that requirement explicit and verify it fairly. Output-equivalent full recomputation must otherwise be accepted.
+
+\newpage
+\question{4}{grpo-length-bias}{Correct the training objective}
+\textbf{Given:} A tiny categorical policy over sequences, a small vocabulary with EOS, and a reward independent of response length. The GRPO trainer divides loss by each sequence's length and normalizes advantages by the group's reward standard deviation. Response length grows without reward improvement.
+
+\textbf{Task:} Implement the intended objective exactly.
+\begin{itemize}
+\item Compute advantage as reward minus group mean, with no standard-deviation division.
+\item Sum over response tokens and divide by the constant \code{max\_len} $\times$ \code{group\_size}; do not divide by each response's own length.
+\item Preserve the given clipping and KL terms, and specify them explicitly.
+\item Do not change the reward function.
+\end{itemize}
+\textbf{Required coverage:} Loss and gradients must match the reference on fixed batches. In a short seeded run, mean response length must remain within the specified band.
+
+\textbf{Restrictions:} Do not add a reward length penalty, fix only advantage normalization, shorten \code{max\_len}, or change sampling.
+
+\vspace{3mm}
+\question{5}{act-from-spec}{Implement Adaptive Computation Time}
+\textbf{Given:} A looped cell with an incomplete \code{act\_forward()} function.
+
+\textbf{Task:} Implement ACT from a complete written specification.
+\begin{itemize}
+\item Define per-step halting probabilities and threshold $1-\epsilon$.
+\item Define the halting step $N(t)$ and remainder
+\[
+R(t)=1-\sum_{\text{steps before halting}}p.
+\]
+\item Define the weighted output and ponder cost $N+R$.
+\item State exact formulas and handle halting at the first step and reaching the maximum step count.
+\item Match reference outputs, $N$, $R$, ponder cost, and gradients across seeds and edge cases.
+\end{itemize}
+\textbf{Restrictions:} The verifier must reject incorrect step counts, a remainder applied to the wrong step, ponder cost missing $R$, and missing gradients through halting probabilities.
+
+\labelhead{Validation required for all five tasks}
+Run the oracle five times and require reward one every time. Require each listed incorrect shortcut to receive reward zero and a materially different correct solution to receive reward one. Check that the starter builds, visible tests run, verification stays below its timeout, and tasks require meaningful work. Keep shortcut implementations private and record their rewards.
+
+\newpage
+\noindent{\sffamily\Large\bfseries Submission requirements.}\par
+\vspace{3pt}
+\noindent{\normalsize\itshape Forecast, evaluate, and report}
+\vspace{3mm}
+
+\labelhead{1. Package each task in Harbor format}
+Include \code{task.toml}, \code{instruction.md}, \path{environment/Dockerfile}, \path{environment/repo/}, \path{tests/test.sh}, private tests and reference code, \path{solution/solve.sh}, and \path{solution/solution.patch}. Hidden tests run after the agent finishes; the solution is available only to the oracle. Write binary reward one or zero to \path{/logs/verifier/reward.txt}.
+
+\labelhead{2. Day 1: pilots and preregistered forecasts}
+Run three or four trials per task using strong, permitted non-target models. Read every trajectory, record pass counts and step-indexed failures, and harden tasks that pilots solve easily.
+
+Submit \code{day1.md} with task rank, capability gap, concrete failure mechanism, predicted $K/8$, evidence, and prompts/agents/tools/orchestration. Include a short methods paragraph explaining task selection, Task 5's calibration role, and forecasting. Forecasts must be registered before the results they predict are known.
+
+\labelhead{3. Implement \code{forecast.py}}
+For each task, use 100,000 Monte Carlo samples:
+\begin{align*}
+p_{\rm proxy}&\sim\operatorname{Beta}(1+k,\,1+n-k),\\
+\operatorname{logit}(p_{\rm front})&=\operatorname{logit}(p_{\rm proxy})+\delta,\\
+\delta&\sim\operatorname{Normal}(\mu,\sigma),\qquad
+K\sim\operatorname{Binomial}(8,p_{\rm front}).
+\end{align*}
+Use Day 1 pilot evidence or Day 2 proxy evidence for $k/n$. Choose $\mu$ by failure type: approximately $+1.5$ to $+2.5$ for capability failures, or $+0.5$ to $+1.0$ for discipline failures. Use a wide $\sigma$, approximately one. Output $P(K=0),\ldots,P(K=8)$ and $P(K\leq2)$. Avoid overconfident forecasts.
+
+\labelhead{4. Day 2: classify results and revise}
+Label every trial \textbf{INFRA}, \textbf{UNFAIR}, \textbf{SHALLOW}, \textbf{MECHANISM}, or \textbf{PASS}. Fix unfair verification first. Keep promising tasks with zero or one pass and substantive mechanism failures; clarify setup when failures are mostly shallow. Harden or retire tasks with three or more passes. Revalidate revised packages and focus remaining effort on the best one or two tasks.
+
+\labelhead{5. Submit a one-page \code{report.md}}
+Include changes and their motivating trials; pass rates $k/n$ with intervals and small-sample limitations; step-indexed trajectory evidence; all five $P(K=0),\ldots,P(K=8)$ distributions; the hardest task and a falsifier; and the division of generation, implementation, critique, testing, and revision across agents or roles.
+
+\labelhead{Final deliverables}
+Five task packages, \code{day1.md}, Day 2 revisions, \code{report.md}, \code{forecast.py}, and an \code{evidence/} folder containing shortcut results, pilot logs, and trajectory labels.
+
+\end{document}
