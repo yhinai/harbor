@@ -78,3 +78,7 @@ The repository is [yhinai/harbor](https://github.com/yhinai/harbor), branch `mai
 **Verified/source-inspected limitation:** Harbor's existing network sidecar allows an initial locally proxied TCP handshake and permits DNS/ICMP; external TLS application connectivity was denied in the check. It is not strict Docker `network_mode=none`. The output threshold also permits polling overshoot. Initial setup and assertion failures are preserved with their diagnoses rather than omitted.
 
 **Unknown:** Provider compatibility under the new harness; no paid smoke or follow-up panel was run. New terminal semantics and limits must be declared before any changed-protocol panel. Frozen task packages, original outcomes, forecasts, and archive remain immutable; this milestone adds only separately versioned infrastructure and development evidence.
+
+## Remote private configuration — 8 October 2026
+
+**Verified:** `matrix:/Users/matrix/projects/harbor/.env` now holds the requested `SUDO_PASSWORD` and `FIREWORKS_API_KEY` entries. The file has permissions `0600`, is ignored by Git, and is not tracked or included in any artifact manifest. Values were not displayed or committed. Existing unrelated configuration entries were preserved. Creating this file did not invoke sudo, enable paid execution, or start a model request. The frozen submission and harness v1.3.0 amendment remain unchanged.
