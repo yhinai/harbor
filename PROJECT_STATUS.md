@@ -68,3 +68,13 @@ The repository is [yhinai/harbor](https://github.com/yhinai/harbor), branch `mai
 **Verified:** The complete Git-tracked project is cloned at `matrix:/Users/matrix/projects/harbor`. Remote verification passed all 457 frozen archive hashes and 344 present loose artifact hashes. Credentials, caches, environments, and temporary job directories were not transferred.
 
 **Blocked:** The remote account lacks Docker/Colima/uv and cannot install them into the existing Homebrew prefix due to permissions. Provisioning stopped without changing shared ownership. An administrator or Homebrew owner must install the tools before offline Harbor work can resume. No paid calls or remote jobs started. See [migration record](analysis/matrix-migration-v1/status.md).
+
+## Matrix runtime and harness v1.3.0 — 8 October 2026
+
+**Verified:** The remote runtime is operational at `matrix:/Users/matrix/projects/harbor`. Official binaries were installed in the account's private prefix without sudo or shared Homebrew changes, resolving the v1 installation blocker. The dedicated Docker VM remains running with 10 CPUs and 10 GiB RAM. No paid jobs are running. See [migration v2](analysis/matrix-migration-v2/status.md).
+
+**Verified:** The separate [v1.3.0 harness](tools/harness-v1.3.0/README.md) passed mock stream/gate tests, budget checks, an output-classification regression, actual Harbor terminal integration, explicit Docker container cancellation, and all five canonical Harbor oracles on matrix. All 457 frozen archive hashes remain unchanged. Evidence and limitations are in [findings](analysis/harness-v1.3.0/findings.md).
+
+**Verified/source-inspected limitation:** Harbor's existing network sidecar allows an initial locally proxied TCP handshake and permits DNS/ICMP; external TLS application connectivity was denied in the check. It is not strict Docker `network_mode=none`. The output threshold also permits polling overshoot. Initial setup and assertion failures are preserved with their diagnoses rather than omitted.
+
+**Unknown:** Provider compatibility under the new harness; no paid smoke or follow-up panel was run. New terminal semantics and limits must be declared before any changed-protocol panel. Frozen task packages, original outcomes, forecasts, and archive remain immutable; this milestone adds only separately versioned infrastructure and development evidence.

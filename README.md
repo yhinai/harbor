@@ -4,6 +4,7 @@ Research, task selection, implementation, validation, proxy findings, and a froz
 
 - [Assignment brief](ASSIGNMENT.md)
 - [Progress and findings](PROJECT_STATUS.md)
+- [Matrix runtime and offline harness validation](analysis/harness-v1.3.0/findings.md)
 - [Post-freeze interruption audit and improvement candidates](analysis/post-day1-review/review.md)
 - [Research memo and sources](analysis/research-memo.md)
 - [Portfolio decisions](analysis/portfolio-decision.md)
