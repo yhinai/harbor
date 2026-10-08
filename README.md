@@ -4,6 +4,7 @@ Research, task selection, implementation, validation, proxy findings, and a froz
 
 - [Assignment brief](ASSIGNMENT.md)
 - [Progress and findings](PROJECT_STATUS.md)
+- [Post-freeze interruption audit and improvement candidates](analysis/post-day1-review/review.md)
 - [Research memo and sources](analysis/research-memo.md)
 - [Portfolio decisions](analysis/portfolio-decision.md)
 - [Final task selection](portfolio/selected-tasks.json)

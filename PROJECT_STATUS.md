@@ -24,7 +24,7 @@ Pass rates below use only uncensored trials. The excluded count is separate; it 
 | atomic-range-history | 3 / 3 | 8 | 6 |
 | checkpointed-journal | 11 / 11 | 0 | 7 |
 
-**Verified:** All 31 uncensored trials pass. The 24 exclusions comprise 16 budget limits, four terminal harness timeouts, three transport failures, and one output limit. Smokes do not enter these denominators. Family-specific rates and intervals are in [panel analysis](portfolio/analysis/panel-analysis.json).
+**Verified:** All 31 uncensored trials pass. The 24 exclusions comprise 16 budget limits, four terminal harness timeouts, three originally labeled transport failures, and one output limit. The post-freeze audit below refines the three transport labels to active-stream client deadline interruptions. Smokes do not enter these denominators. Family-specific rates and intervals are in [panel analysis](portfolio/analysis/panel-analysis.json).
 
 **Inferred:** Present evidence supports validity more strongly than difficulty. Successful agents handle the intended semantic crux; some interrupted agents also recover genuine implementation errors. In particular, every Kimi and GLM exact-fused-dot attempt is budget-censored, so their pass rates are unknown. The top ranking reflects retained uncertainty rather than demonstrated hardness.
 
@@ -46,3 +46,19 @@ Pass rates below use only uncensored trials. The excluded count is separate; it 
 - Any future package or evaluation revision needs a new version and explicit evidence provenance.
 
 **Verified project record:** The allowed development models were Kimi K3, GLM-5.3, and DeepSeek V4.1 Flash. No Fable or GPT-5.6 target run is recorded or claimed. The checkpoint operation itself makes no paid model calls.
+
+## Post-freeze audit milestone — 8 October 2026
+
+**Verified:** The offline [audit](analysis/post-day1-review/review.md) rechecked all 457 frozen artifact hashes against both the workspace and submission archive. The original v1.2.0 packages, forecasts, and archive remain unchanged. The separate audit has its own [hash manifest](analysis/post-day1-review/audit-manifest.json).
+
+**Verified:** All 16 budget interruptions crossed the original per-trial reservation limits, not an aggregate project ceiling. The three client-deadline cases were still streaming immediately before cancellation at 900 seconds. Four terminal calls failed at the outer harness timeout; one DeepSeek answer exhausted its output allowance. See the [24-attempt audit](analysis/post-day1-review/interruptions.json).
+
+**Verified:** An offline Docker experiment reproduced a terminal-wrapper process cleanup problem. An experimental repair passed five synthetic checks; the initial negative reproduction is also preserved. **Unknown:** Harbor integration of that repair has not been validated. It is not installed into the frozen harness.
+
+**Inferred:** The interrupted attempts are censored diagnostic evidence, not completed wrong solutions. No saved submission snapshot exists for these attempts, so authentic graded outcomes cannot simply be recovered. Any follow-up should use a separately recorded protocol and fresh containers; changed-protocol results must not silently replace the original attempts.
+
+**Verified source inspection; inferred candidates:** Lua collection-state and Ninja incremental-build regressions were investigated as possible future debugging tasks. Neither is built or validated. SQLite remains dropped and the five-task selection is unchanged. No additional paid calls or evaluator-results report were made.
+
+## GitHub synchronization
+
+The repository is [yhinai/harbor](https://github.com/yhinai/harbor), branch `main`, starting from checkpoint `6bcde28`. After each meaningful completed milestone, update this progress record, commit relevant research, decisions, packages, evidence, and deliverables, push without force, and verify the remote commit. Preserve frozen artifacts and record revisions separately. Coordinate with active writers before staging their files. Credentials, environment files, caches, and temporary files remain excluded. Synchronization does not authorize paid evaluations or a task-scope change.

@@ -1,0 +1,735 @@
+{
+  "label": "verified artifact audit; no paid calls",
+  "frozen_archive_matches_workspace": true,
+  "original_attempts": 55,
+  "valid_passes": 31,
+  "excluded": 24,
+  "interruptions": [
+    {
+      "trial": "typecheck-soundness-witness__uUNFYPp",
+      "task": "typecheck-soundness-witness",
+      "model": "accounts/fireworks/models/deepseek-v4p1-flash",
+      "replicate": 1,
+      "category": "output",
+      "exception_events": [
+        {
+          "step_index": 65649,
+          "kind": "exception",
+          "time_utc": "2026-10-08T15:34:30.787983+00:00",
+          "exception_type": "ProxyProtocolFailure",
+          "message": "Empty assistant response; no useful action"
+        }
+      ],
+      "original_per_trial_cap_usd": 1.0,
+      "booked_for_trial_usd": 0.10206375,
+      "prospective_next_request_reservation_usd": 0.11885175,
+      "request_to_exception_seconds": 631.412552,
+      "last_tool": {
+        "step_index": 136,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T15:23:59.260271+00:00",
+        "tool_call_id": "call_2ab861a0fc054b408b9a9ad7",
+        "command": "cat /app/language.py; echo \"=====CHECKER=====\"; cat /app/checker.py; echo \"=====INTERP=====\"; cat /app/interpreter.py; echo \"=====EVAL=====\"; cat /app/evaluate.py; echo \"=====WITNESS=====\"; cat /app/witness.json",
+        "timeout_sec": 30
+      },
+      "finish_reasons": [
+        "tool_calls",
+        "tool_calls",
+        "length"
+      ]
+    },
+    {
+      "trial": "exact-fused-dot__4RRbnGP",
+      "task": "exact-fused-dot",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 1,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 40540,
+          "kind": "exception",
+          "time_utc": "2026-10-08T15:53:13.572564+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.83568125,
+      "prospective_next_request_reservation_usd": 2.3574,
+      "request_to_exception_seconds": 0.004642,
+      "last_tool": {
+        "step_index": 40537,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T15:53:13.400761+00:00",
+        "tool_call_id": "call_7d8d046227bf4848852b1e05",
+        "command": "cd /app && python3 - <<'EOF'\n# verify the disputed cases by hand-computation with Fractions\nfrom fractions import Fraction as Fr\ndef dec(h, eb, fb):\n    v=int(h,16); w=1+eb+fb\n    s=v>>(w-1); e=(v>>fb)&((1<<eb)-1); f=v&((1<<fb)-1)\n    bias=(1<<(eb-1))-1; F=1<<fb\n    if e==0: return s, Fr(f)*Fr(2)**(1-bias-fb)\n    return s, Fr(F+f)*Fr(2)**(e-bias-fb)\n# case A: (20,0c),(20,20) fbits=2: products\nfor p in [(\"20\",\"0c\"),(\"20\",\"20\"),(\"20\",\"00\")]:\n    a=dec(p[0],3,2); b=dec(p[1],3,2)\n    print(p, a, b, \"prod sign\", a[0]^b[0], \"mag\", a[1]*b[1])\n# fbits=3 cases\nfor p in [(\"07\",\"08\"),(\"07\",\"18\"),(\"07\",\"04\"),(\"17\",\"20\")]:\n    a=dec(p[0],3,3); b=dec(p[1],3,3)\n    print(p, float(a[1]), float(b[1]), \"prod\", a[1]*b[1])\nEOF",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "exact-fused-dot__dovg6kb",
+      "task": "exact-fused-dot",
+      "model": "accounts/fireworks/models/glm-5p3",
+      "replicate": 1,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 54509,
+          "kind": "exception",
+          "time_utc": "2026-10-08T15:51:18.510158+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 2.0,
+      "booked_for_trial_usd": 1.042121,
+      "prospective_next_request_reservation_usd": 1.0116265,
+      "request_to_exception_seconds": 0.005484,
+      "last_tool": {
+        "step_index": 54506,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T15:51:11.494580+00:00",
+        "tool_call_id": "chatcmpl-tool-85ee34edbf04f408",
+        "command": "cat > /app/tests/random_tests.py <<'EOF'\nimport json, random, struct, sys\nfrom fractions import Fraction as Fr\nsys.path.insert(0, '/app'); sys.path.insert(0, '/app/tests')\nimport main as M\nimport ref as R\n\nrandom.seed(12345)\nfails = []\n\n# ---- 1. exhaustive single finite pair, toy formats, vs independent ref ----\nfor (ebits, fbits) in [(3, 2), (3, 3), (4, 3)]:\n    width = ebits + fbits + 1\n    pats = [None] * (1 << width)\n    for v in range(1 << width):\n        pats[v] = '%x' % v\n    eall = (1 << ebits) - 1\n    finite = [h for v, h in enumerate(pats)\n              if ((v >> fbits) & eall) != eall]  # exclude inf/nan\n    for mode in ('RNE', 'RNA', 'RTZ', 'RUP', 'RDN'):\n        for a in finite:\n            for b in finite:\n                req = {'ebits': ebits, 'fbits': fbits, 'mode': mode, 'pairs': [[a, b]]}\n                g = M.solve(req); r = R.solve(req)\n                if g != r:\n                    fails.append(('exhaustive', req, g, r))\nprint('exhaustive single-pair done, fails:', len(fails))\n\n# ---- 2. random multi-pair (up to 64), several formats, vs ref ----\nfor (ebits, fbits) in [(3,2),(3,3),(4,3),(5,4),(8,10),(11,52),(11,23),(2,5)]:\n    width = ebits + fbits + 1\n    eall = (1 << ebits) - 1\n    for trial in range(400):\n        n = random.randint(0, 64)\n        pairs = []\n        for _ in range(n):\n            def rnd():\n                v = random.getrandbits(width)\n                # mostly finite, sometimes inf/nan/zero\n                roll = random.random()\n                if roll < 0.05:\n                    v = (random.getrandbits(1) << (width-1)) | (eall << fbits)  # inf\n                elif roll < 0.10:\n                    v = (random.getrandbits(1) << (width-1)) | (eall << fbits) | (random.getrandbits(fbits) or 1)  # nan\n                elif roll < 0.18:\n                    v = random.getrandbits(1) << (width-1)  # zero\n                return '%x' % v\n            pairs.append([rnd(), rnd()])\n        mode = random.choice(['RNE','RNA','RTZ','RUP','RDN'])\n        req = {'ebits': ebits, 'fbits': fbits, 'mode': mode, 'pairs': pairs}\n        g = M.solve(req); r = R.solve(req)\n        # ref loses the sign of -0 sums only via its own rule; compare exactly\n        if g != r:\n            fails.append(('random', req, g, r))\nprint('random multi-pair done, fails:', len(fails))\n\n# ---- 3. binary64 == IEEE double: check vs exact Fraction + float() rounding ----\nimport math\ndef d2b(x):\n    return '%016x' % struct.unpack('>Q', struct.pack('>d', x))[0]\ndef b2d(h):\n    return struct.unpack('>d', bytes.fromhex(h.zfill(16)))[0]\n\nnfail = 0; ntest = 0\nfor trial in range(3000):\n    n = random.randint(1, 8)\n    pairs = []\n    exact = Fr(0)\n    for _ in range(n):\n        while True:\n            v = random.getrandbits(64)\n            e = (v >> 52) & 0x7ff\n            if e != 0x7ff:\n                break\n        a = b2d('%016x' % v)\n        while True:\n            v = random.getrandbits(64)\n            e = (v >> 52) & 0x7ff\n            if e != 0x7ff:\n                break\n        b = b2d('%016x' % v)\n        pairs.append(['%016x' % struct.unpack('>Q', struct.pack('>d', a))[0],\n                      '%016x' % struct.unpack('>Q', struct.pack('>d', b))[0]])\n        exact += Fr(a) * Fr(b)\n    req = {'ebits': 11, 'fbits': 52, 'mode': 'RNE', 'pairs': pairs}\n    g = M.solve(req)\n    ntest += 1\n    try:\n        rf = float(exact)\n        exp_bits = d2b(rf)\n        exp_flags = []\n        if Fr(rf) != exact:\n            exp_flags.append('inexact')\n            ax = abs(rf)\n            if ax == 0 or ax < 2.0 ** -1022:\n                exp_flags.append('underflow')\n    except OverflowError:\n        rf = math.inf if exact > 0 else -math.inf\n        exp_bits = d2b(rf)\n        exp_flags = ['overflow', 'inexact']\n    if int(g['bits'], 16) != int(exp_bits, 16) or set(g['flags']) != set(exp_flags):\n        nfail += 1\n        if nfail <= 5:\n            fails.append(('binary64', req, g, exp_bits, exp_flags))\nprint('binary64 fused-dot vs float(): %d tests, %d fails' % (ntest, nfail))\n\n# ---- 4. binary64 exceptional semantics vs python float arithmetic (value only) ----\nnfail = 0; ntest = 0\nfor trial in range(2000):\n    n = random.randint(1, 5)\n    pairs = []\n    vals = []\n    for _ in range(n):\n        def rnd():\n            r = random.random()\n            if r < 0.12: return random.choice([math.inf, -math.inf])\n            if r < 0.24: return struct.unpack('>d', bytes.fromhex('%016x' % random.choice([0x7ff8000000000000, 0x7ff0000000000001, 0xfff0000000000001, 0x7ff8000000000001])))[0]\n            if r < 0.34: return random.choice([0.0, -0.0])\n            while True:\n                v = random.getrandbits(64)\n                if ((v >> 52) & 0x7ff) != 0x7ff:\n                    return struct.unpack('>d', bytes.fromhex('%016x' % v))[0]\n        a, b = rnd(), rnd()\n        pairs.append([d2b(a), d2b(b)])\n        vals.append((a, b))\n    mode = random.choice(['RNE','RNA','RTZ','RUP','RDN'])\n    req = {'ebits': 11, 'fbits': 52, 'mode': mode, 'pairs': pairs}\n    g = M.solve(req)\n    ntest += 1\n    # python float emulation (fused: single final rounding, so only for finite results)\n    try:\n        s = sum(Fr(a) * Fr(b) for a, b in vals)\n    except Exception:\n        continue\n    has_nan = any((a != a) or (b != b) for a, b in vals)\n    inf_prod_signs = set()\n    for a, b in vals:\n        if (a != a) or (b != b):\n            continue\n        if math.isinf(a) or math.isinf(b):\n            if (a == 0 or b == 0):\n                pass\n            else:\n                inf_prod_signs.add((math.copysign(1, a) * math.copysign(1, b)) < 0)\n    if has_nan or len(inf_prod_signs) > 1 or any((a == 0 and math.isinf(b)) or (math.isinf(a) and b == 0) for a, b in vals) or any((a != a and struct.unpack('>Q', struct.pack('>d', a))[0] & 0x7ffffffffffff) or (b != b and 0) for a, b in vals if (a != a or b != b)):\n        expv = float('nan')\n    elif inf_prod_signs:\n        expv = math.inf if not next(iter(inf_prod_signs)) else -math.inf\n    else:\n        try:\n            expv = float(s)\n        except OverflowError:\n            expv = None\n    if expv is not None:\n        exp_bits = d2b(expv)\n        gotv = b2d(g['bits'])\n        same_nan = (gotv != gotv) and (expv != expv)\n        if not (int(g['bits'],16) == int(exp_bits,16) or same_nan):\n            nfail += 1\n            if nfail <= 5:\n                fails.append(('binary64-exc', req, g, exp_bits))\nprint('binary64 exceptional: %d tests, %d fails' % (ntest, nfail))\n\nfor f in fails[:10]:\n    print(f)\nsys.exit(1 if fails else 0)\nEOF\ncd /app && timeout 120 python3 tests/random_tests.py",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "mixed-width-tso__ewcVoqu",
+      "task": "mixed-width-tso",
+      "model": "accounts/fireworks/models/deepseek-v4p1-flash",
+      "replicate": 1,
+      "category": "terminal_harness",
+      "exception_events": [
+        {
+          "step_index": 7931,
+          "kind": "exception",
+          "time_utc": "2026-10-08T15:57:08.986602+00:00",
+          "exception_type": "RuntimeError",
+          "message": "Command timed out after 40 seconds"
+        }
+      ],
+      "original_per_trial_cap_usd": 1.0,
+      "booked_for_trial_usd": 0.03244275,
+      "prospective_next_request_reservation_usd": 0.13480725,
+      "request_to_exception_seconds": 46.540919,
+      "last_tool": {
+        "step_index": 7930,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T15:56:28.976116+00:00",
+        "tool_call_id": "call_7d31363fa50d49bfba93e3ab",
+        "command": "cd /app && cat > /tmp/search3.py << 'PYEOF'\nimport random, time, json, sys\nsys.path.insert(0,'/app')\nimport main\n\ndef rand_instr(memlen, rng):\n    op = rng.choice([\"load\",\"load\",\"store\",\"load\",\"store\",\"load\",\"fence\",\"xchg\"])\n    if op==\"fence\": return [\"fence\"]\n    w = rng.choice([4,4,2,2,1])\n    maxa = memlen - w\n    if maxa < 0:\n        w=1; maxa=memlen-1\n    a = rng.randint(0,maxa)\n    if op in (\"store\",\"xchg\"):\n        v = rng.randint(0,(1<<(8*w))-1)\n        return [op,a,w,v]\n    return [op,a,w]\n\ndef gen(rng):\n    memlen = rng.randint(4,8)\n    nthreads = rng.randint(1,3)\n    total = 10\n    rem = total\n    threads=[]\n    for t in range(nthreads):\n        if t==nthreads-1: k=min(4,rem)\n        else: k = rng.randint(0, min(4,rem))\n        rem -= k\n        threads.append([rand_instr(memlen, rng) for _ in range(k)])\n    mem=[rng.randint(0,255) for _ in range(memlen)]\n    return {\"memory\":mem,\"threads\":threads}\n\nrng=random.Random(7)\nworst=(0,None,0)\nt0=time.time()\nN=100000\nslow=[]\nfor it in range(N):\n    c=gen(rng)\n    t=time.time()\n    r=main.solve(c)\n    dt=time.time()-t\n    if dt>0.1:\n        slow.append((dt,it,c,len(r[\"outcomes\"])))\n        print(\"SLOW\",dt,it,len(r[\"outcomes\"]),file=sys.stderr)\n    if dt>worst[0]:\n        worst=(dt,c,len(r[\"outcomes\"]))\n    if time.time()-t0>55:\n        print(\"stopped at\",it,file=sys.stderr); break\nprint(\"worst\",worst[0],\"n_out\",worst[2])\nprint(json.dumps(worst[1]))\nprint(\"total\",time.time()-t0)\nPYEOF\ntimeout 60 python3 /tmp/search3.py 2>/tmp/err3.txt; echo \"---stderr tail---\"; tail -5 /tmp/err3.txt; wc -l /tmp/err3.txt",
+        "timeout_sec": 30
+      }
+    },
+    {
+      "trial": "atomic-range-history__At9Vdgx",
+      "task": "atomic-range-history",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 1,
+      "category": "terminal_harness",
+      "exception_events": [
+        {
+          "step_index": 29543,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:16:32.349830+00:00",
+          "exception_type": "RuntimeError",
+          "message": "Command timed out after 40 seconds"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.588485,
+      "prospective_next_request_reservation_usd": 2.1811725,
+      "request_to_exception_seconds": 136.102602,
+      "last_tool": {
+        "step_index": 29542,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:15:52.342276+00:00",
+        "tool_call_id": "call_f5e50a40a54e4d9faa12abf9",
+        "command": "cd /app && timeout 580 python3 - << 'EOF'\nimport json, random, itertools, time, sys\nsys.path.insert(0,'/app')\nfrom public_contract import valid_history\nfrom main import solve\n\nKEYS=['a','b','c','d','e','f']\ndef gen(rng, ntx):\n    keys = rng.sample(KEYS, rng.randint(1,5))\n    def val(): return rng.choice([None,-1,0,1,2])\n    def pval(): return rng.choice([-1,0,1,2])\n    initial={k:pval() for k in keys if rng.random()<0.4}\n    txs=[]\n    for i in range(ntx):\n        s=rng.randint(0,6); e=s+rng.randint(1,6); ops=[]\n        for _ in range(rng.randint(1,5)):\n            r=rng.random(); k=rng.choice(keys)\n            if r<0.25: ops.append([\"get\",k,val()])\n            elif r<0.45: ops.append([\"put\",k,pval()])\n            elif r<0.55: ops.append([\"del\",k])\n            elif r<0.75: ops.append([\"cas\",k,val(),rng.choice([None,pval()]),rng.choice([True,False])])\n            else:\n                lo,hi=sorted(rng.sample(KEYS,2))\n                pairs=[[kk,pval()] for kk in sorted(keys) if lo<=kk<hi and rng.random()<0.5]\n                if rng.random()<0.1: pairs=list(reversed(pairs))\n                ops.append([\"scan\",lo,hi,pairs])\n        txs.append({\"id\":f\"t{i}\",\"start\":s,\"end\":e,\"ops\":ops})\n    final={k:pval() for k in keys if rng.random()<0.5}\n    return {\"initial\":initial,\"final\":final,\"transactions\":txs}\n\ndef brute(req):\n    txs=req['transactions']; ids=[t['id'] for t in txs]\n    n=len(txs)\n    ends=[t['end'] for t in txs]; starts=[t['start'] for t in txs]\n    # precompute allowed orders via permutations with early real-time rejection\n    for perm in itertools.permutations(range(n)):\n        pos={x:i for i,x in enumerate(perm)}\n        bad=False\n        for a in range(n):\n            for b in range(n):\n                if ends[a]<=starts[b] and pos[a]>=pos[b]: bad=True; break\n            if bad: break\n        if bad: continue\n        if valid_history(req,[ids[i] for i in perm]): return [ids[i] for i in perm]\n    return None\n\nrng=random.Random(777)\nt_start=time.time()\nn8=sat8=0\nwhile time.time()-t_start < 200:\n    req=gen(rng,8)\n    got=solve(req)['order']; b=brute(req)\n    if got is None: assert b is None, \"FALSE NULL: \"+json.dumps(req)\n    else: assert valid_history(req,got), \"BAD WITNESS: \"+json.dumps(req)\n    n8+=1; sat8+= b is not None\nprint(\"ntx=8:\",n8,\"cases,\",sat8,\"sat\")\n\n# a few ntx=9\nn9=0\nwhile time.time()-t_start < 330:\n    req=gen(rng,9)\n    got=solve(req)['order']; b=brute(req)\n    if got is None: assert b is None, \"FALSE NULL9: \"+json.dumps(req)\n    else: assert valid_history(req,got), \"BAD WITNESS9: \"+json.dumps(req)\n    n9+=1\nprint(\"ntx=9:\",n9,\"cases\")\nprint(\"elapsed %.0fs\"%(time.time()-t_start))\nEOF",
+        "timeout_sec": 30
+      }
+    },
+    {
+      "trial": "atomic-range-history__Jcc8PCj",
+      "task": "atomic-range-history",
+      "model": "accounts/fireworks/models/deepseek-v4p1-flash",
+      "replicate": 1,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 71830,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:13:32.657619+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 1.0,
+      "booked_for_trial_usd": 0.7003882499999999,
+      "prospective_next_request_reservation_usd": 0.333156,
+      "request_to_exception_seconds": 0.007919,
+      "last_tool": {
+        "step_index": 71827,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:13:32.130307+00:00",
+        "tool_call_id": "call_1e2a787351574d2db0289133",
+        "command": "cd /app && python3 - << 'PY'\nsrc = open('main.py').read()\n# add state_bits after strides computation\nold = \"\"\"    strides = []\n    prod = 1\n    for dom in domains:\n        strides.append(prod)\n        prod *= len(dom)\n\"\"\"\nnew = \"\"\"    strides = []\n    prod = 1\n    for dom in domains:\n        strides.append(prod)\n        prod *= len(dom)\n    state_bits = max(1, (prod - 1).bit_length())\n\"\"\"\nassert old in src\nsrc = src.replace(old, new)\n# change failed set key\nold = \"\"\"        key = (mask, state)\n        if key in failed:\n            return False\"\"\"\nnew = \"\"\"        key = (mask << state_bits) | state\n        if key in failed:\n            return False\"\"\"\nassert old in src\nsrc = src.replace(old, new)\nopen('main.py','w').write(src)\nprint('patched')\nPY\ncd /app && python3 smoke.py && python3 fuzz_correct.py",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "typecheck-soundness-witness__rKDuZdk",
+      "task": "typecheck-soundness-witness",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 2,
+      "category": "transport",
+      "exception_events": [
+        {
+          "step_index": 26673,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:20:10.118094+00:00",
+          "exception_type": "ProxyTransportFailure",
+          "message": "TimeoutError; reservation retained"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.4759137500000001,
+      "prospective_next_request_reservation_usd": 1.4425425,
+      "request_to_exception_seconds": 900.009228,
+      "last_tool": {
+        "step_index": 147,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:05:10.001268+00:00",
+        "tool_call_id": "call_032114350497443e95f8e5f6",
+        "command": "cat /app/evaluate.py; cat /app/witness.json",
+        "timeout_sec": 30
+      },
+      "stream_event_kinds": [
+        "exception",
+        "initial",
+        "request",
+        "response",
+        "stream_chunk",
+        "terminal_call",
+        "terminal_result"
+      ],
+      "last_chunk_to_deadline_seconds": 0.021004,
+      "diagnosis": "Client absolute 900-second deadline while stream was active"
+    },
+    {
+      "trial": "mixed-width-tso__cBqSDsE",
+      "task": "mixed-width-tso",
+      "model": "accounts/fireworks/models/deepseek-v4p1-flash",
+      "replicate": 2,
+      "category": "terminal_harness",
+      "exception_events": [
+        {
+          "step_index": 11796,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:24:22.097993+00:00",
+          "exception_type": "RuntimeError",
+          "message": "Command timed out after 40 seconds"
+        }
+      ],
+      "original_per_trial_cap_usd": 1.0,
+      "booked_for_trial_usd": 0.080424,
+      "prospective_next_request_reservation_usd": 0.152856,
+      "request_to_exception_seconds": 46.881201,
+      "last_tool": {
+        "step_index": 11795,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:23:42.088490+00:00",
+        "tool_call_id": "call_85b60313af2a4614ab8aaef6",
+        "command": "cd /app && timeout 55 python3 - << 'PY'\nimport sys,time\nsys.path.insert(0,'/app'); sys.path.insert(0,'/tmp')\nfrom main import solve\nfrom gen2 import gen\nworst=0; ws=None; woc=0; wocs=None; s=0\nt0=time.time()\nwhile time.time()-t0 < 50:\n    r=gen(s)\n    t=time.time(); o=solve(r); dt=time.time()-t; \n    if dt>worst: worst=dt; ws=s\n    if len(o['outcomes'])>woc: woc=len(o['outcomes']); wocs=s\n    s+=1\nprint('seeds',s,'worst',round(worst,4),'seed',ws,'maxoutcomes',woc,'ocseed',wocs)\nPY",
+        "timeout_sec": 30
+      }
+    },
+    {
+      "trial": "exact-fused-dot__nt8BKWV",
+      "task": "exact-fused-dot",
+      "model": "accounts/fireworks/models/glm-5p3",
+      "replicate": 2,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 42495,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:35:48.522552+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 2.0,
+      "booked_for_trial_usd": 1.0620425,
+      "prospective_next_request_reservation_usd": 0.9553675,
+      "request_to_exception_seconds": 0.011944,
+      "last_tool": {
+        "step_index": 42492,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:35:48.386496+00:00",
+        "tool_call_id": "chatcmpl-tool-8feeeb0bb3d06ce3",
+        "command": "cd /app && python3 - <<'EOF'\nsrc = open('tests/ref.py').read()\n# Extend Format with an extended (unbounded-exponent) grid above the finite range.\nold = \"\"\"        self.vals = sorted(vals)  # distinct magnitudes incl. 0\"\"\"\nnew = \"\"\"        self.vals = sorted(vals)  # distinct magnitudes incl. 0\n        # extended grid: continuation of the binade structure above emax,\n        # i.e. rounding \"as if the exponent range were unbounded\"\n        ext = []\n        for L in range(self.emax + 1, self.emax + 5):\n            for M in range(self.F, 2 * self.F):\n                ext.append(Fraction(M) * Fraction(2) ** (L - fbits))\n        self.ext = sorted(set(ext))\n        self.grid = self.vals + self.ext  # sorted; ext strictly above vals\n        self.thresh = Fraction(2) ** (self.emax + 1)\n        assert self.grid == sorted(self.grid) and self.ext[0] == self.thresh\"\"\"\nassert old in src\nsrc = src.replace(old, new)\n\n# replace round_ref with candidate search over the extended grid\nstart = src.index('def round_ref(')\nend = src.index('def solve_ref(')\nnew_rr = '''def round_ref(fmt, x, sign, mode):\n    \"\"\"Round exact magnitude x (Fraction>0) in mode with result sign.\n    Candidate search over the extended (unbounded-exponent) grid.\n    Returns (bits, flags).\"\"\"\n    import bisect\n    grid = fmt.grid\n    i = bisect.bisect_left(grid, x)\n    exact = i < len(grid) and grid[i] == x\n    if exact:\n        chosen = grid[i]\n    else:\n        below = grid[i - 1] if i > 0 else None\n        above = grid[i] if i < len(grid) else None\n        if above is None:\n            # x beyond enumerated grid; virtual above point (any point up there)\n            above = below * 2\n        assert below is not None\n        bd = x - below\n        ad = above - x\n        if mode == 'RTZ':\n            pick_above = False\n        elif mode == 'RUP':\n            pick_above = (sign == 0)\n        elif mode == 'RDN':\n            pick_above = (sign == 1)\n        elif mode == 'RNA':\n            pick_above = not (bd < ad)  # tie -> away from zero\n        else:  # RNE\n            if bd < ad:\n                pick_above = False\n            elif bd > ad:\n                pick_above = True\n            else:\n                pb = fmt.grid_parity(below)\n                pa = fmt.grid_parity(above)\n                pick_above = pa < pb  # tie -> even significand; never equal\n        chosen = above if pick_above else below\n\n    if chosen >= fmt.thresh:\n        # overflow: y >= 2**(emax+1) -> always overflow + inexact\n        away = (mode in ('RNE', 'RNA')\n                or (mode == 'RUP' and sign == 0)\n                or (mode == 'RDN' and sign == 1))\n        if away:\n            return fmt.encode(sign, fmt.Eall, 0), ['overflow', 'inexact']\n        return fmt.encode(sign, fmt.Eall - 1, fmt.fmask), ['overflow', 'inexact']\n\n    e, f = fmt.encode_val(chosen)\n    flags = []\n    if chosen != x:\n        flags.append('inexact')\n        if chosen < Fraction(2) ** fmt.emin:\n            flags.append('underflow')\n    return fmt.encode(sign, e, f), flags\n\n\n'''\nsrc = src[:start] + new_rr + src[end:]\n\n# add grid_parity to Format: parity of the significand (low stored fraction bit)\nold = \"\"\"    def parity(self, val):\n        \\\"\\\"\\\"low stored fraction bit of the encoding of magnitude val (or virtual top).\\\"\\\"\\\"\n        if val == self.vmax:\n            return 0  # even significand 2**(fbits+1)\n        # find encoding: subnormal or normal\n        if val == 0:\n            return 0\n        e = 0\n        # normal?\n        L = val.numerator.bit_length() - 1  # val = num * 2**den_exp\n        raise NotImplementedError\n\"\"\"\nnew = \"\"\"    def grid_parity(self, val):\n        \\\"\\\"\\\"parity of significand (== low stored fraction bit) for a grid point.\n        Works for extended points above max finite too.\\\"\\\"\\\"\n        if val == 0:\n            return 0\n        if val < Fraction(2) ** self.emin:\n            u = Fraction(2) ** (self.emin - self.fbits)\n            m = val / u\n            assert m.denominator == 1\n            return m.numerator & 1\n        L = 0\n        while val < 1:\n            val *= 2\n            L -= 1\n        while val >= 2:\n            val /= 2\n            L += 1\n        # val in [1,2) is the significand/2**fbits\n        m = val * self.F\n        assert m.denominator == 1\n        return m.numerator & 1\n\"\"\"\nassert old in src\nsrc = src.replace(old, new)\nopen('tests/ref.py','w').write(src)\nprint('patched')\nEOF",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "exact-fused-dot__arxzZuE",
+      "task": "exact-fused-dot",
+      "model": "accounts/fireworks/models/glm-5p3",
+      "replicate": 3,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 42956,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:37:39.910690+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 2.0,
+      "booked_for_trial_usd": 1.1803474999999999,
+      "prospective_next_request_reservation_usd": 0.8904075,
+      "request_to_exception_seconds": 0.010627,
+      "last_tool": {
+        "step_index": 42953,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:37:39.581761+00:00",
+        "tool_call_id": "chatcmpl-tool-ac3c637c6b0dfab5",
+        "command": "cd /app && python3 smoke.py && wc -l main.py && python3 -c \"\nimport json,sys\nsys.path.insert(0,'/app')\n# quick replay of the three public examples through the actual stdin/stdout interface\nimport subprocess\nreqs=[{'ebits':3,'fbits':2,'mode':'RNE','pairs':[]},\n      {'ebits':3,'fbits':2,'mode':'RNE','pairs':[['0c','0c']]},\n      {'ebits':3,'fbits':3,'mode':'RNE','pairs':[['37','37'],['77','37'],['1','18']]}]\np=subprocess.run([sys.executable,'/app/main.py'],input=''.join(json.dumps(r)+'\\n' for r in reqs),text=True,capture_output=True,cwd='/app')\nprint(p.stdout.strip().splitlines())\n\"",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "typecheck-soundness-witness__YYktR9w",
+      "task": "typecheck-soundness-witness",
+      "model": "accounts/fireworks/models/glm-5p3",
+      "replicate": 3,
+      "category": "transport",
+      "exception_events": [
+        {
+          "step_index": 47403,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:38:47.177367+00:00",
+          "exception_type": "ProxyTransportFailure",
+          "message": "TimeoutError; reservation retained"
+        }
+      ],
+      "original_per_trial_cap_usd": 2.0,
+      "booked_for_trial_usd": 0.45959975000000003,
+      "prospective_next_request_reservation_usd": 0.45524200000000004,
+      "request_to_exception_seconds": 900.015268,
+      "last_tool": {
+        "step_index": 93,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:23:47.039768+00:00",
+        "tool_call_id": "chatcmpl-tool-a0f249ab2d63ba00",
+        "command": "cat /app/checker.py /app/interpreter.py /app/language.py /app/evaluate.py; cat /app/witness.json",
+        "timeout_sec": 30
+      },
+      "stream_event_kinds": [
+        "exception",
+        "initial",
+        "request",
+        "response",
+        "stream_chunk",
+        "terminal_call",
+        "terminal_result"
+      ],
+      "last_chunk_to_deadline_seconds": 0.047166,
+      "diagnosis": "Client absolute 900-second deadline while stream was active"
+    },
+    {
+      "trial": "atomic-range-history__BEggeaB",
+      "task": "atomic-range-history",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 2,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 30790,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:39:47.027082+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.7064412500000001,
+      "prospective_next_request_reservation_usd": 2.3150175,
+      "request_to_exception_seconds": 0.011359,
+      "last_tool": {
+        "step_index": 30787,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:39:41.957757+00:00",
+        "tool_call_id": "call_aca64687f46c4569b252fa0c",
+        "command": "cd /app && python3 - << 'EOF'\nimport json, random, sys, time, itertools\nsys.path.insert(0, '/app')\nfrom public_contract import valid_history\nfrom main import solve\nfrom test_random import gen_sat_case, gen_random_case, brute_force\n\nbad = sat = unsat = skip = 0\nt0 = time.time()\nfor seed in range(700, 1600):\n    rng = random.Random(seed)\n    req = gen_sat_case(rng) if seed % 2 == 0 else gen_random_case(rng)\n    n = len(req['transactions'])\n    req = json.loads(json.dumps(req))\n    got = solve(req)['order']\n    if n <= 8:\n        bf = brute_force(req)\n        if (bf is None) != (got is None):\n            print('MISMATCH', seed, 'bf=', bf, 'got=', got); print(json.dumps(req)); bad += 1\n        elif bf is None: unsat += 1\n        else: sat += 1\n    else:\n        skip += 1\n        if got is not None and not valid_history(req, got):\n            print('INVALID witness', seed); bad += 1\nprint(f'seeds 700..1599: sat={sat} unsat={unsat} big-n(witness-checked)={skip} bad={bad} in {time.time()-t0:.1f}s')\nEOF",
+        "timeout_sec": 60
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "exact-fused-dot__qjzc947",
+      "task": "exact-fused-dot",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 2,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 43049,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:40:43.867338+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.599675,
+      "prospective_next_request_reservation_usd": 2.42442,
+      "request_to_exception_seconds": 0.011434,
+      "last_tool": {
+        "step_index": 43046,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:40:43.694721+00:00",
+        "tool_call_id": "call_30497fbcf9b2471f96481e7a",
+        "command": "cat > /app/test_hand.py << 'EOF'\nimport sys\nsys.path.insert(0, \"/app\")\nfrom main import solve\n\nfails = 0\ndef ck(req, bits, flags, note=\"\"):\n    global fails\n    got = solve(req)\n    ok = int(got[\"bits\"], 16) == int(bits, 16) and set(got[\"flags\"]) == set(flags)\n    if not ok:\n        fails += 1\n        print(\"FAIL\", note, req, \"got\", got, \"want bits=%s flags=%s\" % (bits, flags))\n\ndef R(pairs, mode=\"RNE\"):\n    return {\"ebits\": 3, \"fbits\": 2, \"mode\": mode, \"pairs\": pairs}\n\n# ebits=3,fbits=2: bias=3, emin=-2, emax=3, maxfinite=14 (0x1b), +inf=0x1c,\n# -inf=0x3c, canon NaN=0x1e, sNaN=0x1d, qNaN=0x1f, +1=0x0c, -1=0x2c,\n# +0=0x00, -0=0x20, min normal=0x04, min sub=0x01\n\n# empty\nck(R([]), \"0\", []); ck(R([], \"RDN\"), \"20\", []); ck(R([], \"RTZ\"), \"0\", [])\n# all products negative zeros\nck(R([[\"20\",\"0c\"]]), \"20\", []); ck(R([[\"20\",\"0c\"]], \"RTZ\"), \"20\", [])\nck(R([[\"20\",\"0c\"]], \"RUP\"), \"20\", []); ck(R([[\"20\",\"20\"]]), \"0\", [])  # (+0 product)\n# mixed zeros\nck(R([[\"20\",\"0c\"],[\"00\",\"0c\"]]), \"0\", []); ck(R([[\"20\",\"0c\"],[\"00\",\"0c\"]], \"RDN\"), \"20\", [])\n# cancellation\nck(R([[\"0c\",\"0c\"],[\"2c\",\"0c\"]]), \"0\", []); ck(R([[\"0c\",\"0c\"],[\"2c\",\"0c\"]], \"RDN\"), \"20\", [])\nck(R([[\"0c\",\"0c\"],[\"2c\",\"0c\"]], \"RUP\"), \"0\", [])\n# invalid / NaN\nck(R([[\"1c\",\"00\"]]), \"1e\", [\"invalid\"])             # 0 * inf\nck(R([[\"00\",\"3c\"]]), \"1e\", [\"invalid\"])             # 0 * -inf\nck(R([[\"1d\",\"0c\"]]), \"1e\", [\"invalid\"])             # sNaN\nck(R([[\"3d\",\"0c\"]]), \"1e\", [\"invalid\"])             # negative sNaN\nck(R([[\"1f\",\"0c\"]]), \"1e\", [])                      # qNaN\nck(R([[\"1e\",\"0c\"]]), \"1e\", [])                      # canonical qNaN operand\nck(R([[\"1f\",\"00\"],[\"1c\",\"00\"]]), \"1e\", [\"invalid\"]) # qNaN pair + 0*inf pair\nck(R([[\"1c\",\"00\"],[\"1d\",\"0c\"]]), \"1e\", [\"invalid\"]) # 0*inf pair + sNaN pair\nck(R([[\"1f\",\"1c\"]]), \"1e\", [])                      # NaN * inf: no infinite product, not invalid\nck(R([[\"1f\",\"00\"]]), \"1e\", [])                      # NaN * 0: not zero*inf\nck(R([[\"1c\",\"0c\"],[\"3c\",\"0c\"]]), \"1e\", [\"invalid\"]) # +inf and -inf products\nck(R([[\"1c\",\"0c\"],[\"1f\",\"0c\"]]), \"1e\", [])          # +inf product and qNaN -> NaN, no flags\nck(R([[\"1c\",\"1c\"],[\"3c\",\"1c\"]]), \"1e\", [\"invalid\"]) # +inf, -inf via products of infs\n# pure infinities\nck(R([[\"1c\",\"2c\"]]), \"3c\", [])                      # +inf * -1 = -inf\nck(R([[\"3c\",\"3c\"]]), \"1c\", [])                      # -inf * -inf = +inf\nck(R([[\"1c\",\"1c\"]]), \"1c\", [])\nck(R([[\"3c\",\"0c\"]]), \"3c\", [])\n# finite basics\nck(R([[\"0c\",\"0c\"]]), \"c\", [])\nck(R([[\"1b\",\"0c\"]]), \"1b\", [])                      # exact maxfinite, no flags\n# overflow boundary: 14 + 1 = 15 -> RNE tie rounds to 16 -> overflow to inf\nck(R([[\"1b\",\"0c\"],[\"0c\",\"0c\"]]), \"1c\", [\"overflow\",\"inexact\"])\nck(R([[\"1b\",\"0c\"],[\"0c\",\"0c\"]], \"RTZ\"), \"1b\", [\"inexact\"])\nck(R([[\"1b\",\"0c\"],[\"0c\",\"0c\"]], \"RUP\"), \"1c\", [\"overflow\",\"inexact\"])\nck(R([[\"1b\",\"0c\"],[\"0c\",\"0c\"]], \"RDN\"), \"1b\", [\"inexact\"])\nck(R([[\"1b\",\"0c\"],[\"0c\",\"0c\"]], \"RNA\"), \"1c\", [\"overflow\",\"inexact\"])\n# negative overflow -> RUP gives -maxfinite, RDN gives -inf\nck(R([[\"3b\",\"0c\"],[\"2c\",\"0c\"]], \"RUP\"), \"3b\", [\"inexact\"])  # -15 RUP: toward +inf -> truncate magnitude\nck(R([[\"3b\",\"0c\"],[\"2c\",\"0c\"]], \"RDN\"), \"3c\", [\"overflow\",\"inexact\"])\nck(R([[\"3b\",\"0c\"],[\"2c\",\"0c\"]], \"RNE\"), \"3c\", [\"overflow\",\"inexact\"])\n# exact 16 = 2^(emax+1): overflow even though exact; inexact still set\nck(R([[\"10\",\"18\"]]), \"1c\", [\"overflow\",\"inexact\"])          # 2*8=16\nck(R([[\"10\",\"18\"]], \"RTZ\"), \"1b\", [\"overflow\",\"inexact\"])\n# 15.75: RNE -> inf; directed down -> maxfinite inexact\nck(R([[\"1b\",\"0c\"],[\"0f\",\"0c\"]]), \"1c\", [\"overflow\",\"inexact\"])\nck(R([[\"1b\",\"0c\"],[\"0f\",\"0c\"]], \"RTZ\"), \"1b\", [\"inexact\"])\nck(R([[\"1b\",\"0c\"],[\"0f\",\"0c\"]], \"RDN\"), \"1b\", [\"inexact\"])\nck(R([[\"1b\",\"0c\"],[\"0f\",\"0c\"]], \"RUP\"), \"1c\", [\"overflow\",\"inexact\"])\n# underflow: x = 1/32 -> tie\nck(R([[\"02\",\"01\"]]), \"0\", [\"underflow\",\"inexact\"])          # RNE tie -> 0\nck(R([[\"02\",\"01\"]], \"RNA\"), \"1\", [\"underflow\",\"inexact\"])   # away -> min sub\nck(R([[\"02\",\"01\"]], \"RTZ\"), \"0\", [\"underflow\",\"inexact\"])\nck(R([[\"02\",\"01\"]], \"RUP\"), \"1\", [\"underflow\",\"inexact\"])\nck(R([[\"02\",\"01\"]], \"RDN\"), \"0\", [\"underflow\",\"inexact\"])\n# negative -1/32\nck(R([[\"22\",\"01\"]], \"RDN\"), \"21\", [\"underflow\",\"inexact\"])  # toward -inf -> -1/16\nck(R([[\"22\",\"01\"]], \"RUP\"), \"20\", [\"underflow\",\"inexact\"])  # toward +inf -> -0\nck(R([[\"22\",\"01\"]], \"RNE\"), \"20\", [\"underflow\",\"inexact\"])\nck(R([[\"22\",\"01\"]], \"RTZ\"), \"20\", [\"underflow\",\"inexact\"])\nck(R([[\"22\",\"01\"]], \"RNA\"), \"21\", [\"underflow\",\"inexact\"])\n# x = 7/32 tie at top of subnormal range: RNE -> min normal (even), no underflow\nck(R([[\"0b\",\"04\"]]), \"4\", [\"inexact\"])\nck(R([[\"0b\",\"04\"]], \"RNA\"), \"4\", [\"inexact\"])\nck(R([[\"0b\",\"04\"]], \"RTZ\"), \"3\", [\"underflow\",\"inexact\"])\nck(R([[\"0b\",\"04\"]], \"RDN\"), \"3\", [\"underflow\",\"inexact\"])\nck(R([[\"0b\",\"04\"]], \"RUP\"), \"4\", [\"inexact\"])\n# exact subnormal: 1/16, no flags\nck(R([[\"01\",\"0c\"]]), \"1\", [])\n# inexact normal, no underflow\nck(R([[\"04\",\"0c\"],[\"22\",\"01\"]]), \"4\", [\"inexact\"])          # 31/128 -> 1/4 RNE\nck(R([[\"04\",\"0c\"],[\"22\",\"01\"]], \"RTZ\"), \"3\", [\"underflow\",\"inexact\"])\n# RNE tie-to-even in normal range: 1.125 -> 1 (even), 1.375 -> 1.5 (even)\nck(R([[\"0e\",\"0a\"]]), \"c\", [\"inexact\"])                      # 1.5 * 0.75 = 1.125 -> 1.0\nck(R([[\"0e\",\"0a\"]], \"RNA\"), \"d\", [\"inexact\"])               # away -> 1.25\nck(R([[\"12\",\"0a\"]]), \"e\", [\"inexact\"])                      # 1.75*0.75? 0x12=e=4,f=2 -> (6)*2^-1=3... check below\nprint(\"hand tests done, fails =\", fails)\nsys.exit(1 if fails else 0)\nEOF\npython3 /app/test_hand.py",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "typecheck-soundness-witness__vgiSmkc",
+      "task": "typecheck-soundness-witness",
+      "model": "accounts/fireworks/models/glm-5p3",
+      "replicate": 2,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 66095,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:42:56.174470+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 2.0,
+      "booked_for_trial_usd": 0.65515325,
+      "prospective_next_request_reservation_usd": 1.3653855,
+      "request_to_exception_seconds": 0.012328,
+      "last_tool": {
+        "step_index": 66092,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:42:55.605233+00:00",
+        "tool_call_id": "chatcmpl-tool-ab4257c8f6f06d00",
+        "command": "cat > /tmp/w/fuzz2.py <<'EOF'\nimport random, sys, json\nsys.path.insert(0,'/app')\nfrom language import validate, InvalidProgram\nfrom checker import check, StaticError\nfrom interpreter import run\n\nKINDS=['int','text','bool','unit']\ndef litv(k,r):\n    if k=='int': return r.randint(-2,3)\n    if k=='text': return r.choice(['a','b','hi','xy'])\n    if k=='bool': return r.choice([True,False])\n    return None\n\nclass Gen:\n    def __init__(self,rng,cells,inputs):\n        self.r=rng\n        self.cells=list(cells)           # names\n        self.cellkinds=cells             # name->list kinds\n        self.inputs=list(inputs)\n        self.ctr=0\n        self.nodes=0\n    def nm(self):\n        self.ctr+=1\n        return 'n%d'%self.ctr\n    def cell(self):\n        return self.r.choice(self.cells) if self.cells else None\n    def kind(self):\n        return self.r.choice(KINDS)\n    def expr(self,scope,d=0):\n        r=self.r\n        if d>3 or self.nodes>200:\n            return ['lit',litv(self.kind(),r)]\n        self.nodes+=1\n        opts=['lit']\n        if scope: opts+=['var']*3\n        if self.cells: opts+=['get','is']\n        opts+=['add','cat','lt','not','fn','call']\n        c=r.choice(opts)\n        if c=='lit': return ['lit',litv(self.kind(),r)]\n        if c=='var': return ['var',r.choice(list(scope))]\n        if c=='get': return ['get',self.cell()]\n        if c=='is':  return ['is',self.cell(),self.kind()]\n        if c=='add': return ['add',self.expr(scope,d+1),self.expr(scope,d+1)]\n        if c=='cat': return ['cat',self.expr(scope,d+1),self.expr(scope,d+1)]\n        if c=='lt':  return ['lt',self.expr(scope,d+1),self.expr(scope,d+1)]\n        if c=='not': return ['not',self.expr(scope,d+1)]\n        if c=='fn':\n            body=self.block(scope,d+1)\n            return ['fn',body,self.expr(scope,d+1)]\n        if c=='call': return ['call',self.expr(scope,d+1)]\n    def cond(self,scope,d=0):\n        if self.cells and self.r.random()<0.5:\n            return ['is',self.cell(),self.kind()]\n        return self.expr(scope,d)\n    def stmt(self,scope,d=0):\n        r=self.r\n        if self.nodes>250 or d>3: return ['eval',['lit',0]]\n        self.nodes+=1\n        opts=['let','let','eval','if','if','repeat','assign','set']\n        if not scope or all(n in self.inputs for n in scope): opts=[o for o in opts if o!='assign']\n        if not self.cells: opts=[o for o in opts if o!='set']\n        c=r.choice(opts)\n        if c=='let':\n            return ['let',self.nm(),self.expr(scope,d)]\n        if c=='assign':\n            return ['assign',r.choice(list(scope)),self.expr(scope,d)]\n        if c=='set':\n            return ['set',self.cell(),self.expr(scope,d)]\n        if c=='eval':\n            return ['eval',self.expr(scope,d)]\n        if c=='if':\n            return ['if',self.cond(scope,d),self.block(scope,d+1),self.block(scope,d+1)]\n        if c=='repeat':\n            return ['repeat',self.expr(scope,d),self.block(scope,d+1)]\n    def block(self,scope,d=0):\n        r=self.r\n        out=[]\n        sc=set(scope)\n        for _ in range(r.randint(0,3)):\n            if self.nodes>250: break\n            s=self.stmt(sc,d)\n            out.append(s)\n            if s[0]=='let': sc.add(s[1])\n        return out\n\ndef make_prog(rng):\n    cells={}\n    for i in range(rng.randint(1,2)):\n        ks=rng.sample(KINDS,rng.randint(1,2))\n        k0=rng.choice(ks)\n        cells['c%d'%i]={'types':ks,'value':litv(k0,rng)}\n    inputs={}\n    for i in range(rng.randint(0,2)):\n        k=rng.choice(KINDS)\n        inputs['i%d'%i]=litv(k,rng)\n    return cells,inputs\n\ndef grow(rng,maxstmt=8,tries=6):\n    cells,inputs=make_prog(rng)\n    g=Gen(rng,cells,inputs)\n    body=[]\n    scope=set(inputs)\n    for _ in range(maxstmt):\n        for _ in range(tries):\n            g.nodes=0; g.ctr=len(scope)+1000\n            sc=set(scope)\n            s=g.stmt(sc,0)\n            g2=Gen(rng,cells,inputs); g2.nodes=0\n            cand={'cells':cells,'inputs':inputs,'body':body+[s]}\n            try:\n                validate(cand); check(cand)\n            except (StaticError,InvalidProgram):\n                continue\n            body.append(s)\n            if s[0]=='let': scope.add(s[1])\n            break\n    return {'cells':cells,'inputs':inputs,'body':body}\n\ndef main():\n    N=int(sys.argv[1]); seed=int(sys.argv[2]) if len(sys.argv)>2 else 1\n    rng=random.Random(seed)\n    stats={}; found=[]\n    for i in range(N):\n        p=grow(rng)\n        if not p['body']:\n            stats['empty']=stats.get('empty',0)+1; continue\n        stats['prog']=stats.get('prog',0)+1\n        try:\n            res=run(p)\n        except Exception as e:\n            stats['exc']=stats.get('exc',0)+1\n            found.append((json.dumps(p),repr(e))); continue\n        st=res['status']; stats[st]=stats.get(st,0)+1\n        if st!='normal':\n            found.append((json.dumps(p),st,res.get('message')))\n    print(stats)\n    for f in found[:10]:\n        print('FOUND:',f[0])\n        print('  ->',f[1])\n    open('/tmp/w/found2.json','w').write('\\n'.join(f[0] for f in found))\n\nmain()\nEOF\ncd /tmp/w && timeout 300 python3 fuzz2.py 300 1",
+        "timeout_sec": 60
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "atomic-range-history__vt9Mb5t",
+      "task": "atomic-range-history",
+      "model": "accounts/fireworks/models/deepseek-v4p1-flash",
+      "replicate": 3,
+      "category": "terminal_harness",
+      "exception_events": [
+        {
+          "step_index": 21690,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:43:21.094546+00:00",
+          "exception_type": "RuntimeError",
+          "message": "Command timed out after 40 seconds"
+        }
+      ],
+      "original_per_trial_cap_usd": 1.0,
+      "booked_for_trial_usd": 0.12439725,
+      "prospective_next_request_reservation_usd": 0.18302925,
+      "request_to_exception_seconds": 49.040205,
+      "last_tool": {
+        "step_index": 21689,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:42:41.087728+00:00",
+        "tool_call_id": "call_7c7a1cfb4ad344dca53cd888",
+        "command": "cd /app && sed -i \"s|        print(\\\"memo\\\",nm,\\\"time\\\",time.time()-tstart,flush=True)|        print(\\\"memo\\\",nm,\\\"time\\\",time.time()-tstart,flush=True); open('/app/hardcase2.json','w').write(json.dumps(r))|\" hill.py && timeout 80 python3 hill.py; ls -la /app/hardcase2.json",
+        "timeout_sec": 30
+      }
+    },
+    {
+      "trial": "exact-fused-dot__dkWQBQe",
+      "task": "exact-fused-dot",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 3,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 40001,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:44:55.290864+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.8322162499999999,
+      "prospective_next_request_reservation_usd": 2.34138,
+      "request_to_exception_seconds": 0.011681,
+      "last_tool": {
+        "step_index": 39998,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:44:55.105186+00:00",
+        "tool_call_id": "call_33e33e029d634a80ab476839",
+        "command": "cd /app && python3 - << 'EOF'\nimport sys\nsys.path.insert(0, \"/app\")\nfrom main import process\nfrom test_cross import ref_solve\n\n# ebits=11, fbits=4: cancellation leaving tiny mag with large common exponent (shift<=0 path)\nA1 = (1053 << 4) | 1   # 17 * 2^26\nA2 = (1053 << 4) | 0   # 16 * 2^26\nreq = {\"ebits\":11,\"fbits\":4,\"mode\":\"RNE\",\n       \"pairs\":[[format(A1,\"x\"), format(A2,\"x\")],\n                [format(A2 | (1<<15),\"x\"), format(A2,\"x\")]]}  # -A2*A2\nexp = 2.0**56\nbits, flags = ref_solve(req)\ngot = process(req)\nprint(\"ref:\", format(bits,\"x\"), flags, \"got:\", got)\nassert int(got[\"bits\"],16) == bits and set(got[\"flags\"]) == flags\n# also through all modes\nfor m in [\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]:\n    req[\"mode\"] = m\n    b,f = ref_solve(req); g = process(req)\n    assert int(g[\"bits\"],16)==b and set(g[\"flags\"])==f, (m,g,b,f)\nprint(\"shift<=0 exact path OK\")\n\n# long/odd hex input forms, uppercase, leading zeros\nr = process({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"000000000C\",\"0c\"]]})\nprint(r); assert int(r[\"bits\"],16) == 0x0c and r[\"flags\"] == []\nEOF",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "typecheck-soundness-witness__BG3PsRv",
+      "task": "typecheck-soundness-witness",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 4,
+      "category": "transport",
+      "exception_events": [
+        {
+          "step_index": 27791,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:51:12.910724+00:00",
+          "exception_type": "ProxyTransportFailure",
+          "message": "TimeoutError; reservation retained"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.444755,
+      "prospective_next_request_reservation_usd": 1.4326425,
+      "request_to_exception_seconds": 900.022614,
+      "last_tool": {
+        "step_index": 91,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:36:12.759914+00:00",
+        "tool_call_id": "call_81e322c710aa454993a45c91",
+        "command": "cat /app/checker.py /app/interpreter.py /app/language.py /app/evaluate.py /app/witness.json",
+        "timeout_sec": 30
+      },
+      "stream_event_kinds": [
+        "exception",
+        "initial",
+        "request",
+        "response",
+        "stream_chunk",
+        "terminal_call",
+        "terminal_result"
+      ],
+      "last_chunk_to_deadline_seconds": 0.140925,
+      "diagnosis": "Client absolute 900-second deadline while stream was active"
+    },
+    {
+      "trial": "atomic-range-history__UdWdk7m",
+      "task": "atomic-range-history",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 3,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 33941,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:51:40.319828+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.72354125,
+      "prospective_next_request_reservation_usd": 2.4252225,
+      "request_to_exception_seconds": 0.01239,
+      "last_tool": {
+        "step_index": 33938,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:51:36.732500+00:00",
+        "tool_call_id": "call_f3542e9690594c78bd7f40b4",
+        "command": "cd /tmp/t && cat > hunt.py << 'EOF'\nimport json, random, sys, time, resource\nsys.path.insert(0, '/app'); sys.path.insert(0, '/tmp/t')\nfrom public_contract import valid_history\nfrom main import solve\n\ndef timed(req):\n    t0 = time.time()\n    got = solve(req)\n    dt = time.time() - t0\n    assert got['order'] is None or valid_history(req, got['order'])\n    return dt, got\n\nrng = random.Random(7)\nkeys = 'abcdef'\nworst = []\nfor trial in range(3000):\n    mode = trial % 4\n    n = 10\n    txs = []\n    for i in range(n):\n        if mode & 1:\n            s, e = 0, 100                    # fully overlapping\n        else:\n            s = rng.randint(0, 5); e = s + rng.randint(1, 6)\n        ops = []\n        for _ in range(5):\n            k = rng.choice(keys)\n            r = rng.random()\n            if mode & 2:\n                v = rng.randint(0, 1)        # tiny value domain\n            else:\n                v = rng.randint(-9, 9)\n            if r < 0.55:\n                ops.append(['put', k, v])\n            elif r < 0.75:\n                ops.append(['get', k, rng.choice([None, v, rng.randint(0, 1)])])\n            elif r < 0.9:\n                ops.append(['cas', k, rng.choice([None, 0, 1]), rng.choice([None, 0, 1]), rng.choice([True, False])])\n            else:\n                ops.append(['del', k])\n        txs.append({'id': f't{i}', 'start': s, 'end': e, 'ops': ops})\n    init = {k: rng.randint(0, 1) for k in keys[:rng.randint(0, 3)]}\n    fin = {k: rng.randint(0, 1) for k in keys if rng.random() < 0.8}\n    req = {'initial': init, 'final': fin, 'transactions': txs}\n    dt, got = timed(req)\n    worst.append((dt, trial, got['order'] is not None))\nworst.sort(reverse=True)\nprint('top-10 slowest (sec, trial, sat):')\nfor w in worst[:10]:\n    print(f'  {w[0]*1000:.0f}ms trial={w[1]} sat={w[2]}')\nprint('total sec:', sum(w[0] for w in worst))\nprint('peak MB:', resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)\nEOF\npython3 hunt.py",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "atomic-range-history__WGWmXJ2",
+      "task": "atomic-range-history",
+      "model": "accounts/fireworks/models/glm-5p3",
+      "replicate": 3,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 33531,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:54:19.071339+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 2.0,
+      "booked_for_trial_usd": 1.122017,
+      "prospective_next_request_reservation_usd": 0.929541,
+      "request_to_exception_seconds": 0.012732,
+      "last_tool": {
+        "step_index": 33528,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:53:48.921126+00:00",
+        "tool_call_id": "chatcmpl-tool-8145564bd05f2b4e",
+        "command": "cat > /tmp/final_hunt.py <<'EOF'\nimport sys, time, json, random\nsys.path.insert(0,'/app')\nfrom main import solve\nrng=random.Random(31337)\nK='abcdef'\ndef mk(rng,fam):\n    txs=[]\n    for i in range(10):\n        ops=[]\n        # every tx writes the final-likely values on several keys (defeat value prune)\n        ks=rng.sample(K,rng.randint(2,5))\n        for k in ks: ops.append(['put',k,rng.randint(0,1)])\n        for _ in range(5-len(ops)):\n            if fam==0: ops.append(['get',rng.choice(K),rng.randint(0,1)])\n            elif fam==1:\n                k=rng.choice(K); ops.append(['cas',k,rng.randint(0,1),rng.randint(0,1),rng.random()<0.5])\n            else:\n                lo=rng.choice(K); hi=rng.choice(K)\n                if lo>=hi: hi=lo+'z'\n                ops.append(['scan',lo,hi,[[k,rng.randint(0,1)] for k in sorted(set(rng.sample(K,2))) if lo<=k<hi]])\n        rng.shuffle(ops)\n        txs.append({'id':'t%d'%i,'start':rng.choice([0,0,rng.randint(0,5)]),'end':0,'ops':ops})\n        txs[-1]['end']=txs[-1]['start']+rng.randint(1,2)\n    return txs\nbest=(0,None)\nt0=time.time(); trial=0\nwhile time.time()-t0<50:\n    trial+=1\n    fam=trial%3\n    txs=mk(rng,fam)\n    final={k:rng.randint(0,1) for k in rng.sample(K,rng.randint(1,6))}\n    r={'initial':{k:rng.randint(0,1) for k in K if rng.random()<0.5},'final':final,'transactions':txs}\n    t=time.time(); res=solve(r); dt=time.time()-t\n    if dt>best[0]:\n        best=(dt,r); print('fam%d best %.3f sat=%s'%(fam,dt,res['order'] is not None),flush=True)\n        json.dump(r,open('/tmp/worstF.json','w'))\nprint('trials=%d worst=%.3f'%(trial,best[0]),flush=True)\nimport os; os._exit(0)\nEOF\ntimeout 120 python3 /tmp/final_hunt.py",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "atomic-range-history__AmEa4wh",
+      "task": "atomic-range-history",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 5,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 23698,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:55:20.282829+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.60259625,
+      "prospective_next_request_reservation_usd": 2.55723,
+      "request_to_exception_seconds": 0.01244,
+      "last_tool": {
+        "step_index": 23695,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:55:20.058727+00:00",
+        "tool_call_id": "call_f55a816afaf44aae95648fbf",
+        "command": "cat > /tmp/t/edge.py << 'EOF'\nimport json, subprocess, sys\nsys.path.insert(0, '/app')\nfrom public_contract import valid_history\n\nE = []\ndef case(tag, req, expect):  # expect: None for unsat, 'sat' for some valid order, or exact list\n    E.append((tag, req, expect))\n\n# zero transactions\ncase('empty-eq', {'initial': {'a': 0}, 'final': {'a': 0}, 'transactions': []}, [])\ncase('empty-neq', {'initial': {}, 'final': {'a': 0}, 'transactions': []}, None)\n# absent vs zero\ncase('zero-stored', {'initial': {}, 'final': {'a': 0}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['put','a',0],['get','a',0]]}]}, 'sat')\ncase('get-zero-on-absent', {'initial': {}, 'final': {}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['get','a',0]]}]}, None)\n# cas variants\ncase('cas-del', {'initial': {'a': 5}, 'final': {}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['cas','a',5,None,True]]}]}, 'sat')\ncase('cas-absent-null-old', {'initial': {}, 'final': {'a': 3}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['cas','a',None,3,True]]}]}, 'sat')\ncase('cas-fail-nochange', {'initial': {'a': 1}, 'final': {'a': 1}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['cas','a',2,9,False]]}]}, 'sat')\ncase('cas-expected-success-mismatch', {'initial': {}, 'final': {'a': 3}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['cas','a',None,3,False]]}]}, None)\n# scan: boundaries and lexicographic order, sees own writes\ncase('scan-own-writes', {'initial': {'b': 1}, 'final': {'a': 2, 'b': 1, 'c': 0}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['put','a',2],['put','c',0],['scan','a','c',[['a',2],['b',1]]],['scan','a','d',[['a',2],['b',1],['c',0]]]]}]}, 'sat')\ncase('scan-excludes-high', {'initial': {'b': 1}, 'final': {'b': 1}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['scan','a','b',[]]]}]}, 'sat')\ncase('scan-wrong-order', {'initial': {'b': 1, 'a': 2}, 'final': {'a': 2, 'b': 1}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['scan','a','c',[['b',1],['a',2]]]]}]}, None)\n# precedence: touching endpoints force order\ncase('touching-endpoints', {'initial': {}, 'final': {'a': 2}, 'transactions': [\n    {'id':'t0','start':0,'end':5,'ops':[['put','a',1]]},\n    {'id':'t1','start':5,'end':9,'ops':[['get','a',1],['put','a',2]]}]}, ['t0','t1'])\ncase('touching-reversed-unsat', {'initial': {}, 'final': {'a': 2}, 'transactions': [\n    {'id':'t0','start':0,'end':5,'ops':[['get','a',1]]},\n    {'id':'t1','start':5,'end':9,'ops':[['put','a',1],['put','a',2]]}]}, None)\n# negative times and values\ncase('negative', {'initial': {}, 'final': {'a': -9}, 'transactions': [\n    {'id':'t0','start':-10,'end':-3,'ops':[['put','a',-9],['get','a',-9]]}]}, 'sat')\n# scan only sees current tx writes, not future\ncase('scan-isolation', {'initial': {}, 'final': {'a': 1, 'b': 2}, 'transactions': [\n    {'id':'t0','start':0,'end':10,'ops':[['put','a',1],['scan','a','z',[['a',1]]]]},\n    {'id':'t1','start':1,'end':2,'ops':[['put','b',2]]}]}, None)  # t1 before t0 -> t0's scan would see b\n# cyclic reads unsat\ncase('cycle', {'initial': {}, 'final': {'a':1,'b':1}, 'transactions': [\n    {'id':'t0','start':0,'end':10,'ops':[['put','a',1],['get','b',1]]},\n    {'id':'t1','start':0,'end':10,'ops':[['put','b',1],['get','a',1]]}]}, None)\n# same txs but satisfiable when one reads absent\ncase('acyclic', {'initial': {}, 'final': {'a':1,'b':1}, 'transactions': [\n    {'id':'t0','start':0,'end':10,'ops':[['put','a',1],['get','b',None]]},\n    {'id':'t1','start':0,'end':10,'ops':[['put','b',1],['get','a',1]]}]}, 'sat')\n# del is idempotent, get null after del\ncase('del-absent', {'initial': {'a': 1}, 'final': {}, 'transactions': [\n    {'id':'t','start':0,'end':1,'ops':[['del','a'],['del','a'],['get','a',None]]}]}, 'sat')\n# 10 txs chain where final reachable only via exact order\ncase('exact-chain-10', {'initial': {}, 'final': {'k': 9}, 'transactions': [\n    {'id':f't{i}','start':0,'end':100,'ops':([['get','k',i-1]] if i else [])+[['put','k',i]]} for i in range(10)]}, 'sat')\n\ninp = ''.join(json.dumps(r) + '\\n' for _, r, _ in E)\np = subprocess.run([sys.executable, '/app/main.py'], input=inp, text=True, capture_output=True, cwd='/app')\nassert p.returncode == 0, p.stderr\nlines = p.stdout.splitlines()\nassert len(lines) == len(E)\nbad = 0\nfor (tag, req, expect), line in zip(E, lines):\n    got = json.loads(line)['order']\n    if expect is None:\n        ok = got is None\n    elif expect == 'sat':\n        ok = got is not None and valid_history(req, got)\n    else:\n        ok = got == expect and valid_history(req, got)\n    if not ok:\n        bad += 1; print('FAIL', tag, 'got', got)\nprint(f'{len(E)} edge cases, {bad} failed')\nEOF\npython3 /tmp/t/edge.py",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "exact-fused-dot__mavgxJ8",
+      "task": "exact-fused-dot",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 4,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 42641,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:56:48.891185+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.6363349999999999,
+      "prospective_next_request_reservation_usd": 2.3728875,
+      "request_to_exception_seconds": 0.012294,
+      "last_tool": {
+        "step_index": 42638,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:56:47.202783+00:00",
+        "tool_call_id": "call_0e36dbfde729411880aa5dcc",
+        "command": "cd /app && python3 - << 'EOF'\nsrc = open('test_f64.py').read()\nold = \"\"\"def dec64(v):\n    s = v >> 63; e = (v >> 52) & 0x7ff; f = v & ((1 << 52) - 1)\n    if e == 0x7ff:\n        return (s, 'inf' if f == 0 else 'nan', None)\n    x = struct.unpack('<d', struct.pack('<Q', v))[0]\n    return (s, 'fin', Fraction(x))\"\"\"\nnew = \"\"\"def dec64(v):\n    s = v >> 63; e = (v >> 52) & 0x7ff; f = v & ((1 << 52) - 1)\n    if e == 0x7ff:\n        return (s, 'inf' if f == 0 else 'nan', None)\n    x = struct.unpack('<d', struct.pack('<Q', v))[0]\n    return (s, 'fin', Fraction(x))  # x is already signed; s kept for zero-sign logic\"\"\"\nassert old in src\nsrc = src.replace(old, new)\nold = \"\"\"            pats.append((a, b))\n            nprod += 1\n            total += (va if sa == 0 else -va) * (vb if sb == 0 else -vb)\n            if not ((va == 0 or vb == 0) and (sa ^ sb) == 1):\n                all_neg_zero = False\"\"\"\nnew = \"\"\"            pats.append((a, b))\n            nprod += 1\n            total += va * vb  # signed fractions already\n            if not ((va == 0 or vb == 0) and (sa ^ sb) == 1):\n                all_neg_zero = False\"\"\"\nassert old in src\nsrc = src.replace(old, new)\nopen('test_f64.py','w').write(src)\nprint('patched')\nEOF\npython3 /app/test_f64.py",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "atomic-range-history__gCrj2sd",
+      "task": "atomic-range-history",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 4,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 31646,
+          "kind": "exception",
+          "time_utc": "2026-10-08T16:59:17.029631+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.82575125,
+      "prospective_next_request_reservation_usd": 2.341035,
+      "request_to_exception_seconds": 0.012347,
+      "last_tool": {
+        "step_index": 31643,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T16:59:09.510281+00:00",
+        "tool_call_id": "call_4bf2243fb62c4a3f85525696",
+        "command": "cat > /app/test_worst3.py << 'EOF'\nimport json, random, time, sys, subprocess\nsys.path.insert(0, '/app')\nimport main as M\n\nkeys = ['a','b','c','d','e','f']\nrng = random.Random(21)\nworst = 0.0; wreq = None\nfor it in range(400):\n    # mix: each tx 3 puts (distinct values) + 2 dels\n    txs = []\n    for i in range(10):\n        ks = rng.sample(keys, 5)\n        ops = [['put', k, rng.randint(-9,9)] for k in ks[:3]] + [['del', k] for k in ks[3:]]\n        rng.shuffle(ops)\n        txs.append({'id': f't{i}', 'start': 0, 'end': 10, 'ops': ops})\n    # achievable-by-construction final, then perturb with values that stay per-key feasible\n    order = list(range(10)); rng.shuffle(order)\n    d = {}\n    for i in order:\n        for op in txs[i]['ops']:\n            if op[0]=='put': d[op[1]]=op[2]\n            else: d.pop(op[1], None)\n    if rng.random() < 0.8 and d:\n        kk = rng.choice(list(d))\n        others = [op[2] for t in txs for op in t['ops'] if op[0]=='put' and op[1]==kk and op[2]!=d[kk]]\n        if others: d[kk] = rng.choice(others)\n    req = {'initial': {}, 'final': d, 'transactions': txs}\n    t0 = time.time(); M.solve(req); dt = time.time()-t0\n    if dt > worst: worst, wreq = dt, req\nprint(f'400 put+del mix, worst {worst*1000:.1f} ms')\n\n# end-to-end CLI batch: 300 hardish cases\nlines = []\nfor it in range(300):\n    txs = [{'id': f't{i}', 'start': 0, 'end': 10,\n            'ops': [['put', k, rng.randint(-9,9)] for k in rng.sample(keys, 5)]} for i in range(10)]\n    order = list(range(10)); rng.shuffle(order)\n    d = {}\n    for i in order:\n        for op in txs[i]['ops']: d[op[1]] = op[2]\n    if rng.random() < 0.7:\n        kk = rng.choice(list(d))\n        others = [op[2] for t in txs for op in t['ops'] if op[1]==kk and op[2]!=d[kk]]\n        if others: d[kk] = rng.choice(others)\n    lines.append(json.dumps({'initial': {}, 'final': d, 'transactions': txs}))\ninp = '\\n'.join(lines) + '\\n'\nt0 = time.time()\np = subprocess.run([sys.executable, '/app/main.py'], input=inp, text=True, capture_output=True, cwd='/app')\ndt = time.time()-t0\nassert p.returncode == 0, p.stderr\nout = p.stdout.splitlines()\nassert len(out) == 300, len(out)\nprint(f'300-case CLI batch: {dt:.2f}s total')\nEOF\ncd /app && timeout 280 python3 test_worst3.py",
+        "timeout_sec": 60
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "exact-fused-dot__mA2apgy",
+      "task": "exact-fused-dot",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 5,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 44127,
+          "kind": "exception",
+          "time_utc": "2026-10-08T17:00:57.564920+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.7707424999999999,
+      "prospective_next_request_reservation_usd": 2.45709,
+      "request_to_exception_seconds": 0.012265,
+      "last_tool": {
+        "step_index": 44124,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T17:00:57.382098+00:00",
+        "tool_call_id": "call_2a267dcc025742059d474197",
+        "command": "cat > /app/test_unit.py << 'EOF'\n\"\"\"Hand-computed unit tests, mostly in the toy format ebits=3, fbits=2.\"\"\"\nimport sys\nsys.path.insert(0, \"/app\")\nfrom main import fused_dot\n\n# toy format ebits=3 fbits=2: w=6 bias=3 emin=-2 emax=3 Eall=7 F=4\n# 0x00=+0 0x20=-0 0x0c=1.0 0x2c=-1.0 0x1b=14(maxfin) 0x3b=-14\n# 0x1c=+inf 0x3c=-inf 0x1e=canonical qNaN 0x1f=qNaN(f=3) 0x1d=sNaN\n# normals: value (4+f)*2^(e-5): 0x04=0.25 0x08=0.5 0x0a=0.75 0x0d=1.25\n# 0x0e=1.5 0x0f=1.75 0x10=2.0 ; subnormals quantum 2^-4: 0x01..0x03\nE, Fb = 3, 2\nCASES = [\n    ([], \"RNE\", \"0\", []),\n    ([], \"RDN\", \"20\", []),\n    ([], \"RTZ\", \"0\", []),\n    ([(\"0c\", \"0c\")], \"RNE\", \"0c\", []),\n    # overflow: 14 * 1.25 = 17.5 -> y=16 >= 2**(emax+1)=16\n    ([(\"1b\", \"0d\")], \"RNE\", \"1c\", [\"overflow\", \"inexact\"]),\n    ([(\"1b\", \"0d\")], \"RNA\", \"1c\", [\"overflow\", \"inexact\"]),\n    ([(\"1b\", \"0d\")], \"RTZ\", \"1b\", [\"overflow\", \"inexact\"]),\n    ([(\"1b\", \"0d\")], \"RUP\", \"1c\", [\"overflow\", \"inexact\"]),   # +, away\n    ([(\"1b\", \"0d\")], \"RDN\", \"1b\", [\"overflow\", \"inexact\"]),   # +, toward\n    ([(\"3b\", \"0d\")], \"RNE\", \"3c\", [\"overflow\", \"inexact\"]),   # -17.5\n    ([(\"3b\", \"0d\")], \"RTZ\", \"3b\", [\"overflow\", \"inexact\"]),\n    ([(\"3b\", \"0d\")], \"RUP\", \"3b\", [\"overflow\", \"inexact\"]),   # -, toward\n    ([(\"3b\", \"0d\")], \"RDN\", \"3c\", [\"overflow\", \"inexact\"]),   # -, away\n    ([(\"1b\", \"0e\")], \"RNE\", \"1c\", [\"overflow\", \"inexact\"]),   # 14*1.5=21\n    ([(\"1b\", \"0c\"), (\"10\", \"0c\")], \"RNE\", \"1c\", [\"overflow\", \"inexact\"]),  # exactly 16\n    ([(\"1b\", \"0c\"), (\"0f\", \"0c\")], \"RNE\", \"1c\", [\"overflow\", \"inexact\"]),  # 15.75 -> 16\n    ([(\"1b\", \"0c\"), (\"0f\", \"0c\")], \"RTZ\", \"1b\", [\"inexact\"]),\n    ([(\"1b\", \"0c\"), (\"0f\", \"0c\")], \"RUP\", \"1c\", [\"overflow\", \"inexact\"]),\n    ([(\"1b\", \"0c\"), (\"0f\", \"0c\")], \"RDN\", \"1b\", [\"inexact\"]),\n    ([(\"1b\", \"0c\")], \"RNE\", \"1b\", []),                        # exact max finite\n    # underflow / subnormal ties: 0.25*0.125 = 0.5 quanta\n    ([(\"04\", \"02\")], \"RNE\", \"0\", [\"inexact\", \"underflow\"]),\n    ([(\"04\", \"02\")], \"RNA\", \"1\", [\"inexact\", \"underflow\"]),\n    ([(\"04\", \"02\")], \"RUP\", \"1\", [\"inexact\", \"underflow\"]),\n    ([(\"04\", \"02\")], \"RDN\", \"0\", [\"inexact\", \"underflow\"]),\n    ([(\"04\", \"02\")], \"RTZ\", \"0\", [\"inexact\", \"underflow\"]),\n    ([(\"24\", \"02\")], \"RTZ\", \"20\", [\"inexact\", \"underflow\"]),\n    ([(\"24\", \"02\")], \"RUP\", \"20\", [\"inexact\", \"underflow\"]),\n    ([(\"24\", \"02\")], \"RDN\", \"21\", [\"inexact\", \"underflow\"]),\n    # 0.75*0.125 = 1.5 quanta tie\n    ([(\"0a\", \"02\")], \"RNE\", \"2\", [\"inexact\", \"underflow\"]),\n    ([(\"0a\", \"02\")], \"RNA\", \"2\", [\"inexact\", \"underflow\"]),\n    # 1.25*0.125 = 2.5 quanta tie\n    ([(\"0d\", \"02\")], \"RNE\", \"2\", [\"inexact\", \"underflow\"]),   # even -> 2\n    ([(\"0d\", \"02\")], \"RNA\", \"3\", [\"inexact\", \"underflow\"]),   # away -> 3\n    # 1.75*0.125 = 3.5 quanta tie -> 4 = min normal: tininess AFTER rounding\n    ([(\"0f\", \"02\")], \"RNE\", \"4\", [\"inexact\"]),\n    ([(\"0f\", \"02\")], \"RNA\", \"4\", [\"inexact\"]),\n    ([(\"0f\", \"02\")], \"RUP\", \"4\", [\"inexact\"]),\n    ([(\"0f\", \"02\")], \"RTZ\", \"3\", [\"inexact\", \"underflow\"]),\n    ([(\"0f\", \"02\")], \"RDN\", \"3\", [\"inexact\", \"underflow\"]),\n    ([(\"2f\", \"02\")], \"RDN\", \"24\", [\"inexact\"]),\n    ([(\"2f\", \"02\")], \"RTZ\", \"23\", [\"inexact\", \"underflow\"]),\n    # exact subnormal / exact min normal\n    ([(\"04\", \"04\")], \"RNE\", \"1\", []),\n    ([(\"08\", \"08\")], \"RNE\", \"4\", []),\n    ([(\"03\", \"0c\"), (\"01\", \"0c\")], \"RNE\", \"4\", []),           # 0.1875+0.0625=0.25\n    # inexact normal tie: 1.5*0.75 = 1.125 -> 4.5 quanta\n    ([(\"0e\", \"0a\")], \"RNE\", \"0c\", [\"inexact\"]),\n    ([(\"0e\", \"0a\")], \"RNA\", \"0d\", [\"inexact\"]),\n    ([(\"0e\", \"0a\")], \"RUP\", \"0d\", [\"inexact\"]),\n    ([(\"0e\", \"0a\")], \"RDN\", \"0c\", [\"inexact\"]),\n    ([(\"0e\", \"0a\")], \"RTZ\", \"0c\", [\"inexact\"]),\n    ([(\"2e\", \"0a\")], \"RNE\", \"2c\", [\"inexact\"]),\n    ([(\"2e\", \"0a\")], \"RUP\", \"2c\", [\"inexact\"]),\n    ([(\"2e\", \"0a\")], \"RDN\", \"2d\", [\"inexact\"]),\n    ([(\"2e\", \"0a\")], \"RTZ\", \"2c\", [\"inexact\"]),\n    # exceptional\n    ([(\"00\", \"1c\")], \"RNE\", \"1e\", [\"invalid\"]),\n    ([(\"1c\", \"20\")], \"RNE\", \"1e\", [\"invalid\"]),\n    ([(\"1c\", \"0c\")], \"RNE\", \"1c\", []),\n    ([(\"3c\", \"0c\")], \"RNE\", \"3c\", []),\n    ([(\"3c\", \"2c\")], \"RNE\", \"1c\", []),\n    ([(\"1c\", \"0c\"), (\"3c\", \"0c\")], \"RNE\", \"1e\", [\"invalid\"]),\n    ([(\"1c\", \"0c\"), (\"1c\", \"0c\")], \"RNE\", \"1c\", []),\n    ([(\"1c\", \"0c\"), (\"3c\", \"0c\"), (\"1c\", \"2c\")], \"RNE\", \"1c\", []),  # +inf,-inf,-inf -> wait\n    ([(\"1f\", \"0c\")], \"RNE\", \"1e\", []),\n    ([(\"1f\", \"1f\")], \"RNE\", \"1e\", []),\n    ([(\"1d\", \"0c\")], \"RNE\", \"1e\", [\"invalid\"]),\n    ([(\"3d\", \"0c\")], \"RNE\", \"1e\", [\"invalid\"]),\n    ([(\"3f\", \"0c\")], \"RNE\", \"1e\", []),\n    ([(\"1f\", \"0c\"), (\"00\", \"1c\")], \"RNE\", \"1e\", [\"invalid\"]),\n    ([(\"1f\", \"1c\")], \"RNE\", \"1e\", []),\n    ([(\"1f\", \"00\")], \"RNE\", \"1e\", []),\n    ([(\"1f\", \"0c\"), (\"1c\", \"0c\")], \"RNE\", \"1e\", []),\n    ([(\"1f\", \"0c\"), (\"1c\", \"0c\"), (\"3c\", \"0c\")], \"RNE\", \"1e\", [\"invalid\"]),\n    # zeros\n    ([(\"20\", \"20\")], \"RNE\", \"0\", []),\n    ([(\"20\", \"20\")], \"RDN\", \"20\", []),\n    ([(\"20\", \"0c\")], \"RNE\", \"20\", []),\n    ([(\"20\", \"0c\")], \"RNA\", \"20\", []),\n    ([(\"20\", \"0c\"), (\"00\", \"0c\")], \"RNE\", \"0\", []),\n    ([(\"20\", \"0c\"), (\"00\", \"0c\")], \"RDN\", \"20\", []),\n    ([(\"20\", \"0c\"), (\"20\", \"0c\")], \"RTZ\", \"20\", []),\n    ([(\"0c\", \"0c\"), (\"2c\", \"0c\")], \"RNE\", \"0\", []),           # cancellation\n    ([(\"0c\", \"0c\"), (\"2c\", \"0c\")], \"RDN\", \"20\", []),\n]\n\ndef run():\n    bad = 0\n    for pairs, mode, bits, flags in CASES:\n        gb, gf = fused_dot(E, Fb, mode, [list(p) for p in pairs])\n        gb, gf = format(gb, \"x\"), sorted(gf)\n        want = (bits.lower().lstrip(\"0\") or \"0\", sorted(flags))\n        if (gb, gf) != want:\n            bad += 1\n            print(\"FAIL\", pairs, mode, \"got\", gb, gf, \"want\", want)\n    print(\"done, failures:\", bad)\n    return bad\n\nif __name__ == \"__main__\":\n    sys.exit(1 if run() else 0)\nEOF\npython3 /app/test_unit.py",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    },
+    {
+      "trial": "typecheck-soundness-witness__hj7NJa7",
+      "task": "typecheck-soundness-witness",
+      "model": "accounts/fireworks/models/kimi-k3",
+      "replicate": 5,
+      "category": "budget",
+      "exception_events": [
+        {
+          "step_index": 46438,
+          "kind": "exception",
+          "time_utc": "2026-10-08T17:06:25.067250+00:00",
+          "exception_type": "ProxyBudgetExceeded",
+          "message": "Would exceed reserved trial or portfolio allowance"
+        }
+      ],
+      "original_per_trial_cap_usd": 4.0,
+      "booked_for_trial_usd": 1.66158375,
+      "prospective_next_request_reservation_usd": 2.8767675,
+      "request_to_exception_seconds": 0.014714,
+      "last_tool": {
+        "step_index": 46435,
+        "kind": "terminal_call",
+        "time_utc": "2026-10-08T17:05:58.658018+00:00",
+        "tool_call_id": "call_8faaceb0ac85452c9b13c5e6",
+        "command": "cat > /tmp/fuzz/fuzz2.py <<'EOF'\nimport random, json, sys\nsys.path.insert(0, '/app')\nfrom language import StaticError, InvalidProgram\nfrom checker import check, Checker, Function\nfrom interpreter import run, Machine, Closure\n\n# Raw-ish random AST generator with heavy use of cells/is/fn/call/repeat.\nKINDS = ['int','text','bool','unit']\n\ndef rand_val(k, rng):\n    if k=='int': return rng.randint(-2,2)\n    if k=='text': return rng.choice(['','a','xy'])\n    if k=='bool': return rng.choice([True,False])\n    return None\n\nclass RawGen:\n    def __init__(self, rng, cell_names, input_names):\n        self.rng=rng; self.cells=cell_names; self.inputs=input_names\n        self.locals=[]  # stack of scopes: list of lists of names\n    def expr(self, depth):\n        rng=self.rng\n        if depth>=6:\n            return [\"lit\", rand_val(rng.choice(KINDS),rng)]\n        op = rng.choice(['lit','var','get','is','add','cat','lt','not','fn','call',\n                         'lit','get','add','is','call','fn'])\n        if op=='lit': return [\"lit\", rand_val(rng.choice(KINDS),rng)]\n        if op=='var':\n            names=self.inputs+[n for sc in self.locals for n in sc]\n            if names and rng.random()<0.9: return [\"var\", rng.choice(names)]\n            return [\"lit\", rand_val(rng.choice(KINDS),rng)]\n        if op=='get':\n            if self.cells: return [\"get\", rng.choice(self.cells)]\n            return [\"lit\", rand_val(rng.choice(KINDS),rng)]\n        if op=='is':\n            if self.cells: return [\"is\", rng.choice(self.cells), rng.choice(KINDS)]\n            return [\"lit\", True]\n        if op in ('add','cat','lt'):\n            return [op, self.expr(depth+1), self.expr(depth+1)]\n        if op=='not': return [\"not\", self.expr(depth+1)]\n        if op=='fn':\n            self.locals.append([])\n            body=self.block(depth+1, rng.randint(0,3))\n            res=self.expr(depth+1)\n            self.locals.pop()\n            return [\"fn\", body, res]\n        if op=='call':\n            return [\"call\", self.expr(depth+1)]\n    def stmt(self, depth):\n        rng=self.rng\n        op = rng.choice(['let','assign','set','eval','if','repeat','set','eval','let'])\n        if op=='let':\n            n=\"v%d\"%rng.randint(0,50)\n            s=[\"let\",n,self.expr(depth+1)]\n            if self.locals is not None and self.locals:\n                self.locals[-1].append(n)\n            elif self.locals is not None:\n                self.locals.append([n])\n            return s\n        if op=='assign':\n            names=[n for sc in self.locals for n in sc if n not in self.inputs]\n            if names: return [\"assign\", rng.choice(names), self.expr(depth+1)]\n            return [\"eval\", self.expr(depth+1)]\n        if op=='set':\n            if self.cells: return [\"set\", rng.choice(self.cells), self.expr(depth+1)]\n            return [\"eval\", self.expr(depth+1)]\n        if op=='eval': return [\"eval\", self.expr(depth+1)]\n        if op=='if':\n            self.locals.append([])\n            tb=self.block(depth+1,rng.randint(0,3))\n            self.locals.pop()\n            self.locals.append([])\n            eb=self.block(depth+1,rng.randint(0,3))\n            self.locals.pop()\n            return [\"if\", self.expr(depth+1), tb, eb]\n        if op=='repeat':\n            self.locals.append([])\n            b=self.block(depth+1,rng.randint(1,3))\n            self.locals.pop()\n            return [\"repeat\", self.expr(depth+1), b]\n    def block(self, depth, n):\n        return [self.stmt(depth) for _ in range(n)]\n\ndef gen(rng):\n    ncells=rng.randint(1,3)\n    cells={}\n    for i in range(ncells):\n        ts=list(set(rng.sample(KINDS, rng.choice([1,2,2,3]))))\n        cells[\"c%d\"%i]={\"types\":ts,\"value\":rand_val(ts[0],rng)}\n    inputs={}\n    if rng.random()<0.3: inputs[\"i0\"]=rand_val(rng.choice(KINDS),rng)\n    g=RawGen(rng,list(cells),list(inputs))\n    g.locals.append([])\n    body=g.block(0,rng.randint(2,9))\n    return {\"cells\":cells,\"inputs\":inputs,\"body\":body}\n\ndef main():\n    seed=int(sys.argv[1]) if len(sys.argv)>1 else 0\n    rng=random.Random(seed)\n    n=acc=0\n    for i in range(300000):\n        p=gen(rng); n+=1\n        try:\n            check(p)\n        except StaticError:\n            continue\n        except Exception:\n            continue\n        acc+=1\n        r=run(p)\n        if r['status']=='type_error':\n            print(\"FOUND seed\",seed,\"iter\",i,\"steps\",r['steps'],r.get('message'))\n            print(json.dumps(p))\n            with open('/tmp/fuzz/found.json','w') as f: json.dump(p,f)\n            return\n        elif r['status']=='other_runtime_error':\n            pass\n    print(f\"done seed={seed}: {n} gen, {acc} accepted, none\")\n\nmain()\nEOF\ncd /tmp/fuzz && timeout 55 python3 fuzz2.py 2 2>&1 | tail -3",
+        "timeout_sec": 30
+      },
+      "verified_trial_limit_not_project_limit": true
+    }
+  ]
+}
