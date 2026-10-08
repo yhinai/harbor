@@ -112,3 +112,5 @@ The repository is [yhinai/harbor](https://github.com/yhinai/harbor), branch `mai
 **Verified unattended v1.4.3 milestone v143-parallel-v142-start (2026-10-08T20:23:44.354069+00:00):** 38 graded panel trials; 72 finished attempts including smokes/exclusions. See `analysis/followup-v1.4.0/studies/mini-panel-20261008-v140`. Reported-usage estimate $79.7765; invoice unknown. Original freeze unchanged.
 
 **Verified unattended v1.4.3 milestone v143-v143-panel-89 (2026-10-08T20:38:16.236507+00:00):** 58 graded panel trials; 92 finished attempts including smokes/exclusions. See `analysis/followup-v1.4.0/studies/mini-panel-20261008-v140`. Reported-usage estimate $102.1311; invoice unknown. Original freeze unchanged.
+
+**Verified unattended v1.4.3 milestone v143-v143-panel-109 (2026-10-08T20:50:34.755605+00:00):** 78 graded panel trials; 112 finished attempts including smokes/exclusions. See `analysis/followup-v1.4.0/studies/mini-panel-20261008-v140`. Reported-usage estimate $137.2597; invoice unknown. Original freeze unchanged.
