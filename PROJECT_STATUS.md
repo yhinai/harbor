@@ -62,3 +62,9 @@ Pass rates below use only uncensored trials. The excluded count is separate; it 
 ## GitHub synchronization
 
 The repository is [yhinai/harbor](https://github.com/yhinai/harbor), branch `main`, starting from checkpoint `6bcde28`. After each meaningful completed milestone, update this progress record, commit relevant research, decisions, packages, evidence, and deliverables, push without force, and verify the remote commit. Preserve frozen artifacts and record revisions separately. Coordinate with active writers before staging their files. Credentials, environment files, caches, and temporary files remain excluded. Synchronization does not authorize paid evaluations or a task-scope change.
+
+## Matrix migration v1 — 8 October 2026
+
+**Verified:** The complete Git-tracked project is cloned at `matrix:/Users/matrix/projects/harbor`. Remote verification passed all 457 frozen archive hashes and 344 present loose artifact hashes. Credentials, caches, environments, and temporary job directories were not transferred.
+
+**Blocked:** The remote account lacks Docker/Colima/uv and cannot install them into the existing Homebrew prefix due to permissions. Provisioning stopped without changing shared ownership. An administrator or Homebrew owner must install the tools before offline Harbor work can resume. No paid calls or remote jobs started. See [migration record](analysis/matrix-migration-v1/status.md).
