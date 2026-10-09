@@ -1,0 +1,232 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-exact-fused-dot-5-a1-8cfed0f0",
+    "task": "exact-fused-dot",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 5,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-kimi-exact-fused-dot-5-a1-8cfed0f0.json",
+    "tool_calls": 13,
+    "agent_elapsed_seconds": 1310.980835,
+    "input_tokens": 561911,
+    "output_tokens": 48374,
+    "uncached_cost_estimate": 2.4113429999999996,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "494fe859ce409870be85f1a6a5727e4b628c02e7ac4720706223a9483f9b5034",
+    "network_mode": "none",
+    "artifact_sha256": "6a69658ef3327fc040141b9b756219b0cf7be9bbffc49ce883d318fab8388866",
+    "normalized_artifact_sha256": "4626caa8265d9374eae6e36d28bdde05b6f15a95e77751d9b8a7dd17a4a12108",
+    "terminal_nonzero_or_error_text_events": 3,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [],
+    "final_artifact_literal_written_by_30_min": false,
+    "first_literal_final_artifact_seconds": null,
+    "event_counts": {
+      "initial": 1,
+      "request": 14,
+      "stream_chunk": 47678,
+      "response": 14,
+      "terminal_call": 13,
+      "terminal_result": 13,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 29886,
+      "time": "2026-10-08T20:38:30.240153+00:00",
+      "tool_call_id": "call_95fdaf7074824940b7bd394f",
+      "command": "ls -la /app && cat /app/smoke.py 2>/dev/null",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 29940,
+      "time": "2026-10-08T20:38:34.784452+00:00",
+      "tool_call_id": "call_6dcee9b5467f4af689400175",
+      "command": "cat /app/examples.json && echo ---- && cat /app/main.py && echo ---- && cat /app/public_contract.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 32214,
+      "time": "2026-10-08T20:39:22.361635+00:00",
+      "tool_call_id": "call_913868c52b95480ab08d5927",
+      "command": "cat > /app/main.py << 'EOF'\nimport sys\nimport json\n\n# kind codes\nZERO, FIN, INF, NAN = 0, 1, 2, 3\nFLAG_ORDER = (\"invalid\", \"overflow\", \"underflow\", \"inexact\")\n\n\nclass Ctx:\n    __slots__ = (\"ebits\", \"fbits\", \"bias\", \"Eall\", \"emin\", \"emax\",\n                 \"tbits\", \"fmask\", \"emask\", \"ftop\", \"F\", \"vmask\", \"sbit\")\n\n    def __init__(self, ebits, fbits):\n        self.ebits = ebits\n        self.fbits = fbits\n        self.bias = (1 << (ebits - 1)) - 1\n        self.Eall = (1 << ebits) - 1\n        self.emin = 1 - self.bias\n        self.emax = self.Eall - 1 - self.bias\n        self.tbits = 1 + ebits + fbits\n        self.fmask = (1 << fbits) - 1\n        self.emask = (1 << ebits) - 1\n        self.ftop = 1 << (fbits - 1)\n        self.F = 1 << fbits\n        self.vmask = (1 << self.tbits) - 1\n        self.sbit = 1 << (ebits + fbits)\n\n\ndef decode(ctx, v):\n    f = v & ctx.fmask\n    e = (v >> ctx.fbits) & ctx.emask\n    s = 1 if (v & ctx.sbit) else 0\n    if e == ctx.Eall:\n        if f == 0:\n            return (INF, s)\n        return (NAN, s, (f & ctx.ftop) == 0)\n    if e == 0:\n        if f == 0:\n            return (ZERO, s)\n        return (FIN, s, f, ctx.emin - ctx.fbits)  # subnormal: f * 2^(1-bias-fbits)\n    return (FIN, s, ctx.F | f, e - ctx.bias - ctx.fbits)\n\n\ndef cmp_pow2(n, q_exp, p):\n    # compare n * 2**q_exp  vs  2**p ; n >= 0 integer\n    if n == 0:\n        return -1\n    k = p - q_exp\n    if k >= 0:\n        t = 1 << k\n        if n < t:\n            return -1\n        if n > t:\n            return 1\n        return 0\n    return 1\n\n\ndef solve(req):\n    ctx = Ctx(req[\"ebits\"], req[\"fbits\"])",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 35019,
+      "time": "2026-10-08T20:40:21.277811+00:00",
+      "tool_call_id": "call_996b5f180f5f41ea8a977a4b",
+      "command": "cat > /app/test_ref.py << 'EOF'\n\"\"\"Differential tests: main.solve (big-int) vs a Fraction-based reference.\"\"\"\nimport random\nfrom fractions import Fraction\nimport main\n\n\ndef floor_log2_frac(x):\n    p, q = x.numerator, x.denominator\n    L = p.bit_length() - q.bit_length()\n    def ge2(k):\n        return (p >= (q << k)) if k >= 0 else ((p << (-k)) >= q)\n    while not ge2(L):\n        L -= 1\n    while ge2(L + 1):\n        L += 1\n    return L\n\n\ndef ref_solve(req):\n    ebits, fbits, mode, pairs = req[\"ebits\"], req[\"fbits\"], req[\"mode\"], req[\"pairs\"]\n    bias = (1 << (ebits - 1)) - 1\n    Eall = (1 << ebits) - 1\n    emin, emax = 1 - bias, Eall - 1 - bias\n    F = 1 << fbits\n\n    def dec(h):\n        v = int(h, 16)\n        f = v & (F - 1)\n        e = (v >> fbits) & Eall\n        s = (v >> (fbits + ebits)) & 1\n        if e == Eall:\n            if f == 0:\n                return (\"inf\", s, None, False)\n            return (\"nan\", s, None, ((f >> (fbits - 1)) & 1) == 0)\n        if e == 0:\n            if f == 0:\n                return (\"zero\", s, Fraction(0), False)\n            return (\"fin\", s, Fraction((-1) ** s * f) * Fraction(2) ** (emin - fbits), False)\n        return (\"fin\", s, Fraction((-1) ** s * (F + f)) * Fraction(2) ** (e - bias - fbits), False)\n\n    any_nan = invalid = False\n    inf_signs = set()\n    total = Fraction(0)\n    prod_list = []\n    for a, b in pairs:\n        A, B = dec(a), dec(b)\n        if A[0] == \"nan\" or B[0] == \"nan\":\n            any_nan = True\n            if (A[0] == \"nan\" and A[3]) or (B[0] == \"nan\" and B[3]):\n                invalid = True\n            continue\n    ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 35245,
+      "time": "2026-10-08T20:40:33.028043+00:00",
+      "tool_call_id": "call_3f1af7cf4b0c4c209735165b",
+      "command": "cd /app && python3 - << 'EOF'\nimport re\nsrc = open('main.py').read()\nsrc = src.replace(\"\"\"        if f == 0:\n            return (ZERO, s)\n        return (FIN, s, f, ctx.emin - ctx.fbits)\"\"\",\n\"\"\"        if f == 0:\n            return (ZERO, s, 0, 0)\n        return (FIN, s, f, ctx.emin - ctx.fbits)\"\"\")\nopen('main.py','w').write(src)\nEOF\npython3 /app/smoke.py && timeout 550 python3 /app/test_ref.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 36846,
+      "time": "2026-10-08T20:41:26.028775+00:00",
+      "tool_call_id": "call_2227c89d1dbf443ea9824026",
+      "command": "cd /app && python3 - << 'EOF'\nfrom fractions import Fraction\n# how does CPython handle overflow in float(Fraction)?\nfor v in [Fraction(2)**1024, Fraction(2)**1024 - Fraction(2)**970, Fraction(2)**1024 - Fraction(2)**971, Fraction(2)**1024 - Fraction(2**971 + 1)]:\n    try:\n        print(float(v).hex())\n    except OverflowError as e:\n        print(\"OverflowError\", e)\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 38202,
+      "time": "2026-10-08T20:42:04.069071+00:00",
+      "tool_call_id": "call_2631fc5cf19f40618e54a9c1",
+      "command": "cat > /app/test_float.py << 'EOF'\n\"\"\"Cross-check RNE double (11/52) against CPython's correctly-rounded float().\"\"\"\nimport random, struct\nfrom fractions import Fraction\nimport main\n\ndef decode_frac(v):\n    f = v & ((1 << 52) - 1)\n    e = (v >> 52) & 0x7ff\n    s = v >> 63\n    if e == 0x7ff:\n        return None  # skip inf/nan in this test\n    if e == 0:\n        return Fraction((-1) ** s * f) * Fraction(2) ** (-1074)\n    return Fraction((-1) ** s * ((1 << 52) | f)) * Fraction(2) ** (e - 1075)\n\ndef bits_of_float(x):\n    return struct.unpack(\">Q\", struct.pack(\">d\", x))[0]\n\nrng = random.Random(999)\nfails = 0\ntested = 0\nfor i in range(60000):\n    k = rng.randrange(0, 6)\n    pairs, total = [], Fraction(0)\n    for _ in range(k):\n        a = rng.getrandbits(64)\n        b = rng.getrandbits(64)\n        va, vb = decode_frac(a), decode_frac(b)\n        if va is None or vb is None:\n            va = vb = None\n            break\n        pairs.append([format(a, \"x\"), format(b, \"x\")])\n        total += va * vb\n    if va is None:\n        continue\n    got = main.solve({\"ebits\": 11, \"fbits\": 52, \"mode\": \"RNE\", \"pairs\": pairs})\n    gbits = int(got[\"bits\"], 16)\n    gflags = set(got[\"flags\"])\n    # expected via CPython float rounding (RNE)\n    try:\n        f = float(total)\n        ebits_ = bits_of_float(f)\n        ef = set()\n        y = Fraction(f)\n        if y != total:\n            ef.add(\"inexact\")\n            if abs(y) < Fraction(2) ** -1022:\n                ef.add(\"underflow\")\n        if total == 0:\n            # zero sign is spec-specific; check separately\n            neg = all(main.decode(main.",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 42550,
+      "time": "2026-10-08T20:43:53.785960+00:00",
+      "tool_call_id": "call_25deb2fa347b45afae952d34",
+      "command": "cat > /app/test_targeted.py << 'EOF'\nimport main\n\nCASES = []\ndef T(eb, fb, mode, pairs, bits, flags):\n    CASES.append(({\"ebits\": eb, \"fbits\": fb, \"mode\": mode, \"pairs\": pairs}, bits, set(flags)))\n\n# --- overflow midpoint ties (3/2: maxfinite=14, threshold 16) ---\nT(3,2,\"RNE\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1c\",[\"overflow\",\"inexact\"])   # 15 -> tie -> even sig -> 16 -> inf\nT(3,2,\"RNA\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1c\",[\"overflow\",\"inexact\"])\nT(3,2,\"RTZ\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1b\",[\"inexact\"])             # 14\nT(3,2,\"RUP\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1c\",[\"overflow\",\"inexact\"])\nT(3,2,\"RDN\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1b\",[\"inexact\"])\nT(3,2,\"RNE\",[[\"5b\",\"0c\"],[\"2c\",\"0c\"]],\"3c\",[\"overflow\",\"inexact\"])  # -15 -> -inf\nT(3,2,\"RTZ\",[[\"5b\",\"0c\"],[\"2c\",\"0c\"]],\"5b\",[\"inexact\"])             # -14\nT(3,2,\"RUP\",[[\"5b\",\"0c\"],[\"2c\",\"0c\"]],\"5b\",[\"inexact\"])             # toward +inf -> -14\nT(3,2,\"RDN\",[[\"5b\",\"0c\"],[\"2c\",\"0c\"]],\"3c\",[\"overflow\",\"inexact\"])  # toward -inf -> -inf\nT(3,2,\"RNE\",[[\"1b\",\"0c\"],[\"0e\",\"0c\"]],\"1c\",[\"overflow\",\"inexact\"])  # 15.5 -> inf\nT(3,2,\"RNE\",[[\"1b\",\"0c\"],[\"0a\",\"0c\"]],\"1b\",[\"inexact\"])             # 14.75 -> 14\nT(3,2,\"RNE\",[[\"1b\",\"1b\"]],\"1c\",[\"overflow\",\"inexact\"])              # 196 -> inf\nT(3,2,\"RTZ\",[[\"1b\",\"1b\"]],\"1b\",[\"overflow\",\"inexact\"])              # -> maxfinite\n# --- underflow / ties at subnormal quantum 2^-4 ---\nT(3,2,\"RNE\",[[\"04\",\"02\"]],\"0\",[\"underflow\",\"inexact\"])              # 2^-5 tie -> 0 (even)\nT(3,2,\"RNA\",[[\"04\",\"02\"]],\"1\",[\"underflow\",\"inexact\"])              # tie away -> 2^-4\nT(3,2,\"RTZ\",[[\"04\",\"02\"]],\"0\",[\"underflow\",\"inexact\"])\nT(3,2,\"RUP\",[[\"04",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43365,
+      "time": "2026-10-08T20:44:16.258968+00:00",
+      "tool_call_id": "call_0e45b803fa0a44e6a62453df",
+      "command": "cd /app && sed -i 's/\\[\"5b\",\"0c\"\\]/[\"3b\",\"0c\"]/g' test_targeted.py && python3 test_targeted.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43518,
+      "time": "2026-10-08T20:44:22.469145+00:00",
+      "tool_call_id": "call_b68c99b0dc0e4177a371d4b7",
+      "command": "cd /app && sed -i 's/,\"5b\",\\[\"inexact\"\\])/,\"3b\",[\"inexact\"])/g' test_targeted.py && python3 test_targeted.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 44817,
+      "time": "2026-10-08T20:45:01.063716+00:00",
+      "tool_call_id": "call_8f0be29f7939482899997a8b",
+      "command": "cat > /app/test_extra.py << 'EOF'\nimport random, time, json\nimport main\nfrom test_ref import ref_solve\n\nrng = random.Random(777)\nfails = 0\n\ndef check(req):\n    global fails\n    got = main.solve(req)\n    eb, ef = ref_solve(req)\n    if int(got[\"bits\"],16) != eb or set(got[\"flags\"]) != ef:\n        print(\"MISMATCH\", req, \"got\", got, \"exp\", format(eb,\"x\"), sorted(ef))\n        fails += 1\n\n# cancellation with wide exponent spread, all modes, assorted formats\nfor ebits, fbits in ((3,2),(4,3),(5,10),(8,23),(11,52),(3,60),(11,2),(10,53)):\n    if 1+ebits+fbits > 64: continue\n    tbits = 1+ebits+fbits\n    for i in range(3000):\n        mode = rng.choice((\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"))\n        k = rng.randrange(1, 6)\n        pairs = []\n        for j in range(k):\n            a = rng.getrandbits(tbits)\n            b = rng.getrandbits(tbits)\n            pairs.append([format(a,\"x\"), format(b,\"x\")])\n            if rng.random() < 0.5:\n                # add cancelling partner (flip sign of one operand)\n                a2 = a ^ (1 << (tbits-1))\n                pairs.append([format(a2,\"x\"), format(b,\"x\")])\n            if rng.random() < 0.3:\n                # add tiny product\n                pairs.append([\"1\",\"1\"])\n        check({\"ebits\":ebits,\"fbits\":fbits,\"mode\":mode,\"pairs\":pairs})\nprint(\"cancellation tests done, fails:\", fails)\n\n# extreme-format sanity by hand: (3,60): min subnormal = 2^-62\nr = main.solve({\"ebits\":3,\"fbits\":60,\"mode\":\"RNE\",\"pairs\":[[\"1000000000000000\",\"1000000000000000\"]]})\n# 0x1<<60 = e=0,f=2^60? no: fbits=60, f = 2^60 & mask... careful: ftop = 2^59. pattern \"1\" << 60 = bit6",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 45439,
+      "time": "2026-10-08T20:45:22.589090+00:00",
+      "tool_call_id": "call_f7eba263b2494acfb8f6aab5",
+      "command": "cd /app && python3 - << 'EOF'\nsrc = open('test_extra.py').read()\nsrc = src.replace('''assert int(r[\"bits\"],16) == 0 and r[\"flags\"] == [], r''',\n'''assert int(r[\"bits\"],16) == 2**58 and r[\"flags\"] == [], r  # 0.25^2 = 2^-4 subnormal f=2^58''')\nopen('test_extra.py','w').write(src)\nEOF\npython3 test_extra.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 46902,
+      "time": "2026-10-08T20:46:24.497096+00:00",
+      "tool_call_id": "call_a952b6dc54b44a1d8d609d10",
+      "command": "cd /app && printf '%s\\n' \\\n '{\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"0c\",\"0c\"]]}' \\\n '{\"ebits\":3,\"fbits\":2,\"mode\":\"RDN\",\"pairs\":[]}' \\\n '{\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1c\",\"00\"]]}' \\\n '{\"ebits\":11,\"fbits\":52,\"mode\":\"RUP\",\"pairs\":[[\"7fefffffffffffff\",\"7fefffffffffffff\"],[\"1f\",\"0c\"]]}' \\\n | python3 main.py && echo \"=== full suites ===\" && python3 smoke.py && python3 test_targeted.py && python3 test_float.py && timeout 400 python3 test_ref.py",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 29887,
+      "time": "2026-10-08T20:38:30.680112+00:00",
+      "tool_call_id": "call_95fdaf7074824940b7bd394f",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:25 ..\n-rw-r--r-- 1 agent agent  896 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('exact-fused-dot',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:25 ..\n-rw-r--r-- 1 agent agent  896 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('exact-fused-dot',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 35020,
+      "time": "2026-10-08T20:40:24.140929+00:00",
+      "tool_call_id": "call_996b5f180f5f41ea8a977a4b",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/test_ref.py\", line 224, in <module>\n    main_test()\n  File \"/app/test_ref.py\", line 148, in main_test\n    if not check(req):\n           ^^^^^^^^^^\n  File \"/app/test_ref.py\", line 122, in check\n    got = main.solve(req)\n          ^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 84, in solve\n    prods.append((A[1] ^ B[1], A[2] * B[2], A[3] + B[3]))\n                               ~^^^\nIndexError: tuple index out of range\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/test_ref.py\", line 224, in <module>\n    main_test()\n  File \"/app/test_ref.py\", line 148, in main_test\n    if not check(req):\n           ^^^^^^^^^^\n  File \"/app/test_ref.py\", line 122, in check\n    got = main.solve(req)\n          ^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 84, in solve\n    prods.append((A[1] ^ B[1], A[2] * B[2], A[3] + B[3]))\n                               ~^^^\nIndexError: tuple index out of range\n"
+    },
+    {
+      "step": 44818,
+      "time": "2026-10-08T20:45:04.170711+00:00",
+      "tool_call_id": "call_8f0be29f7939482899997a8b",
+      "return_code": 1,
+      "stdout": "cancellation tests done, fails: 0\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/test_extra.py\", line 42, in <module>\n    assert int(r[\"bits\"],16) == 0 and r[\"flags\"] == [], r\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: {'bits': '400000000000000', 'flags': []}\n",
+      "stdout_tail": "cancellation tests done, fails: 0\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/test_extra.py\", line 42, in <module>\n    assert int(r[\"bits\"],16) == 0 and r[\"flags\"] == [], r\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: {'bits': '400000000000000', 'flags': []}\n"
+    }
+  ],
+  "last_events": [
+    {
+      "step": 42550,
+      "kind": "terminal_call",
+      "summary": "cat > /app/test_targeted.py << 'EOF'\nimport main\n\nCASES = []\ndef T(eb, fb, mode, pairs, bits, flags):\n    CASES.append(({\"ebits\": eb, \"fbits\": fb, \"mode\": mode, \"pairs\": pairs}, bits, set(flags)))\n\n# --- overflow midpoint ties (3/2: maxfinite=14, threshold 16) ---\nT(3,2,\"RNE\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1c\",[\"overflow\",\"inexact\"])   # 15 -> tie -> even sig -> 16 -> inf\nT(3,2,\"RNA\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1c\",[\"overflow\",\"inexact\"])\nT(3,2,\"RTZ\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1b\",[\"inexact\"])             # 14\nT(3,2,\"RUP\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1c\",[\"overflow\",\"inexact\"])\nT(3,2,\"RDN\",[[\"1b\",\"0c\"],[\"0c\",\"0c\"]],\"1b\",[\"inexact\"])\nT(3,2,\"RNE\",[[\"5b\",\"0c\"],[\"2c\",\"0c\"]],\"3c\",[\"overflow\",\"inexact\"])  # -15 -> -inf\nT(3,2,\"RTZ\",[[\"5b\",\"0c\"],[\"2c\",\"0c\"]],\"5b\",[\"inexact\"])             # -14\nT(3,2,\"RUP\",[[\"5b\",\"0c\"],[\"2c\",\"0c\"]],\"5b\",[\"inexact\"])             # toward +inf -> -14\nT(3,2,\"RDN\",[[\"5b\",\"0c\"],[\"2c\",\"0c\"]],\"3c\",[\"overflow\",\"inexact\"])  # toward -inf -> -inf\nT(3,2,\"RNE\",[[\"1b\",\"0c\"],[\"0e\","
+    },
+    {
+      "step": 42551,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "FAIL {'ebits': 3, 'fbits': 2, 'mode': 'RNE', 'pairs': [['5b', '0c'], ['2c', '0c']]} -> {'bits': '1a', 'flags': ['inexact']} expected 3c ['inexact', 'overflow']\nFAIL {'ebits': 3, 'fbits': 2, 'mode': 'RTZ', 'pairs': [['5b', '0c'], ['2c', '0c']]} -> {'bits': '1a', 'flags': ['inexact']} expected 5b ['inexact']\nFAIL {'ebits': 3, 'fbits': 2, 'mode': 'RUP', 'pairs': [['5b', '0c'], ['2c', '0c']]} -> {'bits': '1b', 'flags': ['inexact']} expected 5b ['inexact']\nFAIL {'ebits': 3, 'fbits': 2, 'mode': 'RDN', 'pairs': [['5b', '0c'], ['2c', '0c']]} -> {'bits': '1a', 'flags': ['inexact']} expected 3c ['inexact', 'overflow']\ntargeted: 67 cases, fails: 4\n"
+    },
+    {
+      "step": 43365,
+      "kind": "terminal_call",
+      "summary": "cd /app && sed -i 's/\\[\"5b\",\"0c\"\\]/[\"3b\",\"0c\"]/g' test_targeted.py && python3 test_targeted.py"
+    },
+    {
+      "step": 43366,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "FAIL {'ebits': 3, 'fbits': 2, 'mode': 'RTZ', 'pairs': [['3b', '0c'], ['2c', '0c']]} -> {'bits': '3b', 'flags': ['inexact']} expected 5b ['inexact']\nFAIL {'ebits': 3, 'fbits': 2, 'mode': 'RUP', 'pairs': [['3b', '0c'], ['2c', '0c']]} -> {'bits': '3b', 'flags': ['inexact']} expected 5b ['inexact']\ntargeted: 67 cases, fails: 2\n"
+    },
+    {
+      "step": 43518,
+      "kind": "terminal_call",
+      "summary": "cd /app && sed -i 's/,\"5b\",\\[\"inexact\"\\])/,\"3b\",[\"inexact\"])/g' test_targeted.py && python3 test_targeted.py"
+    },
+    {
+      "step": 43519,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "targeted: 67 cases, fails: 0\n"
+    },
+    {
+      "step": 44817,
+      "kind": "terminal_call",
+      "summary": "cat > /app/test_extra.py << 'EOF'\nimport random, time, json\nimport main\nfrom test_ref import ref_solve\n\nrng = random.Random(777)\nfails = 0\n\ndef check(req):\n    global fails\n    got = main.solve(req)\n    eb, ef = ref_solve(req)\n    if int(got[\"bits\"],16) != eb or set(got[\"flags\"]) != ef:\n        print(\"MISMATCH\", req, \"got\", got, \"exp\", format(eb,\"x\"), sorted(ef))\n        fails += 1\n\n# cancellation with wide exponent spread, all modes, assorted formats\nfor ebits, fbits in ((3,2),(4,3),(5,10),(8,23),(11,52),(3,60),(11,2),(10,53)):\n    if 1+ebits+fbits > 64: continue\n    tbits = 1+ebits+fbits\n    for i in range(3000):\n        mode = rng.choice((\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"))\n        k = rng.randrange(1, 6)\n        pairs = []\n        for j in range(k):\n            a = rng.getrandbits(tbits)\n            b = rng.getrandbits(tbits)\n            pairs.append([format(a,\"x\"), format(b,\"x\")])\n            if rng.random() < 0.5:\n                # add cancelling partner (flip sign of one operand)\n  "
+    },
+    {
+      "step": 44818,
+      "kind": "terminal_result",
+      "return_code": 1,
+      "summary": "cancellation tests done, fails: 0\nTraceback (most recent call last):\n  File \"/app/test_extra.py\", line 42, in <module>\n    assert int(r[\"bits\"],16) == 0 and r[\"flags\"] == [], r\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: {'bits': '400000000000000', 'flags': []}\n"
+    },
+    {
+      "step": 45439,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - << 'EOF'\nsrc = open('test_extra.py').read()\nsrc = src.replace('''assert int(r[\"bits\"],16) == 0 and r[\"flags\"] == [], r''',\n'''assert int(r[\"bits\"],16) == 2**58 and r[\"flags\"] == [], r  # 0.25^2 = 2^-4 subnormal f=2^58''')\nopen('test_extra.py','w').write(src)\nEOF\npython3 test_extra.py"
+    },
+    {
+      "step": 45440,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "cancellation tests done, fails: 0\nextreme format hand checks ok\n20000 requests x 64 pairs (double): 2.03s -> 0.102 ms/req\nEXTRA TESTS PASSED\n"
+    },
+    {
+      "step": 46902,
+      "kind": "terminal_call",
+      "summary": "cd /app && printf '%s\\n' \\\n '{\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"0c\",\"0c\"]]}' \\\n '{\"ebits\":3,\"fbits\":2,\"mode\":\"RDN\",\"pairs\":[]}' \\\n '{\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1c\",\"00\"]]}' \\\n '{\"ebits\":11,\"fbits\":52,\"mode\":\"RUP\",\"pairs\":[[\"7fefffffffffffff\",\"7fefffffffffffff\"],[\"1f\",\"0c\"]]}' \\\n | python3 main.py && echo \"=== full suites ===\" && python3 smoke.py && python3 test_targeted.py && python3 test_float.py && timeout 400 python3 test_ref.py"
+    },
+    {
+      "step": 46903,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "{\"bits\": \"c\", \"flags\": []}\n{\"bits\": \"20\", \"flags\": []}\n{\"bits\": \"1e\", \"flags\": [\"invalid\"]}\n{\"bits\": \"7ff0000000000000\", \"flags\": [\"overflow\", \"inexact\"]}\n=== full suites ===\nPassed 3 public examples\ntargeted: 67 cases, fails: 0\ntested 59836 fails 0\nexhaustive 3/2 single-pair done\nexhaustive 4/3 single-pair done\nrandom multi-pair done\nbiased random done\n64-pair double done\nALL DIFFERENTIAL TESTS PASSED\n"
+    }
+  ]
+}

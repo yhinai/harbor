@@ -1,0 +1,536 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-glm-checkpointed-journal-7-a1-e5043fc2",
+    "task": "checkpointed-journal",
+    "model": "accounts/fireworks/models/glm-5p3",
+    "replicate": 7,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-glm-checkpointed-journal-7-a1-e5043fc2.json",
+    "tool_calls": 34,
+    "agent_elapsed_seconds": 826.315477,
+    "input_tokens": 1170686,
+    "output_tokens": 44194,
+    "uncached_cost_estimate": 1.8334139999999999,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "f21d42bcff9b5ec88867c307c24e5f228d99a011fd36d99bdf0c146cc54c5928",
+    "network_mode": "none",
+    "artifact_sha256": "733ce95a48ce1d684d19b73f902813120023100624470e6f85c12628dec38200",
+    "normalized_artifact_sha256": "78ddf63ed9d5dd3912ce7b7d25a83c993f550ec1ac63a963ccdf91925dca22c1",
+    "terminal_nonzero_or_error_text_events": 18,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 36431,
+        "time": "2026-10-08T20:50:01.821383+00:00",
+        "artifact_sha256": "733ce95a48ce1d684d19b73f902813120023100624470e6f85c12628dec38200",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 611.831122,
+    "event_counts": {
+      "initial": 1,
+      "request": 34,
+      "stream_chunk": 44296,
+      "response": 34,
+      "terminal_call": 34,
+      "terminal_result": 34,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 86,
+      "time": "2026-10-08T20:39:51.500175+00:00",
+      "tool_call_id": "chatcmpl-tool-9c0c45b76228abdf",
+      "command": "ls -la /app/ 2>/dev/null && echo \"---\" && cat /app/smoke.py 2>/dev/null",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 88,
+      "time": "2026-10-08T20:39:51.748600+00:00",
+      "tool_call_id": "chatcmpl-tool-a28acd664d94fb87",
+      "command": "python3 --version && python3 -c \"import zlib; print(zlib.crc32(b''))\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 146,
+      "time": "2026-10-08T20:39:53.745412+00:00",
+      "tool_call_id": "chatcmpl-tool-b42b386bbe7c6c19",
+      "command": "cat /app/main.py; echo \"=== examples.json ===\"; cat /app/examples.json; echo \"=== public_contract.py ===\"; cat /app/public_contract.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 5391,
+      "time": "2026-10-08T20:41:09.005553+00:00",
+      "tool_call_id": "chatcmpl-tool-9cf54405632ebcad",
+      "command": "cd /app && cat > /tmp/decode.py <<'EOF'\nimport json, struct, zlib\ncases = json.loads(open('examples.json').read())\nfor c in cases:\n    log = bytes.fromhex(c['request']['log'])\n    print('=== case', c['id'], 'checkpoint', c['request']['checkpoint'], 'loglen', len(log))\n    pos = 0\n    while pos + 13 <= len(log):\n        plen, seq, kind, txid = struct.unpack_from('<IIBI', log, pos)\n        end = pos + 13 + plen + 4\n        if end > len(log):\n            print('  incomplete at', pos, 'plen', plen); break\n        header = log[pos:pos+13]; payload = log[pos+13:pos+13+plen]\n        crc = int.from_bytes(log[pos+13+plen:end], 'little')\n        calc = zlib.crc32(header+payload) & 0xffffffff\n        print(f'  @{pos:3d} plen={plen} seq={seq} kind={kind} tx={txid} payload={payload.hex()} crc={crc:08x} calc={calc:08x} {\"OK\" if crc==calc else \"BADCRC\"}')\n        pos = end\n    print('  expected:', c['expected'])\nEOF\npython3 /tmp/decode.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 10852,
+      "time": "2026-10-08T20:42:35.367650+00:00",
+      "tool_call_id": "chatcmpl-tool-ad15057df0cf2785",
+      "command": "cd /app && cat > main.py <<'PYEOF'\n#!/usr/bin/env python3\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nRequest  : {\"pages\": [hex...], \"checkpoint\": int, \"log\": hex}\nResponse : {\"pages\": [hex...], \"valid_bytes\": int, \"last_seq\": int}\n\nThe journal is a sequence of records:\n\n    payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32 | payload | crc:u32\n\nwith ``crc == zlib.crc32(header + payload) & 0xffffffff``.  Recovery replays the\nlongest structurally valid prefix of the log and re-applies the transactions\nthat were completely and correctly sealed by a COMMIT whose sequence is newer\nthan the durable checkpoint watermark.\n\"\"\"\n\nimport json\nimport struct\nimport sys\nimport zlib\n\n# Record header: payload_length, sequence, kind, transaction_id (13 bytes).\n_HEADER = struct.Struct(\"<IIBI\")\n# PATCH payload prefix: page_index, byte_offset, byte_count.\n_PATCH = struct.Struct(\"<HHH\")\n# COMMIT payload: patch_count, digest.\n_COMMIT = struct.Struct(\"<II\")\n\n_HEADER_SIZE = _HEADER.size          # 13\n_CRC_SIZE = 4\n_MAX_PAYLOAD = 4096\n\n_BEGIN = 1\n_PATCH_KIND = 2\n_COMMIT_KIND = 3\n_ABORT = 4\n_VALID_KINDS = frozenset((_BEGIN, _PATCH_KIND, _COMMIT_KIND, _ABORT))\n\n\ndef _decode_log(log):\n    \"\"\"Return the raw log bytes (hex case is immaterial).\"\"\"\n    if not log:\n        return b\"\"\n    if isinstance(log, str):\n        text = log.strip()\n        if not text:\n            return b\"\"\n        # Tolerate a stray \"0x\" prefix defensively; the contract never sends it.\n        if text[:2].lower() == \"0x\":\n            text = text[2:]\n        return bytes.fromhex(text)\n    ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 13212,
+      "time": "2026-10-08T20:43:15.212173+00:00",
+      "tool_call_id": "chatcmpl-tool-b950f30c84166ca2",
+      "command": "mkdir -p /tmp/t && cat > /tmp/t/harness.py <<'PYEOF'\nimport json, struct, subprocess, sys, zlib, os\n\nAPP = '/app'\n\ndef rec(seq, kind, txid, payload=b'', crc=None, plen=None, seq_field=None, kind_field=None, tx_field=None):\n    \"\"\"Build a record; *_field allow deliberate header corruption.\"\"\"\n    header = struct.pack('<IIBI',\n                         len(payload) if plen is None else plen,\n                         seq if seq_field is None else seq_field,\n                         kind if kind_field is None else kind_field,\n                         txid if tx_field is None else tx_field)\n    if crc is None:\n        crc = zlib.crc32(header + payload) & 0xffffffff\n    return header + payload + struct.pack('<I', crc)\n\ndef patch(page, off, data):\n    return struct.pack('<HHH', page, off, len(data)) + data\n\ndef commit(count, digest):\n    return struct.pack('<II', count, digest)\n\ndef digest_of(payloads):\n    return zlib.crc32(b''.join(payloads)) & 0xffffffff\n\ndef run(requests):\n    p = subprocess.run([sys.executable, os.path.join(APP, 'main.py')],\n                      input=''.join(json.dumps(r) + '\\n' for r in requests),\n                      text=True, capture_output=True, cwd=APP)\n    assert p.returncode == 0, (p.returncode, p.stderr)\n    assert not p.stdout.count('\\n') or True\n    lines = p.stdout.splitlines()\n    assert len(lines) == len(requests), (len(lines), len(requests), p.stderr)\n    return [json.loads(l) for l in lines]\n\ndef check(name, request, expected):\n    got = run([request])[0]\n    ok = (got.get('valid_bytes') == expected['valid_bytes']\n          and got.get('last",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 13802,
+      "time": "2026-10-08T20:43:26.544160+00:00",
+      "tool_call_id": "chatcmpl-tool-8da1ebd54c72b013",
+      "command": "cat > /tmp/t/scenarios.py <<'PYEOF'\nimport sys\nsys.path.insert(0, '/tmp/t')\nfrom harness import rec, patch, commit, digest_of, check\n\nP = [\"00000000\", \"00000000\"]        # two 4-byte pages\nresults = []\n\ndef T(name, log_recs, expected_pages, valid_bytes, last_seq, checkpoint=0, pages=P, log=None):\n    loghex = (log.hex() if isinstance(log, (bytes, bytearray)) else log) if log is not None else b''.join(log_recs).hex()\n    req = {\"pages\": pages, \"checkpoint\": checkpoint, \"log\": loghex.upper() if 'upper' in name else loghex}\n    return check(name, req, {\"pages\": expected_pages, \"valid_bytes\": valid_bytes, \"last_seq\": last_seq})\n\n# --- basics -----------------------------------------------------------------\nresults.append(T(\"empty-log\", [], P, 0, 0))\nresults.append(T(\"single-commit\", [rec(1,1,7), rec(2,2,7,patch(0,0,b'\\x11\\x22')),\n                                   rec(3,3,7,commit(1,digest_of([patch(0,0,b'\\x11\\x22')])))],\n                [\"11220000\",\"00000000\"], 67, 3))\n\n# interleaved transactions: commit order governs application order\np1 = patch(0,0,b'\\x11\\x22'); p2 = patch(0,1,b'\\x22\\x44')\nresults.append(T(\"commit-order\", [rec(1,1,1), rec(2,2,1,p1), rec(3,1,2), rec(4,2,2,p2),\n                                  rec(5,3,2,commit(1,digest_of([p2]))),\n                                  rec(6,3,1,commit(1,digest_of([p1])))],\n                [\"11442200\",\"00000000\"], 134, 6))\n\n# overlapping patches inside one transaction: later wins\na = patch(0,0,b'\\xaa\\xbb'); b = patch(0,1,b'\\xcc')\nresults.append(T(\"overlap-in-tx\", [rec(1,1,3), rec(2,2,3,a), rec(3,2,3,b),\n                           ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 14678,
+      "time": "2026-10-08T20:43:41.993659+00:00",
+      "tool_call_id": "chatcmpl-tool-a4502e6a1b974bd5",
+      "command": "cat > /tmp/t/harness.py <<'PYEOF'\nimport json, struct, subprocess, sys, zlib, os\n\nAPP = '/app'\n\ndef R(seq, kind, txid, payload=b'', **over):\n    \"\"\"Build a record as (bytes, seq). Keyword args corrupt specific fields.\"\"\"\n    plen = over.get('plen', len(payload))\n    h = struct.pack('<IIBI', plen, over.get('seqf', seq), over.get('kindf', kind),\n                    over.get('txf', txid))\n    crc = over.get('crc', zlib.crc32(h + payload) & 0xffffffff)\n    return (h + payload + struct.pack('<I', crc), seq)\n\ndef patch(page, off, data):\n    return struct.pack('<HHH', page, off, len(data)) + data\n\ndef commit(count, digest):\n    return struct.pack('<II', count, digest)\n\ndef dg(*payloads):\n    return zlib.crc32(b''.join(payloads)) & 0xffffffff\n\ndef run(requests):\n    p = subprocess.run([sys.executable, os.path.join(APP, 'main.py')],\n                      input=''.join(json.dumps(r) + '\\n' for r in requests),\n                      text=True, capture_output=True, cwd=APP)\n    assert p.returncode == 0, (p.returncode, p.stderr)\n    lines = p.stdout.splitlines()\n    assert len(lines) == len(requests), (len(lines), len(requests), p.stderr)\n    return [json.loads(l) for l in lines]\n\nFAILED = []\n\ndef T(name, recs, expected_pages, nvalid, checkpoint=0, pages=(\"00000000\", \"00000000\"),\n      log=None, expect=None):\n    \"\"\"nvalid = number of leading records that belong to the valid prefix.\"\"\"\n    if log is None:\n        log = b''.join(r for r, _ in recs).hex()\n    req = {\"pages\": list(pages), \"checkpoint\": checkpoint,\n           \"log\": log.upper() if name.startswith('upper') else log}\n    exp =",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 18997,
+      "time": "2026-10-08T20:44:40.429077+00:00",
+      "tool_call_id": "chatcmpl-tool-981283801c85a8b3",
+      "command": "cat > /tmp/t/scenarios.py <<'PYEOF'\nimport sys\nsys.path.insert(0, '/tmp/t')\nfrom harness import R, patch, commit, dg, T, FAILED\n\nP = (\"00000000\", \"00000000\")\nQ = (\"00112233445566778899\", \"ffeeddccbbaa99887766\")   # 10-byte pages\none = (\"00000000\",)\n\n# ---------------------------------------------------------------- basics ---\nT(\"empty-log\", [], P, 0)\n\np1 = patch(0, 0, b'\\x11\\x22')\nT(\"single-commit\",\n  [R(1,1,7), R(2,2,7,p1), R(3,3,7,commit(1,dg(p1)))],\n  [\"11220000\",\"00000000\"], 3)\n\npA, pB = patch(0,0,b'\\x11\\x22'), patch(0,1,b'\\x44\\x55')\nT(\"commit-order-interleaved\",\n  [R(1,1,1), R(2,2,1,pA), R(3,1,2), R(4,2,2,pB),\n   R(5,3,2,commit(1,dg(pB))), R(6,3,1,commit(1,dg(pA)))],\n  [\"11445500\",\"00000000\"], 6)\n\na, b = patch(0,0,b'\\xaa\\xbb'), patch(0,1,b'\\xcc')\nT(\"overlap-in-tx\",\n  [R(1,1,3), R(2,2,3,a), R(3,2,3,b), R(4,3,3,commit(2,dg(a,b)))],\n  [\"aacce\\x00\".replace('e','\\x00',\"00000000\") and \"aacc0000\",\"00000000\"], 4)\n\nT(\"patch-second-page\",\n  [R(1,1,9), R(2,2,9,patch(1,2,b'\\xde\\xad')), R(3,3,9,commit(1,dg(patch(1,2,b'\\xde\\xad'))))],\n  [\"00000000\",\"0000dead\"], 3)\n\nT(\"patch-full-page-exact-fit\",\n  [R(1,1,5), R(2,2,5,patch(1,0,b'\\x01\\x02\\x03\\x04')), R(3,3,5,commit(1,dg(patch(1,0,b'\\x01\\x02\\x03\\x04'))))],\n  [\"00000000\",\"01020304\"], 3)\n\n# empty incarnation commits cleanly (empty concatenation digest == 0)\nT(\"empty-transaction-commit\", [R(1,1,2), R(2,3,2,commit(0,0))], list(P), 2)\n\n# same transaction id reused sequentially\nc1, c2 = patch(0,0,b'\\x01\\x02'), patch(0,2,b'\\x03\\x04')\nT(\"tx-id-reuse\",\n  [R(1,1,4), R(2,2,4,c1), R(3,3,4,commit(1,dg(c1))),\n   R(4,1,4), R(5,2,4,c2), R(6,3,4,commit",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 20169,
+      "time": "2026-10-08T20:45:00.139921+00:00",
+      "tool_call_id": "chatcmpl-tool-a2be3501b46c1f7e",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport re\ns = open('scenarios.py').read()\ns = s.replace('''  [\"11445500\",\"00000000\"], 6)''', '''  [\"11225500\",\"00000000\"], 6)  # tx2 commits first, tx1 (offset 0-1) commits last''')\ns = s.replace('''  [\"aacce\\\\x00\".replace('e','\\\\x00',\"00000000\") and \"aacc0000\",\"00000000\"], 4)''',\n              '''  [\"aacc0000\",\"00000000\"], 4)''')\nopen('scenarios.py','w').write(s)\nEOF\npython3 scenarios.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 21903,
+      "time": "2026-10-08T20:45:30.982265+00:00",
+      "tool_call_id": "chatcmpl-tool-8e06ed77bc0bbdab",
+      "command": "cd /tmp/t && python3 - <<'EOF'\ns = open('scenarios.py').read()\nfixes = [\n # torn record: the incomplete record is excluded -> only 0 valid bytes\n ('T(\"torn-header-few-bytes\", [R(1,1,1)], list(P), 1,',\n  'T(\"torn-header-few-bytes\", [R(1,1,1)], list(P), 0,'),\n # record 2 loses its last CRC bytes -> excluded, prefix is record 1\n ('T(\"torn-crc\", [R(1,1,1), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 2,',\n  'T(\"torn-crc\", [R(1,1,1), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 1,'),\n # these first records are themselves invalid -> empty prefix\n ('T(\"txid-zero\", [R(1,1,0), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 1)',\n  'T(\"txid-zero\", [R(1,1,0), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 0)'),\n ('T(\"kind-zero\", [R(1,0,1), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 1)',\n  'T(\"kind-zero\", [R(1,0,1), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 0)'),\n ('T(\"kind-unknown-5\", [R(1,5,1), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 1)',\n  'T(\"kind-unknown-5\", [R(1,5,1), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 0)'),\n ('T(\"kind-255\", [R(1,255,1), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 1)',\n  'T(\"kind-255\", [R(1,255,1), R(2,2,1,patch(0,0,b\\'\\\\x11\\\\x22\\'))], list(P), 0)'),\n # single page request -> single page response\n ('''T(\"patch-page-index-equal-npages\", [R(1,2,1,patch(1,0,b'\\\\x11'))], list(P), 0, pages=one)''',\n  '''T(\"patch-page-index-equal-npages\", [R(1,2,1,patch(1,0,b'\\\\x11'))], list(one), 0, pages=one)'''),\n # commit seq 3 vs checkpoint 2 means *above*; use 4 for a true below case\n ('''  [R(1,1,1), R(2,2,1,old), R(3,3,1,commit(1,dg(old)))], li",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 22152,
+      "time": "2026-10-08T20:45:43.104849+00:00",
+      "tool_call_id": "chatcmpl-tool-8482d8a52caf61b8",
+      "command": "cd /tmp/t && sed -i 's/\\[\"0011223344556677880102\"/[\"00112233445566770102\"/' scenarios.py && python3 scenarios.py 2>&1 | tail -4 && python3 scenarios.py 2>&1 | grep -c PASS",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 23853,
+      "time": "2026-10-08T20:46:19.557447+00:00",
+      "tool_call_id": "chatcmpl-tool-be82ac5c730597df",
+      "command": "cat > /tmp/t/reference.py <<'PYEOF'\n\"\"\"Independent re-reading of the spec, used only to cross-check main.solve.\"\"\"\nimport zlib\n\n\ndef reference(request):\n    data = bytes.fromhex(request[\"log\"])\n    pages = [bytearray(bytes.fromhex(p)) for p in request[\"pages\"]]\n    sizes = [len(p) for p in pages]\n    checkpoint = request[\"checkpoint\"]\n\n    i = 0\n    last = 0\n    valid = 0\n    active = {}\n\n    while i < len(data):\n        if i + 13 > len(data):\n            break\n        plen = int.from_bytes(data[i:i + 4], \"little\")\n        seq = int.from_bytes(data[i + 4:i + 8], \"little\")\n        kind = data[i + 8]\n        txid = int.from_bytes(data[i + 9:i + 13], \"little\")\n        if plen > 4096:\n            break\n        if i + 13 + plen + 4 > len(data):\n            break\n        body = data[i:i + 13 + plen]\n        if zlib.crc32(body) != int.from_bytes(data[i + 13 + plen:i + 13 + plen + 4], \"little\"):\n            break\n        if seq == 0 or seq <= last:\n            break\n        if txid == 0:\n            break\n        if kind not in (1, 2, 3, 4):\n            break\n        payload = data[i + 13:i + 13 + plen]\n        if kind in (1, 4):\n            if plen != 0:\n                break\n        elif kind == 2:\n            if plen < 6:\n                break\n            pi = int.from_bytes(payload[0:2], \"little\")\n            off = int.from_bytes(payload[2:4], \"little\")\n            cnt = int.from_bytes(payload[4:6], \"little\")\n            if cnt == 0 or plen != 6 + cnt:\n                break\n            if pi >= len(sizes) or off + cnt > sizes[pi]:\n                break\n        else:\n           ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 25434,
+      "time": "2026-10-08T20:46:43.921530+00:00",
+      "tool_call_id": "chatcmpl-tool-bb000d32e95667c5",
+      "command": "cat > /tmp/t/fuzz.py <<'PYEOF'\nimport random, struct, sys, zlib\nsys.path.insert(0, '/tmp/t'); sys.path.insert(0, '/app')\nfrom reference import reference\nfrom main import solve\n\nKINDS = (1, 2, 3, 4)\n\ndef rand_payload(rng, kind, npages, page_size, staged):\n    \"\"\"Return a payload of the right shape most of the time.\"\"\"\n    shape_ok = rng.random() < 0.85\n    if kind in (1, 4):\n        return b'' if shape_ok else bytes(rng.randrange(256) for _ in range(rng.randrange(1, 5)))\n    if kind == 3:\n        if shape_ok:\n            count = len(staged) if rng.random() < 0.7 else rng.randrange(0, 4)\n            digest = zlib.crc32(b''.join(staged)) & 0xffffffff if count == len(staged) and rng.random() < 0.7 \\\n                     else rng.randrange(1 << 32)\n            return struct.pack('<II', count, digest)\n        return bytes(rng.randrange(256) for _ in range(rng.choice((0, 1, 7, 9, 12))))\n    # PATCH\n    if shape_ok:\n        page = rng.randrange(npages) if rng.random() < 0.9 else rng.randrange(0, npages + 3)\n        room = page_size if page < npages else page_size + 4\n        off = rng.randrange(0, room) if rng.random() < 0.9 else room + rng.randrange(0, 3)\n        cnt = rng.randrange(1, max(2, min(page_size, 8)) + 1)\n        if rng.random() < 0.15:\n            off = max(0, room - cnt + rng.choice((-1, 1, 2)))   # boundary cases\n        data = bytes(rng.randrange(256) for _ in range(cnt))\n        p = struct.pack('<HHH', page, off, cnt) + data\n        if rng.random() < 0.1:      # payload length that lies about count\n            p = p + bytes(rng.randrange(256) for _ in range(rng.ran",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 25837,
+      "time": "2026-10-08T20:46:51.119929+00:00",
+      "tool_call_id": "chatcmpl-tool-83c448acfd7f3d29",
+      "command": "cd /tmp/t && cat > fuzzstats.py <<'PYEOF'\nimport random, sys, zlib\nsys.path.insert(0, '/tmp/t'); sys.path.insert(0, '/app')\nimport fuzz as F\nfrom reference import reference\nfrom main import solve\n\nfor seed in (2, 3, 4, 5, 6, 7):\n    rng = random.Random(seed)\n    stats = {'cases': 3000, 'full': 0, 'partial': 0, 'empty': 0, 'changed': 0, 'bytes': 0}\n    for _ in range(3000):\n        req = F.build_request(rng)\n        exp = reference(req); got = solve(req)\n        assert exp == got, (req, exp, got)\n        n = len(bytes.fromhex(req['log']))\n        if exp['valid_bytes'] == n and n: stats['full'] += 1\n        elif exp['valid_bytes'] == 0: stats['empty'] += 1\n        else: stats['partial'] += 1\n        if exp['pages'] != req['pages']: stats['changed'] += 1\n        stats['bytes'] += exp['valid_bytes']\n    print(seed, stats)\nPYEOF\npython3 fuzzstats.py 2>&1 | grep -v '^fuzz done'",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 26015,
+      "time": "2026-10-08T20:46:55.689413+00:00",
+      "tool_call_id": "chatcmpl-tool-a25323a422d53cfd",
+      "command": "cd /tmp/t && python3 - <<'EOF'\ns = open('fuzz.py').read()\ni = s.index(\"rng = random.Random(\")\nhead, tail = s[:i], s[i:]\ntail = \"\\n\".join(\"    \" + l if l.strip() else l for l in tail.splitlines())\nopen('fuzz.py','w').write(head + 'if __name__ == \"__main__\":\\n' + tail + \"\\n\")\nEOF\npython3 fuzz.py 2 && python3 fuzzstats.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 27470,
+      "time": "2026-10-08T20:47:21.632349+00:00",
+      "tool_call_id": "chatcmpl-tool-8d4924df7f2fd678",
+      "command": "cat > /tmp/t/fuzz_clean.py <<'PYEOF'\nimport random, struct, sys, zlib\nsys.path.insert(0, '/tmp/t'); sys.path.insert(0, '/app')\nfrom reference import reference\nfrom main import solve\n\ndef build_valid(rng):\n    npages = rng.randrange(1, 9)\n    page_size = rng.randrange(1, 65)\n    pages = [''.join('%02x' % rng.randrange(256) for _ in range(page_size)) for _ in range(page_size and npages)]\n    ids = list(range(1, rng.randrange(1, 5) + 1))\n    recs, seq = [], 0\n    active = {}\n    for _ in range(rng.randrange(0, 40)):\n        seq += rng.randrange(1, 4)\n        kind = rng.choices((1, 2, 3, 4), weights=(2, 6, 3, 1))[0]\n        txid = rng.choice(ids)\n        staged = active.get(txid, [])\n        if kind == 1:\n            payload = b''\n            active[txid] = []\n        elif kind == 2:\n            if txid not in active:                 # inactive patch: shape-valid only\n                page = rng.randrange(npages); off = rng.randrange(0, page_size)\n                cnt = rng.randrange(1, min(8, page_size - off) + 1)\n                payload = struct.pack('<HHH', page, off, cnt) + bytes(rng.randrange(256) for _ in range(cnt))\n            else:\n                page = rng.randrange(npages); off = rng.randrange(0, page_size)\n                cnt = rng.randrange(1, min(8, page_size - off) + 1)\n                payload = struct.pack('<HHH', page, off, cnt) + bytes(rng.randrange(256) for _ in range(cnt))\n                active[txid].append(payload)\n        elif kind == 3:\n            good = rng.random() < 0.8\n            cnt = len(staged) if good else rng.randrange(0, len(staged) + 3)\n     ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 29770,
+      "time": "2026-10-08T20:48:02.691829+00:00",
+      "tool_call_id": "chatcmpl-tool-9f9fd888598acba5",
+      "command": "cat > /tmp/t/perf.py <<'PYEOF'\nimport json, struct, sys, time, zlib, random, subprocess, os\nrng = random.Random(7)\nnpages, page_size = 8, 64\npages = [''.join('%02x' % rng.randrange(256) for _ in range(page_size)) for _ in range(npages)]\n\n# Fill a 64 KiB log with complete transactions (BEGIN/PATCH/COMMIT triplets).\nrecs, seq = [], 0\ntotal = 0\nLIMIT = 65536\nwhile True:\n    body = []\n    seq += 1\n    body.append(struct.pack('<IIBI', 0, seq, 1, 1))\n    seq += 1\n    staged = []\n    for _ in range(rng.randrange(1, 4)):\n        off = rng.randrange(0, page_size - 3)\n        cnt = rng.randrange(1, 4)\n        p = struct.pack('<HHH', rng.randrange(npages), off, cnt) + bytes(rng.randrange(256) for _ in range(cnt))\n        staged.append(p)\n    for p in staged:\n        seq += 1\n        r = struct.pack('<IIBI', len(p), seq, 2, 1) + p\n        body.append(r + struct.pack('<I', zlib.crc32(r) & 0xffffffff))\n    seq += 1\n    c = struct.pack('<II', len(staged), zlib.crc32(b''.join(staged)) & 0xffffffff)\n    r = struct.pack('<IIBI', len(c), seq, 3, 1) + c\n    body.append(r + struct.pack('<I', zlib.crc32(r) & 0xffffffff))\n    out = []\n    for r in body:\n        out.append(r + struct.pack('<I', zlib.crc32(r) & 0xffffffff) if False else r)\n    # recompute crc per record properly (header+payload already whole record minus crc)\n    fixed = []\n    for r in body:\n        fixed.append(r + struct.pack('<I', zlib.crc32(r) & 0xffffffff))\n    chunk = b''.join(fixed)\n    if total + len(chunk) > LIMIT:\n        break\n    total += len(chunk)\n    recs.append(chunk)\nlog = b''.join(recs).hex()\nprint('log bytes', l",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 30450,
+      "time": "2026-10-08T20:48:19.931205+00:00",
+      "tool_call_id": "chatcmpl-tool-844d8ee5eeb63cab",
+      "command": "cd /tmp/t && python3 - <<'EOF'\ns = open('perf.py').read()\nold_start = s.index(\"recs, seq = [], 0\")\nold_end = s.index(\"log = b''.join(recs).hex()\")\nnew = '''recs, seq = [], 0\ntotal = 0\nLIMIT = 65536\ndef mk(seq, kind, txid, payload=b''):\n    h = struct.pack('<IIBI', len(payload), seq, kind, txid) + payload\n    return h + struct.pack('<I', zlib.crc32(h) & 0xffffffff)\nwhile True:\n    chunk_parts = []\n    seq += 1\n    chunk_parts.append(mk(seq, 1, 1))\n    staged = []\n    for _ in range(rng.randrange(1, 4)):\n        off = rng.randrange(0, page_size - 3)\n        cnt = rng.randrange(1, 4)\n        p = struct.pack('<HHH', rng.randrange(npages), off, cnt) + bytes(rng.randrange(256) for _ in range(cnt))\n        staged.append(p)\n    for p in staged:\n        seq += 1\n        chunk_parts.append(mk(seq, 2, 1, p))\n    seq += 1\n    c = struct.pack('<II', len(staged), zlib.crc32(b''.join(staged)) & 0xffffffff)\n    chunk_parts.append(mk(seq, 3, 1, c))\n    chunk = b''.join(chunk_parts)\n    if total + len(chunk) > LIMIT:\n        break\n    total += len(chunk)\n    recs.append(chunk)\n'''\nopen('perf.py','w').write(s[:old_start] + new + s[old_end:])\nEOF\npython3 perf.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 31087,
+      "time": "2026-10-08T20:48:38.580097+00:00",
+      "tool_call_id": "chatcmpl-tool-b9e84f8e1322417e",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport json, subprocess, sys, collections\nexec(open('perf.py').read().split(\"N = 1500\")[0])\nimport random\nreqs = [{\"pages\": pages, \"checkpoint\": c, \"log\": log} for c in (0, 1425, 2850, 2851)]\np = subprocess.run([sys.executable, '/app/main.py'], input=''.join(json.dumps(r)+'\\n' for r in reqs), text=True, capture_output=True, cwd='/app')\nouts = [json.loads(l) for l in p.stdout.splitlines()]\nfor c, o in zip((0,1425,2850,2851), outs):\n    print(c, o['valid_bytes'], o['last_seq'], len(bytes.fromhex(log)))\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 31731,
+      "time": "2026-10-08T20:48:49.873791+00:00",
+      "tool_call_id": "chatcmpl-tool-ae60f0ae426617cc",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport json, subprocess, sys, collections, re\nsrc = open('perf.py').read()\nexec(src[:src.index(\"N = 1500\")])\nreqs = [{\"pages\": pages, \"checkpoint\": rng.choice((0, 0, 0, seq // 2)), \"log\": log} for _ in range(300)]\np = subprocess.run([sys.executable, '/app/main.py'], input=''.join(json.dumps(r)+'\\n' for r in reqs), text=True, capture_output=True, cwd='/app')\nouts = [json.loads(l) for l in p.stdout.splitlines()]\nprint(collections.Counter((o['valid_bytes'], o['last_seq']) for o in outs))\nprint('expected valid_bytes', len(bytes.fromhex(log)), 'last_seq', seq)\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 33033,
+      "time": "2026-10-08T20:49:12.775656+00:00",
+      "tool_call_id": "chatcmpl-tool-933d0821f8dae738",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport cProfile, pstats, io, sys, json\nsys.path.insert(0, '/app'); sys.path.insert(0, '/tmp/t')\nsrc = open('perf.py').read()\nexec(src[:src.index(\"N = 1500\")])\nfrom main import solve\nreq = {\"pages\": pages, \"checkpoint\": 0, \"log\": log}\nsolve(req)  # warm\npr = cProfile.Profile(); pr.enable()\nfor _ in range(50): solve(req)\npr.disable()\ns = io.StringIO(); pstats.Stats(pr, stream=s).sort_stats('tottime').print_stats(12)\nprint(s.getvalue()[:2000])\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 36431,
+      "time": "2026-10-08T20:50:01.821383+00:00",
+      "tool_call_id": "chatcmpl-tool-9974e822da4f5646",
+      "command": "cd /app && cat > main.py <<'PYEOF'\n#!/usr/bin/env python3\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nRequest  : {\"pages\": [hex, ...], \"checkpoint\": int, \"log\": hex}\nResponse : {\"pages\": [hex, ...], \"valid_bytes\": int, \"last_seq\": int}\n\nRecord layout (all integers unsigned little-endian, no implicit padding):\n\n    payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32 | payload | crc:u32\n\nwith ``crc == zlib.crc32(header + payload) & 0xffffffff``.  Kinds:\n\n    1 BEGIN  empty payload\n    2 PATCH  page_index:u16 | byte_offset:u16 | byte_count:u16 | data[byte_count]\n    3 COMMIT patch_count:u32 | digest:u32\n    4 ABORT  empty payload\n\nRecovery replays the longest structurally valid prefix of the log, maintaining\ntransaction state across the whole prefix (records at or below the checkpoint\nincluded), and re-applies the staged patches of every transaction that was\nclosed by a correctly sealed COMMIT whose sequence is newer than the durable\ncheckpoint watermark.\n\"\"\"\n\nimport json\nimport struct\nimport sys\nimport zlib\n\n# Record header: payload_length, sequence, kind, transaction_id (13 bytes).\n_HEADER = struct.Struct(\"<IIBI\")\n# Trailing CRC field.\n_CRC = struct.Struct(\"<I\")\n# PATCH payload prefix: page_index, byte_offset, byte_count.\n_PATCH = struct.Struct(\"<HHH\")\n# COMMIT payload: patch_count, digest.\n_COMMIT = struct.Struct(\"<II\")\n\n_HEADER_SIZE = _HEADER.size      # 13\n_CRC_SIZE = _CRC.size            # 4\n_MAX_PAYLOAD = 4096\n\n_BEGIN = 1\n_PATCH_KIND = 2\n_COMMIT_KIND = 3\n_ABORT = 4\n\n\ndef _decode_pages(pages):\n    \"\"\"Authoritative durable checkpo",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 36493,
+      "time": "2026-10-08T20:50:07.955057+00:00",
+      "tool_call_id": "chatcmpl-tool-b66060cdd2d1b7b3",
+      "command": "cd /tmp/t && python3 scenarios.py 2>&1 | tail -3 && python3 fuzz.py 1 && python3 fuzz.py 99 && python3 fuzz_clean.py 2>&1 | tail -3",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 37025,
+      "time": "2026-10-08T20:50:27.873042+00:00",
+      "tool_call_id": "chatcmpl-tool-a4736322e8625bf0",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport json, subprocess, sys, time, collections\nsrc = open('perf.py').read()\nexec(src[:src.index(\"N = 1500\")])\nlast_record_seq = max([s for _, s in [] ] ) if False else None\n# derive last record sequence by decoding the log\nimport struct\ndata = bytes.fromhex(log); p = 0; lastseq = 0\nwhile p + 13 <= len(data):\n    plen, seq, kind, txid = struct.unpack_from('<IIBI', data, p)\n    e = p + 13 + plen + 4\n    if e > len(data) or plen > 4096: break\n    lastseq = seq; p = e\nprint('last record seq =', lastseq, 'full valid bytes =', p, '/', len(data))\nN = 2000\nreqs = [{\"pages\": pages, \"checkpoint\": rng.choice((0, 0, 0, lastseq // 2)), \"log\": log} for _ in range(N)]\npayload = ''.join(json.dumps(r) + '\\n' for r in reqs)\nt0 = time.time()\npr = subprocess.run([sys.executable, '/app/main.py'], input=payload, text=True, capture_output=True, cwd='/app')\ndt = time.time() - t0\nassert pr.returncode == 0, pr.stderr\nouts = [json.loads(l) for l in pr.stdout.splitlines()]\nprint('requests', N, 'total time %.2fs' % dt, '=> %.3f ms/request' % (dt/N*1000),\n      '(%d MiB of log processed)' % (N*len(data)//1048576))\nprint(collections.Counter((o['valid_bytes'], o['last_seq']) for o in outs))\nassert all(o['valid_bytes'] == len(data) and o['last_seq'] == lastseq for o in outs)\nassert len(outs) == N\ndistinct = len({tuple(o['pages']) for o in outs})\nprint('distinct page results:', distinct)\nprint('OK')\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 38360,
+      "time": "2026-10-08T20:50:52.886540+00:00",
+      "tool_call_id": "chatcmpl-tool-b8ead7904f92e2fe",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport json, struct, subprocess, sys, time, zlib, random\nrng = random.Random(3)\ndef mk(seq, kind, txid, payload=b''):\n    h = struct.pack('<IIBI', len(payload), seq, kind, txid) + payload\n    return h + struct.pack('<I', zlib.crc32(h) & 0xffffffff)\n\ndef build(kind):\n    pages = [''.join('%02x' % rng.randrange(256) for _ in range(64)) for _ in range(8)]\n    recs, seq, staged = [], 0, []\n    budget = 65536\n    total = 0\n    if kind == 'begins':            # densest possible: 17-byte records\n        while True:\n            seq += 1\n            r = mk(seq, 1, 1)\n            if total + len(r) > budget: break\n            total += len(r); recs.append(r)\n    elif kind == 'orphan-patches':  # patches for inactive tx (ignored)\n        while True:\n            seq += 1\n            p = struct.pack('<HHH', 0, 0, 64) + bytes(64)\n            r = mk(seq, 2, 5, p)\n            if total + len(r) > budget: break\n            total += len(r); recs.append(r)\n    elif kind == 'one-giant-tx':    # BEGIN + max patches + COMMIT\n        seq += 1; recs.append(mk(seq, 1, 1))\n        while True:\n            seq += 1\n            p = struct.pack('<HHH', rng.randrange(8), 0, 64) + bytes(64)\n            r = mk(seq, 2, 1, p)\n            if total + len(r) + 25 > budget: break\n            total += len(r); staged.append(p); recs.append(r)\n        seq += 1\n        c = struct.pack('<II', len(staged), zlib.crc32(b''.join(staged)) & 0xffffffff)\n        recs.append(mk(seq, 3, 1, c))\n    elif kind == 'mismatched-commit':\n        while True:\n            seq += 1\n            recs.append(mk(",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 40879,
+      "time": "2026-10-08T20:51:33.931650+00:00",
+      "tool_call_id": "chatcmpl-tool-a31491fc75e8ed4f",
+      "command": "cd /tmp/t && cat >> scenarios.py <<'PYEOF'\n\n# -------------------------------------------- extra hand-computed cases ---\nig, st = patch(0,0,b'\\x11\\x22'), patch(0,2,b'\\x33\\x44')\nT(\"inactive-patch-excluded-from-digest\",\n  [R(1,1,2), R(2,2,1,ig), R(3,2,2,st), R(4,3,2,commit(1,dg(st)))],\n  [\"00003344\",\"00000000\"], 4)\nT(\"inactive-patch-counted-anyway-mismatch\",\n  [R(1,1,2), R(2,2,1,ig), R(3,2,2,st), R(4,3,2,commit(2,dg(ig,st)))],\n  list(P), 4)\nT(\"mismatch-then-fresh-begin-applies\",\n  [R(1,1,1), R(2,2,1,st), R(3,3,1,commit(1,0)),\n   R(4,1,1), R(5,2,1,ig), R(6,3,1,commit(1,dg(ig)))],\n  [\"11220000\",\"00000000\"], 6)\nT(\"abort-then-begin-stale-digest-mismatch\",\n  [R(1,1,1), R(2,2,1,st), R(3,4,1), R(4,1,1), R(5,2,1,ig), R(6,3,1,commit(2,dg(st,ig)))],\n  list(P), 6)\nT(\"two-tx-same-page-later-commit-wins\",\n  [R(1,1,1), R(2,2,1,patch(0,0,b'\\xaa')), R(3,1,2), R(4,2,2,patch(0,0,b'\\xbb')),\n   R(5,3,1,commit(1,dg(patch(0,0,b'\\xaa')))), R(6,3,2,commit(1,dg(patch(0,0,b'\\xbb'))))],\n  [\"aa000000\",\"00000000\"], 6)\nT(\"abort-clears-partial-overlap\",\n  [R(1,1,1), R(2,2,1,patch(0,0,b'\\xaa\\xbb')), R(3,4,1), R(4,1,1),\n   R(5,2,1,patch(0,0,b'\\xcc')), R(6,3,1,commit(1,dg(patch(0,0,b'\\xcc'))))],\n  [\"cc000000\",\"00000000\"], 6)\nT(\"exact-13-byte-header-only\", [R(1,1,1)], list(P), 0, log=R(1,1,1)[0][:13].hex())\nT(\"header-plus-3-crc-bytes\", [R(1,1,1)], list(P), 0, log=R(1,1,1)[0][:16].hex())\nT(\"header-only-then-valid-record\",\n  [R(1,1,1), R(2,1,2)], [\"00000000\",\"00000000\"], 2,\n  log=(R(1,1,1)[0] + R(2,1,2)[0]).hex())\nT(\"patch-into-last-byte-of-64-byte-page\",\n  [R(1,1,1), R(2,2,1,patch(3,63,b'\\xff')), R(3,3,1,commit",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 40957,
+      "time": "2026-10-08T20:51:41.540931+00:00",
+      "tool_call_id": "chatcmpl-tool-96210169ea1f6c25",
+      "command": "cd /tmp/t && python3 scenarios.py 2>&1 | grep -E 'extra|inactive|mismatch-then|abort-then|two-tx-same|abort-clears|exact-13|header-only|header-plus|uppercase-page|patch-into-last|failed:' ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 41276,
+      "time": "2026-10-08T20:51:53.016357+00:00",
+      "tool_call_id": "chatcmpl-tool-b6f958988e0170c2",
+      "command": "cd /tmp/t && python3 - <<'EOF'\ns = open('scenarios.py').read()\nblock = \"\\nprint()\\nprint('failed:', FAILED if FAILED else 'none')\\nsys.exit(1 if FAILED else 0)\\n\"\ni = s.find(block)\nassert s.count(block) == 2, s.count(block)\ns = s.replace(block, \"\\n\", 1)          # drop the first (early) exit block\nopen('scenarios.py','w').write(s)\nEOF\npython3 scenarios.py 2>&1 | tail -18; echo \"---- total ----\"; python3 scenarios.py 2>&1 | grep -c '^PASS'",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 42178,
+      "time": "2026-10-08T20:52:18.493267+00:00",
+      "tool_call_id": "chatcmpl-tool-9b53b100729a5c34",
+      "command": "cd /tmp/t && python3 - <<'EOF'\ns = open('scenarios.py').read()\nfixes = [\n ('''  [\"aa000000\",\"00000000\"], 6)''', '''  [\"bb000000\",\"00000000\"], 6)   # tx2 commits last, so its byte wins'''),\n ('''  expect={\"pages\": [\"00\"*64]*3 + [\"00\"*63 + \"ff\", \"00\"*64],\n          \"valid_bytes\": 17 + 21 + 21, \"last_seq\": 3})''',\n  '''  expect={\"pages\": [\"00\"*64]*3 + [\"00\"*63 + \"ff\", \"00\"*64],\n          \"valid_bytes\": 17 + 24 + 25, \"last_seq\": 3})'''),\n ('''  expect={\"pages\": [\"aabbccdd\", \"ab112233\"], \"valid_bytes\": 17 + 21 + 21, \"last_seq\": 3})''',\n  '''  expect={\"pages\": [\"aabbccdd\", \"ab112233\"], \"valid_bytes\": 17 + 24 + 25, \"last_seq\": 3})'''),\n]\nfor old, new in fixes:\n    assert old in s, old[:50]\n    s = s.replace(old, new)\nopen('scenarios.py','w').write(s)\nEOF\npython3 scenarios.py 2>&1 | tail -3; python3 scenarios.py 2>&1 | grep -c '^PASS'; python3 scenarios.py 2>&1 | grep '^FAIL' || echo \"no failures\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 42894,
+      "time": "2026-10-08T20:52:49.787744+00:00",
+      "tool_call_id": "chatcmpl-tool-9b0c468960bc4154",
+      "command": "cd /tmp/t && echo \"=== smoke ===\" && python3 /app/smoke.py && echo \"=== scenarios (76) ===\" && python3 scenarios.py 2>&1 | tail -2 && echo \"=== corrupt fuzz ===\" && for s in 1 5 42 777; do python3 fuzz.py $s; done && echo \"=== clean fuzz ===\" && python3 fuzz_clean.py 2>&1 | tail -2",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43322,
+      "time": "2026-10-08T20:53:12.686375+00:00",
+      "tool_call_id": "chatcmpl-tool-960520a7f0fcd009",
+      "command": "cd /tmp/t && python3 - <<'EOF'\n# final end-to-end checks: stdout cleanliness, order, stderr, error isolation\nimport json, subprocess, sys\nreqs = [\n  {\"pages\": [\"00000000\",\"00000000\"], \"checkpoint\": 0, \"log\": \"\"},\n  {\"pages\": [\"00000000\"], \"checkpoint\": 3, \"log\": \"zz\"},          # bad hex (not in contract)\n  {\"pages\": [\"00000000\"], \"checkpoint\": 0, \"log\": \"\"},\n  {\"pages\": [\"00000000\",\"00000000\"], \"checkpoint\": 0,\n   \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"},\n  {\"pages\": [\"00000000\",\"00000000\"], \"checkpoint\": 3,\n   \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"},\n]\np = subprocess.run([sys.executable, '/app/main.py'], input=''.join(json.dumps(r)+'\\n' for r in reqs),\n                   text=True, capture_output=True, cwd='/app')\nlines = p.stdout.splitlines()\nprint('returncode', p.returncode, 'stdout lines', len(lines), 'stderr:', repr(p.stderr[:120]))\nfor r, l in zip(reqs, lines):\n    o = json.loads(l)\n    print(' cp=%-2d ->' % r['checkpoint'], o['pages'], o['valid_bytes'], o['last_seq'])\nassert len(lines) == len(reqs)\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43516,
+      "time": "2026-10-08T20:53:17.989516+00:00",
+      "tool_call_id": "chatcmpl-tool-af0ac700cbd1a285",
+      "command": "cd /app && ls -la && python3 -m py_compile main.py && python3 - <<'EOF'\nimport sys; sys.path.insert(0,'/app')\nimport main, inspect\nsrc = inspect.getsource(main)\nprint('lines:', len(src.splitlines()))\n# confirm no stray prints to stdout other than the response writer\nprint('stdout writes:', [l.strip() for l in src.splitlines() if 'print(' in l])\nEOF\nsed -n '73,175p' /app/main.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43826,
+      "time": "2026-10-08T20:53:24.203869+00:00",
+      "tool_call_id": "chatcmpl-tool-84d9b5abee54e1f5",
+      "command": "cd /app && rm -rf __pycache__ && ls -la && python3 smoke.py && printf '%s\\n' '{\"pages\":[\"00000000\",\"00000000\"],\"checkpoint\":0,\"log\":\"\"}' | python3 /app/main.py",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 87,
+      "time": "2026-10-08T20:39:51.748382+00:00",
+      "tool_call_id": "chatcmpl-tool-9c0c45b76228abdf",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:39 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:39 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 18998,
+      "time": "2026-10-08T20:44:41.691242+00:00",
+      "tool_call_id": "chatcmpl-tool-981283801c85a8b3",
+      "return_code": 1,
+      "stdout": "PASS empty-log\nPASS single-commit\nFAIL commit-order-interleaved\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367000000000300000001020000007c9b90a1080000000400000002020000000000010002004455b2f4d87508000000050000000302000000010000003deb638b4faf4f9e0800000006000000030100000001000000167592499ee83842\"}\n   expected : {'pages': ['11445500', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n   got      : {'pages': ['11225500', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/t/scenarios.py\", line 26, in <module>\n    [\"aacce\\x00\".replace('e','\\x00',\"00000000\") and \"aacc0000\",\"00000000\"], 4)\n     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: 'str' object cannot be interpreted as an integer\n",
+      "stdout_tail": "PASS empty-log\nPASS single-commit\nFAIL commit-order-interleaved\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367000000000300000001020000007c9b90a1080000000400000002020000000000010002004455b2f4d87508000000050000000302000000010000003deb638b4faf4f9e0800000006000000030100000001000000167592499ee83842\"}\n   expected : {'pages': ['11445500', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n   got      : {'pages': ['11225500', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/tmp/t/scenarios.py\", line 26, in <module>\n    [\"aacce\\x00\".replace('e','\\x00',\"00000000\") and \"aacc0000\",\"00000000\"], 4)\n     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: 'str' object cannot be interpreted as an integer\n"
+    },
+    {
+      "step": 20170,
+      "time": "2026-10-08T20:45:07.031203+00:00",
+      "tool_call_id": "chatcmpl-tool-a2be3501b46c1f7e",
+      "return_code": 1,
+      "stdout": "PASS empty-log\nPASS single-commit\nPASS commit-order-interleaved\nPASS overlap-in-tx\nPASS patch-second-page\nPASS patch-full-page-exact-fit\nPASS empty-transaction-commit\nPASS tx-id-reuse\nPASS bad-crc-mid-log\nFAIL torn-header-few-bytes\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"0000000001000000\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 17, 'last_seq': 1}\n   got      : {'pages': ['00000000', '00000000'], 'valid_bytes': 0, 'last_seq': 0}\nPASS partial-header-only\nPASS torn-payload\nFAIL torn-crc\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 42, 'last_seq': 2}\n   got      : {'pages': ['00000000', '00000000'], 'valid_bytes': 17, 'last_seq': 1}\nPASS trailing-garbage-after-valid\nPASS seq-zero\nPASS seq-equal\nPASS seq-decreasing\nPASS seq-gap-ok\nFAIL txid-zero\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000100000000717b6f25080000000200000002010000000000000002001122610f8367\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 17, 'last_seq': 1}\n   got      : {'pages': ['00000000', '00000000'], 'valid_bytes': 0, 'last_seq': 0}\nFAIL kind-zero\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000001000000a435b3a0080000000200000002010000000000000002001122610f8367\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 17, 'last_seq': 1}\n   got      : {'pages': ['00000000', '00000000'], 'valid_bytes': 0, 'last_seq': 0}\nFAIL kind-unknown-5\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000501000000d4ba5368080000000200000002010000000000000002001122610f8367\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 17, 'last_seq': 1}\n   got      : {'pages': ['00000000', '00000000'], 'valid_bytes': 0, 'last_seq': 0}\nFAIL kind-255\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"0000000001000000ff0100000028f2d76a080000000200000002010000000000000002001122610f8367\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 17, 'last_seq': 1}\n   got      : {'pages': ['00000000', '00000000'], 'valid_bytes': 0, 'last_seq': 0}\nPASS begin-nonempty-payload\nPASS abort-nonempty-payload\nPASS commit-short-payload\nPASS commit-long-payload\nPASS patch-count-zero\nPASS patch-truncated-header\nPASS patch-length-mismatch-long\nPASS patch-page-index-out-of-range\nFAIL patch-page-index-equal-npages\n   request  : {\"pages\": [\"00000000\"], \"checkpoint\": 0, \"log\": \"0700000001000000020100000001000000010011a1ac49a0\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 0, 'last_seq': 0}\n   got      : {'pages': ['00000000'], 'valid_bytes': 0, 'last_seq': 0}\nPASS patch-offset-overflow\nPASS patch-offset-plus-count-overflow\nPASS patch-offset-just-past-end\nPASS plen-declared-too-large\nPASS plen-declared-too-small\nPASS plen-over-4096-correct-crc\nPASS plen-exactly-4096-but-begin\nPASS plen-huge-incomplete\nPASS patch-inactive-ignored\nPASS abort-then-orphan-commit\nPASS orphan-abort\nPASS begin-discards-unfinished\nPASS begin-discards-then-stale-digest\nPASS digest-mismatch-no-apply-prefix-intact\nPASS patch-count-mismatch-no-apply\nPASS count-zero-but-one-patch\nPASS uncommitted-no-effect\nPASS commit-at-checkpoint-not-replayed\nFAIL commit-below-checkpoint-not-replayed\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 2, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n   got      : {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nPASS commit-above-checkpoint-replayed\nPASS commit-above-watermark-staged-below\nPASS checkpoint-between-records\nPASS checkpoint-above-last-seq\nPASS checkpointed-commit-closes-incarnation\nPASS new-begin-after-checkpointed-commit\nPASS records-below-checkpoint-validated\nPASS upper-case-hex-log\nPASS single-byte-pages\nFAIL wide-pages\n   request  : {\"pages\": [\"00112233445566778899\", \"ffeeddccbbaa99887766\"], \"checkpoint\": 0, \"log\": \"000000000100000001030000009fd4da37080000000200000002030000000000090002000102aff21bdd08000000030000000303000000010000004716311fd89caf64\"}\n   expected : {'pages': ['0011223344556677880102', 'ffeeddccbbaa99887766'], 'valid_bytes': 67, 'last_seq': 3}\n   got      : {'pages': ['00112233445566778899', 'ffeeddccbbaa99887766'], 'valid_bytes': 17, 'last_seq': 1}\nPASS eight-pages-patch-page-7\nPASS page-index-8-invalid-on-eight-pages\nPASS two-commits-same-tx-after-rebegin\nPASS abort-of-other-tx-does-not-touch-active\nPASS mismatch-closes-so-next-patch-ignored\n\nfailed: ['torn-header-few-bytes', 'torn-crc', 'txid-zero', 'kind-zero', 'kind-unknown-5', 'kind-255', 'patch-page-index-equal-npages', 'commit-below-checkpoint-not-replayed', 'wide-pages']\n",
+      "stderr": "",
+      "stdout_tail": "pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"0000000001000000ff0100000028f2d76a080000000200000002010000000000000002001122610f8367\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 17, 'last_seq': 1}\n   got      : {'pages': ['00000000', '00000000'], 'valid_bytes': 0, 'last_seq': 0}\nPASS begin-nonempty-payload\nPASS abort-nonempty-payload\nPASS commit-short-payload\nPASS commit-long-payload\nPASS patch-count-zero\nPASS patch-truncated-header\nPASS patch-length-mismatch-long\nPASS patch-page-index-out-of-range\nFAIL patch-page-index-equal-npages\n   request  : {\"pages\": [\"00000000\"], \"checkpoint\": 0, \"log\": \"0700000001000000020100000001000000010011a1ac49a0\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 0, 'last_seq': 0}\n   got      : {'pages': ['00000000'], 'valid_bytes': 0, 'last_seq': 0}\nPASS patch-offset-overflow\nPASS patch-offset-plus-count-overflow\nPASS patch-offset-just-past-end\nPASS plen-declared-too-large\nPASS plen-declared-too-small\nPASS plen-over-4096-correct-crc\nPASS plen-exactly-4096-but-begin\nPASS plen-huge-incomplete\nPASS patch-inactive-ignored\nPASS abort-then-orphan-commit\nPASS orphan-abort\nPASS begin-discards-unfinished\nPASS begin-discards-then-stale-digest\nPASS digest-mismatch-no-apply-prefix-intact\nPASS patch-count-mismatch-no-apply\nPASS count-zero-but-one-patch\nPASS uncommitted-no-effect\nPASS commit-at-checkpoint-not-replayed\nFAIL commit-below-checkpoint-not-replayed\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 2, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"}\n   expected : {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n   got      : {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nPASS commit-above-checkpoint-replayed\nPASS commit-above-watermark-staged-below\nPASS checkpoint-between-records\nPASS checkpoint-above-last-seq\nPASS checkpointed-commit-closes-incarnation\nPASS new-begin-after-checkpointed-commit\nPASS records-below-checkpoint-validated\nPASS upper-case-hex-log\nPASS single-byte-pages\nFAIL wide-pages\n   request  : {\"pages\": [\"00112233445566778899\", \"ffeeddccbbaa99887766\"], \"checkpoint\": 0, \"log\": \"000000000100000001030000009fd4da37080000000200000002030000000000090002000102aff21bdd08000000030000000303000000010000004716311fd89caf64\"}\n   expected : {'pages': ['0011223344556677880102', 'ffeeddccbbaa99887766'], 'valid_bytes': 67, 'last_seq': 3}\n   got      : {'pages': ['00112233445566778899', 'ffeeddccbbaa99887766'], 'valid_bytes': 17, 'last_seq': 1}\nPASS eight-pages-patch-page-7\nPASS page-index-8-invalid-on-eight-pages\nPASS two-commits-same-tx-after-rebegin\nPASS abort-of-other-tx-does-not-touch-active\nPASS mismatch-closes-so-next-patch-ignored\n\nfailed: ['torn-header-few-bytes', 'torn-crc', 'txid-zero', 'kind-zero', 'kind-unknown-5', 'kind-255', 'patch-page-index-equal-npages', 'commit-below-checkpoint-not-replayed', 'wide-pages']\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 21904,
+      "time": "2026-10-08T20:45:38.274948+00:00",
+      "tool_call_id": "chatcmpl-tool-8e06ed77bc0bbdab",
+      "return_code": 0,
+      "stdout": "patched\nPASS commit-above-checkpoint-replayed\nPASS commit-above-watermark-staged-below\nPASS checkpoint-between-records\nPASS checkpoint-above-last-seq\nPASS checkpointed-commit-closes-incarnation\nPASS new-begin-after-checkpointed-commit\nPASS records-below-checkpoint-validated\nPASS upper-case-hex-log\nPASS single-byte-pages\nFAIL wide-pages\n   request  : {\"pages\": [\"00112233445566778899\", \"ffeeddccbbaa99887766\"], \"checkpoint\": 0, \"log\": \"000000000100000001030000009fd4da370800000002000000020300000000000800020001020a2147160800000003000000030300000001000000e2c56dd4e6f76d8b\"}\n   expected : {'pages': ['0011223344556677880102', 'ffeeddccbbaa99887766'], 'valid_bytes': 67, 'last_seq': 3}\n   got      : {'pages': ['00112233445566770102', 'ffeeddccbbaa99887766'], 'valid_bytes': 67, 'last_seq': 3}\nPASS eight-pages-patch-page-7\nPASS page-index-8-invalid-on-eight-pages\nPASS two-commits-same-tx-after-rebegin\nPASS abort-of-other-tx-does-not-touch-active\nPASS mismatch-closes-so-next-patch-ignored\n\nfailed: ['wide-pages']\n",
+      "stderr": "",
+      "stdout_tail": "patched\nPASS commit-above-checkpoint-replayed\nPASS commit-above-watermark-staged-below\nPASS checkpoint-between-records\nPASS checkpoint-above-last-seq\nPASS checkpointed-commit-closes-incarnation\nPASS new-begin-after-checkpointed-commit\nPASS records-below-checkpoint-validated\nPASS upper-case-hex-log\nPASS single-byte-pages\nFAIL wide-pages\n   request  : {\"pages\": [\"00112233445566778899\", \"ffeeddccbbaa99887766\"], \"checkpoint\": 0, \"log\": \"000000000100000001030000009fd4da370800000002000000020300000000000800020001020a2147160800000003000000030300000001000000e2c56dd4e6f76d8b\"}\n   expected : {'pages': ['0011223344556677880102', 'ffeeddccbbaa99887766'], 'valid_bytes': 67, 'last_seq': 3}\n   got      : {'pages': ['00112233445566770102', 'ffeeddccbbaa99887766'], 'valid_bytes': 67, 'last_seq': 3}\nPASS eight-pages-patch-page-7\nPASS page-index-8-invalid-on-eight-pages\nPASS two-commits-same-tx-after-rebegin\nPASS abort-of-other-tx-does-not-touch-active\nPASS mismatch-closes-so-next-patch-ignored\n\nfailed: ['wide-pages']\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 22153,
+      "time": "2026-10-08T20:45:54.390531+00:00",
+      "tool_call_id": "chatcmpl-tool-8482d8a52caf61b8",
+      "return_code": 0,
+      "stdout": "PASS abort-of-other-tx-does-not-touch-active\nPASS mismatch-closes-so-next-patch-ignored\n\nfailed: none\n65\n",
+      "stderr": "",
+      "stdout_tail": "PASS abort-of-other-tx-does-not-touch-active\nPASS mismatch-closes-so-next-patch-ignored\n\nfailed: none\n65\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 25435,
+      "time": "2026-10-08T20:46:44.977112+00:00",
+      "tool_call_id": "chatcmpl-tool-bb000d32e95667c5",
+      "return_code": 0,
+      "stdout": "fuzz done, mismatches = 0\n",
+      "stderr": "",
+      "stdout_tail": "fuzz done, mismatches = 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 25838,
+      "time": "2026-10-08T20:46:51.964324+00:00",
+      "tool_call_id": "chatcmpl-tool-83c448acfd7f3d29",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "",
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "step": 26016,
+      "time": "2026-10-08T20:46:57.921371+00:00",
+      "tool_call_id": "chatcmpl-tool-a25323a422d53cfd",
+      "return_code": 0,
+      "stdout": "fuzz done, mismatches = 0\n2 {'cases': 3000, 'full': 63, 'partial': 1111, 'empty': 1826, 'changed': 0, 'bytes': 38582}\n3 {'cases': 3000, 'full': 67, 'partial': 1030, 'empty': 1903, 'changed': 0, 'bytes': 36361}\n4 {'cases': 3000, 'full': 49, 'partial': 1079, 'empty': 1872, 'changed': 0, 'bytes': 37175}\n5 {'cases': 3000, 'full': 56, 'partial': 1040, 'empty': 1904, 'changed': 0, 'bytes': 36558}\n6 {'cases': 3000, 'full': 68, 'partial': 1064, 'empty': 1868, 'changed': 0, 'bytes': 37445}\n7 {'cases': 3000, 'full': 69, 'partial': 1142, 'empty': 1789, 'changed': 0, 'bytes': 40299}\n",
+      "stderr": "",
+      "stdout_tail": "fuzz done, mismatches = 0\n2 {'cases': 3000, 'full': 63, 'partial': 1111, 'empty': 1826, 'changed': 0, 'bytes': 38582}\n3 {'cases': 3000, 'full': 67, 'partial': 1030, 'empty': 1903, 'changed': 0, 'bytes': 36361}\n4 {'cases': 3000, 'full': 49, 'partial': 1079, 'empty': 1872, 'changed': 0, 'bytes': 37175}\n5 {'cases': 3000, 'full': 56, 'partial': 1040, 'empty': 1904, 'changed': 0, 'bytes': 36558}\n6 {'cases': 3000, 'full': 68, 'partial': 1064, 'empty': 1868, 'changed': 0, 'bytes': 37445}\n7 {'cases': 3000, 'full': 69, 'partial': 1142, 'empty': 1789, 'changed': 0, 'bytes': 40299}\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 29771,
+      "time": "2026-10-08T20:48:04.602600+00:00",
+      "tool_call_id": "chatcmpl-tool-9f9fd888598acba5",
+      "return_code": 1,
+      "stdout": "log bytes 65481 records-ish, transactions: 631\nrequests 1500 time 0.64s per-req 0.429 ms\nsample {'pages': ['a54dca182530bb1d6d132cded6237b2ed91e3f721fcb1971174494d6493c9d5c3460be31201e69fedaa0eee8b9997f5c7c2999fdafe593253cd654af4dfad714'], 'valid_bytes': 42, 'last_seq': 3}\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/t/perf.py\", line 56, in <module>\n    assert all(o['valid_bytes'] == len(bytes.fromhex(log)) and o['last_seq'] == seq for o in out)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+      "stdout_tail": "log bytes 65481 records-ish, transactions: 631\nrequests 1500 time 0.64s per-req 0.429 ms\nsample {'pages': ['a54dca182530bb1d6d132cded6237b2ed91e3f721fcb1971174494d6493c9d5c3460be31201e69fedaa0eee8b9997f5c7c2999fdafe593253cd654af4dfad714'], 'valid_bytes': 42, 'last_seq': 3}\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/tmp/t/perf.py\", line 56, in <module>\n    assert all(o['valid_bytes'] == len(bytes.fromhex(log)) and o['last_seq'] == seq for o in out)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+    },
+    {
+      "step": 30451,
+      "time": "2026-10-08T20:48:25.242486+00:00",
+      "tool_call_id": "chatcmpl-tool-844d8ee5eeb63cab",
+      "return_code": 1,
+      "stdout": "log bytes 65516 records-ish, transactions: 714\nrequests 1500 time 4.40s per-req 2.933 ms\nsample {'pages': ['a571daf78d4da99dd7d98099eca0d6309e90b3af3880d26276d997c3791a73ffc0ba404abb26394bd30c8cdc344008f96d89a7a286cf45fc7d0f549200e2ba14'], 'valid_bytes': 65516, 'last_seq': 2850}\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/t/perf.py\", line 49, in <module>\n    assert all(o['valid_bytes'] == len(bytes.fromhex(log)) and o['last_seq'] == seq for o in out)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+      "stdout_tail": "log bytes 65516 records-ish, transactions: 714\nrequests 1500 time 4.40s per-req 2.933 ms\nsample {'pages': ['a571daf78d4da99dd7d98099eca0d6309e90b3af3880d26276d997c3791a73ffc0ba404abb26394bd30c8cdc344008f96d89a7a286cf45fc7d0f549200e2ba14'], 'valid_bytes': 65516, 'last_seq': 2850}\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/tmp/t/perf.py\", line 49, in <module>\n    assert all(o['valid_bytes'] == len(bytes.fromhex(log)) and o['last_seq'] == seq for o in out)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+    },
+    {
+      "step": 36494,
+      "time": "2026-10-08T20:50:18.894051+00:00",
+      "tool_call_id": "chatcmpl-tool-b66060cdd2d1b7b3",
+      "return_code": 0,
+      "stdout": "PASS mismatch-closes-so-next-patch-ignored\n\nfailed: none\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\n17 {'cases': 4000, 'changed': 609, 'full': 2018, 'applied': 609}\n18 {'cases': 4000, 'changed': 606, 'full': 2007, 'applied': 606}\nclean fuzz: all match\n",
+      "stderr": "",
+      "stdout_tail": "PASS mismatch-closes-so-next-patch-ignored\n\nfailed: none\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\n17 {'cases': 4000, 'changed': 609, 'full': 2018, 'applied': 609}\n18 {'cases': 4000, 'changed': 606, 'full': 2007, 'applied': 606}\nclean fuzz: all match\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 38361,
+      "time": "2026-10-08T20:50:57.030864+00:00",
+      "tool_call_id": "chatcmpl-tool-b8ead7904f92e2fe",
+      "return_code": 0,
+      "stdout": "begins             log=65535 B  valid=65535 last_seq=3855  pages_changed=False  2.015 ms/req\norphan-patches     log=65511 B  valid=65511 last_seq= 753  pages_changed=False  1.020 ms/req\none-giant-tx       log=65553 B  valid=65553 last_seq= 756  pages_changed=True  1.267 ms/req\nmismatched-commit  log=65549 B  valid=65549 last_seq=1525  pages_changed=False  1.711 ms/req\nbad-first-record   log=   57 B  valid=   17 last_seq=   1  pages_changed=False  0.244 ms/req\n20000 tiny requests in 0.64s (0.032 ms/req)\n",
+      "stderr": "",
+      "stdout_tail": "begins             log=65535 B  valid=65535 last_seq=3855  pages_changed=False  2.015 ms/req\norphan-patches     log=65511 B  valid=65511 last_seq= 753  pages_changed=False  1.020 ms/req\none-giant-tx       log=65553 B  valid=65553 last_seq= 756  pages_changed=True  1.267 ms/req\nmismatched-commit  log=65549 B  valid=65549 last_seq=1525  pages_changed=False  1.711 ms/req\nbad-first-record   log=   57 B  valid=   17 last_seq=   1  pages_changed=False  0.244 ms/req\n20000 tiny requests in 0.64s (0.032 ms/req)\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 40880,
+      "time": "2026-10-08T20:51:39.155101+00:00",
+      "tool_call_id": "chatcmpl-tool-a31491fc75e8ed4f",
+      "return_code": 0,
+      "stdout": "PASS commit-above-watermark-staged-below\nPASS checkpoint-between-records\nPASS checkpoint-above-last-seq\nPASS checkpointed-commit-closes-incarnation\nPASS new-begin-after-checkpointed-commit\nPASS records-below-checkpoint-validated\nPASS upper-case-hex-log\nPASS single-byte-pages\nPASS wide-pages\nPASS eight-pages-patch-page-7\nPASS page-index-8-invalid-on-eight-pages\nPASS two-commits-same-tx-after-rebegin\nPASS abort-of-other-tx-does-not-touch-active\nPASS mismatch-closes-so-next-patch-ignored\n\nfailed: none\n",
+      "stderr": "",
+      "stdout_tail": "PASS commit-above-watermark-staged-below\nPASS checkpoint-between-records\nPASS checkpoint-above-last-seq\nPASS checkpointed-commit-closes-incarnation\nPASS new-begin-after-checkpointed-commit\nPASS records-below-checkpoint-validated\nPASS upper-case-hex-log\nPASS single-byte-pages\nPASS wide-pages\nPASS eight-pages-patch-page-7\nPASS page-index-8-invalid-on-eight-pages\nPASS two-commits-same-tx-after-rebegin\nPASS abort-of-other-tx-does-not-touch-active\nPASS mismatch-closes-so-next-patch-ignored\n\nfailed: none\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 40958,
+      "time": "2026-10-08T20:51:46.732257+00:00",
+      "tool_call_id": "chatcmpl-tool-96210169ea1f6c25",
+      "return_code": 0,
+      "stdout": "PASS partial-header-only\nPASS patch-inactive-ignored\nPASS abort-then-orphan-commit\nfailed: none\n",
+      "stderr": "",
+      "stdout_tail": "PASS partial-header-only\nPASS patch-inactive-ignored\nPASS abort-then-orphan-commit\nfailed: none\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 41277,
+      "time": "2026-10-08T20:52:05.260003+00:00",
+      "tool_call_id": "chatcmpl-tool-b6f958988e0170c2",
+      "return_code": 0,
+      "stdout": "FAIL two-tx-same-page-later-commit-wins\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d07000000020000000201000000000000000100aae3794573000000000300000001020000007c9b90a107000000040000000202000000000000000100bbf45686d30800000005000000030100000001000000bfffadaa3de2beac08000000060000000302000000010000004ddf1dc07bd53ad5\"}\n   expected : {'pages': ['aa000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\n   got      : {'pages': ['bb000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\nPASS abort-clears-partial-overlap\nPASS exact-13-byte-header-only\nPASS header-plus-3-crc-bytes\nPASS header-only-then-valid-record\nFAIL patch-into-last-byte-of-64-byte-page\n   request  : {\"pages\": [\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000003003f000100ff52e9dd7a08000000030000000301000000010000000e6f35a38c7c1393\"}\n   expected : {'pages': ['00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ff', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'], 'valid_bytes': 59, 'last_seq': 3}\n   got      : {'pages': ['00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ff', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL uppercase-page-hex\n   request  : {\"pages\": [\"AABBCCDD\", \"00112233\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141CD39D07000000020000000201000000010000000100ABC14235A208000000030000000301000000010000009DC4DD7B45A364F7\"}\n   expected : {'pages': ['aabbccdd', 'ab112233'], 'valid_bytes': 59, 'last_seq': 3}\n   got      : {'pages': ['aabbccdd', 'ab112233'], 'valid_bytes': 66, 'last_seq': 3}\n\nfailed: ['two-tx-same-page-later-commit-wins', 'patch-into-last-byte-of-64-byte-page', 'uppercase-page-hex']\n---- total ----\n73\n",
+      "stderr": "",
+      "stdout_tail": "st_seq': 6}\nPASS abort-clears-partial-overlap\nPASS exact-13-byte-header-only\nPASS header-plus-3-crc-bytes\nPASS header-only-then-valid-record\nFAIL patch-into-last-byte-of-64-byte-page\n   request  : {\"pages\": [\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000003003f000100ff52e9dd7a08000000030000000301000000010000000e6f35a38c7c1393\"}\n   expected : {'pages': ['00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ff', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'], 'valid_bytes': 59, 'last_seq': 3}\n   got      : {'pages': ['00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000', '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ff', '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL uppercase-page-hex\n   request  : {\"pages\": [\"AABBCCDD\", \"00112233\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141CD39D07000000020000000201000000010000000100ABC14235A208000000030000000301000000010000009DC4DD7B45A364F7\"}\n   expected : {'pages': ['aabbccdd', 'ab112233'], 'valid_bytes': 59, 'last_seq': 3}\n   got      : {'pages': ['aabbccdd', 'ab112233'], 'valid_bytes': 66, 'last_seq': 3}\n\nfailed: ['two-tx-same-page-later-commit-wins', 'patch-into-last-byte-of-64-byte-page', 'uppercase-page-hex']\n---- total ----\n73\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 42179,
+      "time": "2026-10-08T20:52:37.114634+00:00",
+      "tool_call_id": "chatcmpl-tool-9b53b100729a5c34",
+      "return_code": 0,
+      "stdout": "PASS uppercase-page-hex\n\nfailed: none\n76\nno failures\n",
+      "stderr": "",
+      "stdout_tail": "PASS uppercase-page-hex\n\nfailed: none\n76\nno failures\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 42895,
+      "time": "2026-10-08T20:53:05.472310+00:00",
+      "tool_call_id": "chatcmpl-tool-9b0c468960bc4154",
+      "return_code": 0,
+      "stdout": "=== smoke ===\nPassed 3 public examples\n=== scenarios (76) ===\n\nfailed: none\n=== corrupt fuzz ===\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\n=== clean fuzz ===\n18 {'cases': 4000, 'changed': 606, 'full': 2007, 'applied': 606}\nclean fuzz: all match\n",
+      "stderr": "",
+      "stdout_tail": "=== smoke ===\nPassed 3 public examples\n=== scenarios (76) ===\n\nfailed: none\n=== corrupt fuzz ===\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\n=== clean fuzz ===\n18 {'cases': 4000, 'changed': 606, 'full': 2007, 'applied': 606}\nclean fuzz: all match\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 43517,
+      "time": "2026-10-08T20:53:18.483147+00:00",
+      "tool_call_id": "chatcmpl-tool-af0ac700cbd1a285",
+      "return_code": 0,
+      "stdout": "total 36\ndrwxr-xr-x 1 agent agent 4096 Oct  8 20:50 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:39 ..\ndrwxr-xr-x 2 agent agent 4096 Oct  8 20:50 __pycache__\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent 7753 Oct  8 20:50 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nlines: 217\nstdout writes: ['print(\"bad request line: %r\" % (exc,), file=sys.stderr)', 'print(\"recovery error: %r\" % (exc,), file=sys.stderr)']\n            return b\"\"\n        return bytes.fromhex(text)\n    if isinstance(log, (bytes, bytearray, memoryview)):\n        return bytes(log)\n    return b\"\"\n\n\ndef solve(request):\n    \"\"\"Replay one journal request and return the recovered state.\"\"\"\n    if not isinstance(request, dict):\n        raise TypeError(\"request must be an object\")\n\n    pages = _decode_pages(request.get(\"pages\"))\n    page_sizes = [len(page) for page in pages]\n    n_pages = len(pages)\n    log = _decode_log(request.get(\"log\"))\n\n    checkpoint = request.get(\"checkpoint\", 0)\n    if type(checkpoint) is not int:          # bool/float/str: never sent\n        checkpoint = int(checkpoint)\n\n    total = len(log)\n    view = memoryview(log)\n\n    unpack_header = _HEADER.unpack_from\n    unpack_crc = _CRC.unpack_from\n    unpack_patch = _PATCH.unpack_from\n    unpack_commit = _COMMIT.unpack_from\n    crc32 = zlib.crc32\n\n    # Active incarnations: transaction_id -> staged PATCH payloads (log order).\n    staged = {}\n\n    pos = 0        # Start of the record currently being validated.\n    last_seq = 0   # Sequence of the last valid record (0 for an empty prefix).\n\n    while pos + _HEADER_SIZE <= total:\n        payload_len, seq, kind, txid = unpack_header(log, pos)\n\n        # An oversized payload declaration is an invalid header; a record whose\n        # payload or CRC is cut short is incomplete.  Both end the valid prefix\n        # right here.\n        if payload_len > _MAX_PAYLOAD:\n            break\n        body_end = pos + _HEADER_SIZE + payload_len\n        end = body_end + _CRC_SIZE\n        if end > total:\n            break\n\n        # The seal covers the fixed header plus the payload.\n        if crc32(view[pos:body_end]) != unpack_crc(log, body_end)[0]:\n            break\n        # Sequence must be positive and strictly increasing (initial watermark\n        # 0 therefore also rejects a zero sequence); the id must be positive.\n        if seq <= last_seq or txid == 0 or kind < _BEGIN or kind > _ABORT:\n            break\n\n        # Payload shape validation -- structural, independent of activity.\n        if kind == _PATCH_KIND:\n            if payload_len < 7:                      # 6 fixed bytes + data\n                break\n            page_index, byte_offset, byte_count = unpack_patch(log, pos + _HEADER_SIZE)\n            if byte_count == 0 or 6 + byte_count != payload_len:\n                break\n            if page_index >= n_pages:\n                break\n            if byte_offset + byte_count > page_sizes[page_index]:\n                break\n            incarnation = staged.get(txid)\n            if incarnation is not None:              # inactive ids are ignored\n                incarnation.append(log[pos + _HEADER_SIZE:body_end])\n        elif kind == _COMMIT_KIND:\n            if payload_len != 8:\n                break\n            # COMMIT always closes the active incarnation, if any.\n            incarnation = staged.pop(txid, None)\n            if incarnation is not None:\n                patch_count, digest = unpack_commit(log, pos + _HEADER_SIZE)\n                if patch_count == len(incarnation):\n                    # Digest covers this incarnation's PATCH payloads in log\n                    # order; the empty concatenation has CRC zero.\n                    if crc32(b\"\".join(incarnation)) == digest and seq > checkpoint:\n                        # Atomic application, in patch order.  A seal mismatch\n                        # or an already-checkpointed COMMIT merely drops the\n                        # incarnation and leaves the valid prefix intact.\n                        for patch_payload in incarnation:\n                            page_index, byte_offset, byte_count = unpack_patch(patch_payload, 0)\n                            pages[page_index][\n                                byte_offset:byte_offset + byte_count\n                            ] = patch_payload[6:6 + byte_count]\n        else:  # BEGIN or ABORT\n            if payload_len != 0:\n                break\n            if kind == _BEGIN:\n                # A fresh incarnation discards any unfinished one.\n                staged[txid] = []\n            else:\n                staged.pop(txid, None)\n\n        # The record was structurally valid and has been accounted for.\n        last_seq = seq\n        pos = end\n\n",
+      "stderr": "",
+      "stdout_tail": " invalid header; a record whose\n        # payload or CRC is cut short is incomplete.  Both end the valid prefix\n        # right here.\n        if payload_len > _MAX_PAYLOAD:\n            break\n        body_end = pos + _HEADER_SIZE + payload_len\n        end = body_end + _CRC_SIZE\n        if end > total:\n            break\n\n        # The seal covers the fixed header plus the payload.\n        if crc32(view[pos:body_end]) != unpack_crc(log, body_end)[0]:\n            break\n        # Sequence must be positive and strictly increasing (initial watermark\n        # 0 therefore also rejects a zero sequence); the id must be positive.\n        if seq <= last_seq or txid == 0 or kind < _BEGIN or kind > _ABORT:\n            break\n\n        # Payload shape validation -- structural, independent of activity.\n        if kind == _PATCH_KIND:\n            if payload_len < 7:                      # 6 fixed bytes + data\n                break\n            page_index, byte_offset, byte_count = unpack_patch(log, pos + _HEADER_SIZE)\n            if byte_count == 0 or 6 + byte_count != payload_len:\n                break\n            if page_index >= n_pages:\n                break\n            if byte_offset + byte_count > page_sizes[page_index]:\n                break\n            incarnation = staged.get(txid)\n            if incarnation is not None:              # inactive ids are ignored\n                incarnation.append(log[pos + _HEADER_SIZE:body_end])\n        elif kind == _COMMIT_KIND:\n            if payload_len != 8:\n                break\n            # COMMIT always closes the active incarnation, if any.\n            incarnation = staged.pop(txid, None)\n            if incarnation is not None:\n                patch_count, digest = unpack_commit(log, pos + _HEADER_SIZE)\n                if patch_count == len(incarnation):\n                    # Digest covers this incarnation's PATCH payloads in log\n                    # order; the empty concatenation has CRC zero.\n                    if crc32(b\"\".join(incarnation)) == digest and seq > checkpoint:\n                        # Atomic application, in patch order.  A seal mismatch\n                        # or an already-checkpointed COMMIT merely drops the\n                        # incarnation and leaves the valid prefix intact.\n                        for patch_payload in incarnation:\n                            page_index, byte_offset, byte_count = unpack_patch(patch_payload, 0)\n                            pages[page_index][\n                                byte_offset:byte_offset + byte_count\n                            ] = patch_payload[6:6 + byte_count]\n        else:  # BEGIN or ABORT\n            if payload_len != 0:\n                break\n            if kind == _BEGIN:\n                # A fresh incarnation discards any unfinished one.\n                staged[txid] = []\n            else:\n                staged.pop(txid, None)\n\n        # The record was structurally valid and has been accounted for.\n        last_seq = seq\n        pos = end\n\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 41276,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && python3 - <<'EOF'\ns = open('scenarios.py').read()\nblock = \"\\nprint()\\nprint('failed:', FAILED if FAILED else 'none')\\nsys.exit(1 if FAILED else 0)\\n\"\ni = s.find(block)\nassert s.count(block) == 2, s.count(block)\ns = s.replace(block, \"\\n\", 1)          # drop the first (early) exit block\nopen('scenarios.py','w').write(s)\nEOF\npython3 scenarios.py 2>&1 | tail -18; echo \"---- total ----\"; python3 scenarios.py 2>&1 | grep -c '^PASS'"
+    },
+    {
+      "step": 41277,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "FAIL two-tx-same-page-later-commit-wins\n   request  : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d07000000020000000201000000000000000100aae3794573000000000300000001020000007c9b90a107000000040000000202000000000000000100bbf45686d30800000005000000030100000001000000bfffadaa3de2beac08000000060000000302000000010000004ddf1dc07bd53ad5\"}\n   expected : {'pages': ['aa000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\n   got      : {'pages': ['bb000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\nPASS abort-clears-partial-overlap\nPASS exact-13-byte-header-only\nPASS header-plus-3-crc-bytes\nPASS header-only-then-valid-record\nFAIL patch-into-last-byte-of-64-byte-page\n   request  : {\"pages\": [\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"0000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "step": 42178,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && python3 - <<'EOF'\ns = open('scenarios.py').read()\nfixes = [\n ('''  [\"aa000000\",\"00000000\"], 6)''', '''  [\"bb000000\",\"00000000\"], 6)   # tx2 commits last, so its byte wins'''),\n ('''  expect={\"pages\": [\"00\"*64]*3 + [\"00\"*63 + \"ff\", \"00\"*64],\n          \"valid_bytes\": 17 + 21 + 21, \"last_seq\": 3})''',\n  '''  expect={\"pages\": [\"00\"*64]*3 + [\"00\"*63 + \"ff\", \"00\"*64],\n          \"valid_bytes\": 17 + 24 + 25, \"last_seq\": 3})'''),\n ('''  expect={\"pages\": [\"aabbccdd\", \"ab112233\"], \"valid_bytes\": 17 + 21 + 21, \"last_seq\": 3})''',\n  '''  expect={\"pages\": [\"aabbccdd\", \"ab112233\"], \"valid_bytes\": 17 + 24 + 25, \"last_seq\": 3})'''),\n]\nfor old, new in fixes:\n    assert old in s, old[:50]\n    s = s.replace(old, new)\nopen('scenarios.py','w').write(s)\nEOF\npython3 scenarios.py 2>&1 | tail -3; python3 scenarios.py 2>&1 | grep -c '^PASS'; python3 scenarios.py 2>&1 | grep '^FAIL' || echo \"no failures\""
+    },
+    {
+      "step": 42179,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "PASS uppercase-page-hex\n\nfailed: none\n76\nno failures\n"
+    },
+    {
+      "step": 42894,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && echo \"=== smoke ===\" && python3 /app/smoke.py && echo \"=== scenarios (76) ===\" && python3 scenarios.py 2>&1 | tail -2 && echo \"=== corrupt fuzz ===\" && for s in 1 5 42 777; do python3 fuzz.py $s; done && echo \"=== clean fuzz ===\" && python3 fuzz_clean.py 2>&1 | tail -2"
+    },
+    {
+      "step": 42895,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "=== smoke ===\nPassed 3 public examples\n=== scenarios (76) ===\n\nfailed: none\n=== corrupt fuzz ===\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\nfuzz done, mismatches = 0\n=== clean fuzz ===\n18 {'cases': 4000, 'changed': 606, 'full': 2007, 'applied': 606}\nclean fuzz: all match\n"
+    },
+    {
+      "step": 43322,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && python3 - <<'EOF'\n# final end-to-end checks: stdout cleanliness, order, stderr, error isolation\nimport json, subprocess, sys\nreqs = [\n  {\"pages\": [\"00000000\",\"00000000\"], \"checkpoint\": 0, \"log\": \"\"},\n  {\"pages\": [\"00000000\"], \"checkpoint\": 3, \"log\": \"zz\"},          # bad hex (not in contract)\n  {\"pages\": [\"00000000\"], \"checkpoint\": 0, \"log\": \"\"},\n  {\"pages\": [\"00000000\",\"00000000\"], \"checkpoint\": 0,\n   \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"},\n  {\"pages\": [\"00000000\",\"00000000\"], \"checkpoint\": 3,\n   \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"},\n]\np = subprocess.run([sys.executable, '/app/main.py'], input=''.join(json.dumps(r)+'\\n' for r in reqs),\n                   text=True, capture_output=True, cwd='/app')\nlines = p.stdout.splitlines()\nprint('returncode', p.returncode, '"
+    },
+    {
+      "step": 43323,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "returncode 0 stdout lines 5 stderr: \"recovery error: ValueError('non-hexadecimal number found in fromhex() arg at position 0')\\n\"\n cp=0  -> ['00000000', '00000000'] 0 0\n cp=3  -> ['00000000'] 0 0\n cp=0  -> ['00000000'] 0 0\n cp=0  -> ['11220000', '00000000'] 67 3\n cp=3  -> ['00000000', '00000000'] 67 3\n"
+    },
+    {
+      "step": 43516,
+      "kind": "terminal_call",
+      "summary": "cd /app && ls -la && python3 -m py_compile main.py && python3 - <<'EOF'\nimport sys; sys.path.insert(0,'/app')\nimport main, inspect\nsrc = inspect.getsource(main)\nprint('lines:', len(src.splitlines()))\n# confirm no stray prints to stdout other than the response writer\nprint('stdout writes:', [l.strip() for l in src.splitlines() if 'print(' in l])\nEOF\nsed -n '73,175p' /app/main.py"
+    },
+    {
+      "step": 43517,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "total 36\ndrwxr-xr-x 1 agent agent 4096 Oct  8 20:50 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:39 ..\ndrwxr-xr-x 2 agent agent 4096 Oct  8 20:50 __pycache__\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent 7753 Oct  8 20:50 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nlines: 217\nstdout writes: ['print(\"bad request line: %r\" % (exc,), file=sys.stderr)', 'print(\"recovery error: %r\" % (exc,), file=sys.stderr)']\n            return b\"\"\n        return bytes.fromhex(text)\n    if isinstance(log, (bytes, bytearray, memoryview)):\n        return bytes(log)\n    return b\"\"\n\n\ndef solve(request):\n    \"\"\"Replay one journal request and return the recovered state.\"\"\"\n    if not isinstance(request, dict):\n        raise TypeError(\"request must be an object\")\n\n    pages = _decode_pages(request.get(\"pages\"))\n    page_sizes = [len(page) for page in pages]\n    n_pages = len(pages)\n    log = _decode_log(request.get(\"log\"))\n\n    checkpoint = request.get(\"checkpoint\", 0)\n    if type(checkpoint) is not int:          # bool/float/str: never sent\n        checkpoint = int(checkpoint)\n\n    total = len(log)\n"
+    },
+    {
+      "step": 43826,
+      "kind": "terminal_call",
+      "summary": "cd /app && rm -rf __pycache__ && ls -la && python3 smoke.py && printf '%s\\n' '{\"pages\":[\"00000000\",\"00000000\"],\"checkpoint\":0,\"log\":\"\"}' | python3 /app/main.py"
+    },
+    {
+      "step": 43827,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "total 32\ndrwxr-xr-x 1 agent agent 4096 Oct  8 20:53 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:39 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent 7753 Oct  8 20:50 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nPassed 3 public examples\n{\"pages\": [\"00000000\", \"00000000\"], \"valid_bytes\": 0, \"last_seq\": 0}\n"
+    }
+  ]
+}

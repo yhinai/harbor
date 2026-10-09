@@ -1,0 +1,268 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-checkpointed-journal-4-a1-dd8e9bcf",
+    "task": "checkpointed-journal",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 4,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcome-corrections/v1.4.3/panel-kimi-checkpointed-journal-4-a1-dd8e9bcf.json",
+    "tool_calls": 13,
+    "agent_elapsed_seconds": 703.877664,
+    "input_tokens": 249358,
+    "output_tokens": 23006,
+    "uncached_cost_estimate": 1.093164,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "c708a346cc32233ed77a2b738e3f181cb130f49e9a46f76cdb8ed8ca332258ff",
+    "network_mode": "none",
+    "artifact_sha256": "755475629afca17b8c696ee862946dd59b5e5fa7f7d579be7191f9786cb60d58",
+    "normalized_artifact_sha256": "0393a48fbac8db446027b3b70ac8cb05de55152c4ed5246f03fcf3b8033678b2",
+    "terminal_nonzero_or_error_text_events": 5,
+    "protected_path_command_mentions": [
+      10512,
+      10856,
+      17499,
+      17694,
+      19761,
+      20095,
+      20284,
+      21196
+    ],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 6290,
+        "time": "2026-10-08T18:47:23.469254+00:00",
+        "artifact_sha256": "755475629afca17b8c696ee862946dd59b5e5fa7f7d579be7191f9786cb60d58",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 192.779326,
+    "event_counts": {
+      "initial": 1,
+      "request": 14,
+      "stream_chunk": 22489,
+      "response": 14,
+      "terminal_call": 13,
+      "terminal_result": 13,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 49,
+      "time": "2026-10-08T18:44:14.784368+00:00",
+      "tool_call_id": "call_9eb9c716574c43a797029a10",
+      "command": "ls -la /app 2>/dev/null && echo \"---\" && cat /app/smoke.py 2>/dev/null",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 85,
+      "time": "2026-10-08T18:44:18.700501+00:00",
+      "tool_call_id": "call_7d7174b1a4304103b2688833",
+      "command": "cat /app/examples.json; echo \"---\"; cat /app/main.py; echo \"---\"; cat /app/public_contract.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 5140,
+      "time": "2026-10-08T18:46:49.319604+00:00",
+      "tool_call_id": "call_832df9e5add8462fa23057f5",
+      "command": "cd /app && python3 - <<'EOF'\nimport zlib\nlog = bytes.fromhex(\"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\")\n# record 1\nhdr = log[:13]\nprint(\"hdr1\", hdr.hex(), \"crc stored\", log[13:17].hex(), hex(zlib.crc32(hdr)&0xffffffff), hex(int.from_bytes(log[13:17],'little')))\n# record 2\nr2 = log[17:42]\nprint(\"r2 len\", len(r2), \"crc ok\", hex(zlib.crc32(r2[:21])&0xffffffff), hex(int.from_bytes(r2[21:25],'little')))\npayload = r2[13:21]\nprint(\"patch payload\", payload.hex(), \"crc32\", hex(zlib.crc32(payload)&0xffffffff))\n# record 3\nr3 = log[42:]\nprint(\"r3\", r3.hex(), \"crc ok\", hex(zlib.crc32(r3[:21])&0xffffffff), hex(int.from_bytes(r3[21:25],'little')))\nprint(\"commit digest stored\", hex(int.from_bytes(r3[13+4:13+8],'little')))\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6290,
+      "time": "2026-10-08T18:47:23.469254+00:00",
+      "tool_call_id": "call_1388554864594605bef02091",
+      "command": "cat > /app/main.py <<'EOF'\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nRecord layout (all integers unsigned, little-endian):\n    payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32\n    | payload | crc:u32\nCRC is zlib.crc32(header + payload) & 0xffffffff.\n\nOnly the structurally valid prefix of the log is replayed, and only complete,\ncorrectly sealed transactions with COMMIT sequence greater than the checkpoint\nare applied.\n\"\"\"\n\nimport json\nimport sys\nimport zlib\n\nHEADER_LEN = 13\nCRC_LEN = 4\nMAX_PAYLOAD = 4096\n\nKIND_BEGIN = 1\nKIND_PATCH = 2\nKIND_COMMIT = 3\nKIND_ABORT = 4\n\n\ndef solve(request):\n    pages = [bytearray.fromhex(p) for p in request[\"pages\"]]\n    checkpoint = request[\"checkpoint\"]\n    log_hex = request[\"log\"]\n    log = bytes.fromhex(log_hex) if log_hex else b\"\"\n\n    n_pages = len(pages)\n    page_len = len(pages[0])\n    n = len(log)\n\n    # Active transaction incarnations: txid -> [staged patches, count, digest].\n    active = {}\n\n    pos = 0\n    last_seq = 0\n    valid_bytes = 0\n\n    while True:\n        remaining = n - pos\n        if remaining < HEADER_LEN:\n            break  # incomplete header\n\n        payload_length = int.from_bytes(log[pos:pos + 4], \"little\")\n        sequence = int.from_bytes(log[pos + 4:pos + 8], \"little\")\n        kind = log[pos + 8]\n        txid = int.from_bytes(log[pos + 9:pos + 13], \"little\")\n\n        if payload_length > MAX_PAYLOAD:\n            break  # invalid header\n        total = HEADER_LEN + payload_length + CRC_LEN\n        if remaining < total:\n            break  # incomplete record\n\n        payl",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 10512,
+      "time": "2026-10-08T18:50:12.822437+00:00",
+      "tool_call_id": "call_1ba54529be5e4dd18e6918ed",
+      "command": "mkdir -p /app/tests && cat > /app/tests/harness.py <<'EOF'\nimport json, struct, zlib, random, subprocess, sys\n\ndef rec(seq, kind, txid, payload=b\"\", crc=None, plen=None):\n    hdr = struct.pack(\"<IIBI\", plen if plen is not None else len(payload), seq, kind, txid)\n    c = crc if crc is not None else (zlib.crc32(hdr + payload) & 0xffffffff)\n    return hdr + payload + struct.pack(\"<I\", c)\n\ndef patch_payload(page, off, data):\n    return struct.pack(\"<HHH\", page, off, len(data)) + data\n\ndef commit_payload(count, digest):\n    return struct.pack(\"<II\", count, digest)\n\ndef run(cases):\n    inp = \"\".join(json.dumps(c[\"request\"]) + \"\\n\" for c in cases)\n    p = subprocess.run([sys.executable, \"/app/main.py\"], input=inp, text=True,\n                       capture_output=True, cwd=\"/app\")\n    assert p.returncode == 0, p.stderr\n    lines = p.stdout.splitlines()\n    assert len(lines) == len(cases), f\"{len(lines)} lines vs {len(cases)} cases\"\n    ok = True\n    for case, line in zip(cases, lines):\n        got = json.loads(line)\n        exp = case[\"expected\"]\n        if not ([bytes.fromhex(x) for x in got[\"pages\"]] == [bytes.fromhex(x) for x in exp[\"pages\"]]\n                and got[\"valid_bytes\"] == exp[\"valid_bytes\"] and got[\"last_seq\"] == exp[\"last_seq\"]):\n            print(\"FAIL\", case[\"id\"])\n            print(\"  req \", json.dumps(case[\"request\"]))\n            print(\"  exp \", exp)\n            print(\"  got \", got)\n            ok = False\n    return ok\n\ncases = []\nP = [\"00000000\", \"00000000\"]\n\ndef add(id_, pages, checkpoint, log, exp_pages, exp_bytes, exp_seq):\n    cases.append({\"id\": id_, \"req",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 10856,
+      "time": "2026-10-08T18:50:22.155587+00:00",
+      "tool_call_id": "call_bb9200686d92436798c29b00",
+      "command": "cd /app && python3 - <<'EOF'\nimport re\nsrc = open('tests/harness.py').read()\nbad = '''add(\"interleave-rev\", P, 0, bA + bB + paA + paB + cB2 := rec(5, 3, 2, commit_payload(1, zlib.crc32(patch_payload(0, 0, b\"\\\\x22\")) & 0xffffffff)) + rec(6, 3, 1, commit_payload(1, zlib.crc32(patch_payload(0, 0, b\"\\\\x11\")) & 0xffffffff)), [\"11000000\", \"00000000\"], 121, 6)'''\ngood = '''cB_first = rec(5, 3, 2, commit_payload(1, zlib.crc32(patch_payload(0, 0, b\"\\\\x22\")) & 0xffffffff))\ncA_last = rec(6, 3, 1, commit_payload(1, zlib.crc32(patch_payload(0, 0, b\"\\\\x11\")) & 0xffffffff))\nadd(\"interleave-rev\", P, 0, bA + bB + paA + paB + cB_first + cA_last, [\"11000000\", \"00000000\"], 121, 6)'''\nassert bad in src\nopen('tests/harness.py','w').write(src.replace(bad, good))\nEOF\npython3 /app/tests/harness.py",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 17499,
+      "time": "2026-10-08T18:53:10.671169+00:00",
+      "tool_call_id": "call_15739da6c7b140478cc0284d",
+      "command": "cat > /app/tests/harness.py <<'EOF'\nimport json, struct, zlib, subprocess, sys\n\ndef rec(seq, kind, txid, payload=b\"\", crc=None, plen=None):\n    hdr = struct.pack(\"<IIBI\", plen if plen is not None else len(payload), seq, kind, txid)\n    c = crc if crc is not None else (zlib.crc32(hdr + payload) & 0xffffffff)\n    return hdr + payload + struct.pack(\"<I\", c)\n\ndef pp(page, off, data):\n    return struct.pack(\"<HHH\", page, off, len(data)) + data\n\ndef cp(count, digest):\n    return struct.pack(\"<II\", count, digest)\n\ndef run(cases):\n    inp = \"\".join(json.dumps(c[\"request\"]) + \"\\n\" for c in cases)\n    p = subprocess.run([sys.executable, \"/app/main.py\"], input=inp, text=True,\n                       capture_output=True, cwd=\"/app\")\n    assert p.returncode == 0, p.stderr\n    lines = p.stdout.splitlines()\n    assert len(lines) == len(cases), f\"{len(lines)} lines vs {len(cases)} cases\"\n    ok = True\n    for case, line in zip(cases, lines):\n        got = json.loads(line)\n        exp = case[\"expected\"]\n        if not ([bytes.fromhex(x) for x in got[\"pages\"]] == [bytes.fromhex(x) for x in exp[\"pages\"]]\n                and got[\"valid_bytes\"] == exp[\"valid_bytes\"] and got[\"last_seq\"] == exp[\"last_seq\"]):\n            print(\"FAIL\", case[\"id\"])\n            print(\"  exp \", exp)\n            print(\"  got \", got)\n            ok = False\n    return ok\n\ncases = []\nP = [\"00000000\", \"00000000\"]\n\ndef add(id_, pages, checkpoint, log, exp_pages, exp_bytes, exp_seq):\n    assert isinstance(log, bytes)\n    cases.append({\"id\": id_, \"request\": {\"pages\": pages, \"checkpoint\": checkpoint, \"log\": log.hex()},\n        ",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 17694,
+      "time": "2026-10-08T18:53:18.218444+00:00",
+      "tool_call_id": "call_5a880d7f031f41e1a7c5ec15",
+      "command": "cd /app && python3 - <<'EOF'\nsrc = open('tests/harness.py').read()\nstart = src.index('add(\"interleave-rev\",')\nend = src.index('# true reversed')\nsrc = src[:start] + src[end:]\nopen('tests/harness.py','w').write(src)\nEOF\npython3 /app/tests/harness.py",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 19761,
+      "time": "2026-10-08T18:54:19.294861+00:00",
+      "tool_call_id": "call_c8cf6153ad5c43a9bbc8ab73",
+      "command": "cat > /app/tests/difftest.py <<'EOF'\nimport json, struct, zlib, random, subprocess, sys\n\n# ---------- independent two-pass reference ----------\ndef reference(request):\n    pages = [bytearray(bytes.fromhex(p)) for p in request[\"pages\"]]\n    checkpoint = request[\"checkpoint\"]\n    log = bytes.fromhex(request[\"log\"]) if request[\"log\"] else b\"\"\n    n, pos, last_seq = len(log), 0, 0\n    records = []\n    while pos < n:\n        if n - pos < 13:\n            break\n        plen, seq, kind, txid = struct.unpack_from(\"<IIBI\", log, pos)\n        if plen > 4096:\n            break\n        end = pos + 13 + plen + 4\n        if end > n:\n            break\n        payload = log[pos + 13: pos + 13 + plen]\n        (crc_stored,) = struct.unpack_from(\"<I\", log, pos + 13 + plen)\n        if zlib.crc32(log[pos:pos + 13 + plen]) & 0xFFFFFFFF != crc_stored:\n            break\n        if seq == 0 or seq <= last_seq or txid == 0:\n            break\n        if kind in (1, 4):\n            if plen != 0:\n                break\n        elif kind == 2:\n            if plen < 6:\n                break\n            pi, off, cnt = struct.unpack_from(\"<HHH\", payload, 0)\n            if cnt == 0 or plen != 6 + cnt:\n                break\n            if pi >= len(pages) or off + cnt > len(pages[pi]):\n                break\n        elif kind == 3:\n            if plen != 8:\n                break\n        else:\n            break\n        records.append((seq, kind, txid, payload))\n        pos = end\n        last_seq = seq\n\n    # second pass: transaction semantics, collecting sealed commits\n    active = {}  # txid -> list of payloads\n",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 20095,
+      "time": "2026-10-08T18:54:33.291847+00:00",
+      "tool_call_id": "call_aad21c8f892e4a09a9196456",
+      "command": "cd /app && python3 - <<'EOF'\nsrc = open('tests/difftest.py').read()\nsrc = src.replace(\"        seq += rng.randint(1, 5)\\n\",\n                  \"        seq = min(seq + rng.randint(1, 5), 2**32 - 1)\\n\")\nopen('tests/difftest.py','w').write(src)\nEOF\npython3 /app/tests/difftest.py",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 20284,
+      "time": "2026-10-08T18:54:39.406365+00:00",
+      "tool_call_id": "call_48298f51b9664473847d5348",
+      "command": "cd /app && python3 - <<'EOF'\nsrc = open('tests/difftest.py').read()\nsrc = src.replace(\"                if seq <= prev:\\n                    seq = prev + 1\\n\",\n                  \"                if seq <= prev:\\n                    seq = min(prev + 1, 2**32 - 1)\\n\")\nopen('tests/difftest.py','w').write(src)\nEOF\npython3 /app/tests/difftest.py",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 21196,
+      "time": "2026-10-08T18:55:10.081347+00:00",
+      "tool_call_id": "call_3e40ac266114498587ecfa2d",
+      "command": "cat > /app/tests/stress.py <<'EOF'\nimport json, struct, zlib, random, subprocess, sys, time\n\ndef rec(seq, kind, txid, payload=b\"\"):\n    hdr = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n    return hdr + payload + struct.pack(\"<I\", zlib.crc32(hdr + payload) & 0xffffffff)\n\ndef pp(page, off, data):\n    return struct.pack(\"<HHH\", page, off, len(data)) + data\n\nrng = random.Random(7)\nreqs = []\nfor _ in range(200):\n    pages = [\"00\" * 64] * 8\n    seq = 0\n    log = b\"\"\n    staged = {}\n    # fill close to 64 KiB\n    while len(log) < 60000:\n        seq += 1\n        k = rng.choice([1, 2, 2, 2, 3, 4])\n        t = rng.randint(1, 6)\n        if k == 1:\n            r = rec(seq, k, t); staged[t] = []\n        elif k == 2:\n            off = rng.randrange(64); cnt = rng.randint(1, 64 - off)\n            p = pp(rng.randrange(8), off, rng.randbytes(cnt))\n            r = rec(seq, k, t, p)\n            if t in staged: staged[t].append(p)\n        elif k == 3:\n            st = staged.pop(t, [])\n            r = rec(seq, k, t, struct.pack(\"<II\", len(st), zlib.crc32(b\"\".join(st)) & 0xffffffff))\n        else:\n            r = rec(seq, k, t); staged.pop(t, None)\n        log += r\n    reqs.append({\"pages\": pages, \"checkpoint\": rng.randint(0, seq), \"log\": log.hex()})\n\ninp = \"\".join(json.dumps(r) + \"\\n\" for r in reqs)\nt0 = time.time()\np = subprocess.run([sys.executable, \"/app/main.py\"], input=inp, text=True, capture_output=True, cwd=\"/app\")\ndt = time.time() - t0\nassert p.returncode == 0, p.stderr\nassert len(p.stdout.splitlines()) == len(reqs)\nprint(f\"stress: {len(reqs)} requests, ~{sum(len(r['log'])//2 ",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 22028,
+      "time": "2026-10-08T18:55:36.652887+00:00",
+      "tool_call_id": "call_56fee9f122694826a41b7b6f",
+      "command": "cd /app && printf '' | python3 main.py | wc -l && printf '%s\\n' '{\"pages\":[\"AABBCCDD\"],\"checkpoint\":0,\"log\":\"\"}' '{\"pages\":[\"00\"],\"checkpoint\":5,\"log\":\"00000000010000000101000000141cd39d\"}' | python3 main.py && python3 tests/harness.py && python3 tests/difftest.py && python3 smoke.py",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 50,
+      "time": "2026-10-08T18:44:15.644705+00:00",
+      "tool_call_id": "call_9eb9c716574c43a797029a10",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:44 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:44 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 10513,
+      "time": "2026-10-08T18:50:13.026586+00:00",
+      "tool_call_id": "call_1ba54529be5e4dd18e6918ed",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "  File \"/app/tests/harness.py\", line 137\n    add(\"interleave-rev\", P, 0, bA + bB + paA + paB + cB2 := rec(5, 3, 2, commit_payload(1, zlib.crc32(patch_payload(0, 0, b\"\\x22\")) & 0xffffffff)) + rec(6, 3, 1, commit_payload(1, zlib.crc32(patch_payload(0, 0, b\"\\x11\")) & 0xffffffff)), [\"11000000\", \"00000000\"], 121, 6)\n                                                          ^^\nSyntaxError: invalid syntax\n",
+      "stdout_tail": "",
+      "stderr_tail": "  File \"/app/tests/harness.py\", line 137\n    add(\"interleave-rev\", P, 0, bA + bB + paA + paB + cB2 := rec(5, 3, 2, commit_payload(1, zlib.crc32(patch_payload(0, 0, b\"\\x22\")) & 0xffffffff)) + rec(6, 3, 1, commit_payload(1, zlib.crc32(patch_payload(0, 0, b\"\\x11\")) & 0xffffffff)), [\"11000000\", \"00000000\"], 121, 6)\n                                                          ^^\nSyntaxError: invalid syntax\n"
+    },
+    {
+      "step": 10857,
+      "time": "2026-10-08T18:50:22.453004+00:00",
+      "tool_call_id": "call_bb9200686d92436798c29b00",
+      "return_code": 0,
+      "stdout": "FAIL patch-edge\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d07000000020000000201000000010003000100aa870892920800000003000000030100000001000000db8e7a4b30b689f3\"}\n  exp  {'pages': ['00000000', '000000aa'], 'valid_bytes': 63, 'last_seq': 3}\n  got  {'pages': ['00000000', '000000aa'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL ignored-patch\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d07000000020000000207000000000000000100ee293641ea080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"}\n  exp  {'pages': ['11220000', '00000000'], 'valid_bytes': 88, 'last_seq': 3}\n  got  {'pages': ['00000000', '00000000'], 'valid_bytes': 41, 'last_seq': 2}\nFAIL seal-mismatch\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f83670800000003000000030100000001000000efbeadde4508b7e600000000040000000102000000b5f6f1c50700000005000000020200000001000100010077fa6b2b740800000006000000030200000001000000d273d8c9221b2a2f\"}\n  exp  {'pages': ['00000000', '00770000'], 'valid_bytes': 155, 'last_seq': 6}\n  got  {'pages': ['00000000', '00770000'], 'valid_bytes': 133, 'last_seq': 6}\nFAIL orphan\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"080000000100000003050000000000000000000000601c39c600000000020000000406000000189769f100000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"}\n  exp  {'pages': ['11220000', '00000000'], 'valid_bytes': 109, 'last_seq': 3}\n  got  {'pages': ['00000000', '00000000'], 'valid_bytes': 42, 'last_seq': 2}\nFAIL rebegin\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f836700000000030000000101000000923425b307000000020000000201000000010003000100aa870892920800000003000000030100000001000000db8e7a4b30b689f3\"}\n  exp  {'pages': ['00000000', '000000aa'], 'valid_bytes': 109, 'last_seq': 5}\n  got  {'pages': ['00000000', '00000000'], 'valid_bytes': 59, 'last_seq': 3}\nFAIL abort\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f836700000000030000000401000000e2bbc57b00000000040000000102000000b5f6f1c50700000005000000020200000001000100010077fa6b2b740800000006000000030200000001000000d273d8c9221b2a2f\"}\n  exp  {'pages': ['00000000', '00770000'], 'valid_bytes': 130, 'last_seq': 6}\n  got  {'pages': ['00000000', '00770000'], 'valid_bytes': 125, 'last_seq': 6}\nFAIL interleave\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d000000000200000001020000003f8febb6070000000300000002010000000000000001001176829e810700000004000000020200000000000000010022147d555a0800000005000000030100000001000000bb951ef638dba9cb0800000006000000030200000001000000adf4ce491a902c09\"}\n  exp  {'pages': ['22000000', '00000000'], 'valid_bytes': 121, 'last_seq': 6}\n  got  {'pages': ['22000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\nFAIL interleave-rev\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d000000000200000001020000003f8febb6070000000300000002010000000000000001001176829e810700000004000000020200000000000000010022147d555a0800000005000000030200000001000000adf4ce499ecbb65a0800000006000000030100000001000000bb951ef6bc803398\"}\n  exp  {'pages': ['11000000', '00000000'], 'valid_bytes': 121, 'last_seq': 6}\n  got  {'pages': ['11000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\nFAIL cp-mid\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 3, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b600000000040000000102000000b5f6f1c50700000005000000020200000001000000010099358df90e08000000060000000302000000010000001d950ab3df76b5af\"}\n  exp  {'pages': ['00000000', '99000000'], 'valid_bytes': 138, 'last_seq': 6}\n  got  {'pages': ['00000000', '99000000'], 'valid_bytes': 133, 'last_seq': 6}\nFAIL cp-closes\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 3, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b60700000004000000020100000000000200010055eaac1677080000000500000003010000000100000052436ffd370d2c48\"}\n  exp  {'pages': ['00005500', '00000000'], 'valid_bytes': 113, 'last_seq': 5}\n  got  {'pages': ['00000000', '00000000'], 'valid_bytes': 116, 'last_seq': 5}\nFAIL overlap\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d08000000020000000201000000000000000200aabbf25361e907000000030000000201000000000001000100ccaf059c440800000004000000030100000002000000b9b5d9db0f84a091\"}\n  exp  {'pages': ['aacc0000', '00000000'], 'valid_bytes': 88, 'last_seq': 4}\n  got  {'pages': ['aacc0000', '00000000'], 'valid_bytes': 91, 'last_seq': 4}\nFAIL eight-pages\n  req  {\"pages\": [\"00000000\", \"01010101\", \"02020202\", \"03030303\", \"04040404\", \"05050505\", \"06060606\", \"07070707\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d08000000020000000201000000070002000200ffee8af7a1720800000003000000030100000001000000fd8db05c884250c6\"}\n  exp  {'pages': ['00000000', '01010101', '02020202', '03030303', '04040404', '05050505', '06060606', '0707ffee'], 'valid_bytes': 63, 'last_seq': 3}\n  got  {'pages': ['00000000', '01010101', '02020202', '03030303', '04040404', '05050505', '06060606', '0707ffee'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL one-byte-page\n  req  {\"pages\": [\"00\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d070000000200000002010000000000000001007fb85ffc850800000003000000030100000001000000e4d9145c1ca59f4a\"}\n  exp  {'pages': ['7f'], 'valid_bytes': 60, 'last_seq': 3}\n  got  {'pages': [",
+      "stderr": "",
+      "stdout_tail": "30100000001000000bb951ef6bc803398\"}\n  exp  {'pages': ['11000000', '00000000'], 'valid_bytes': 121, 'last_seq': 6}\n  got  {'pages': ['11000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\nFAIL cp-mid\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 3, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b600000000040000000102000000b5f6f1c50700000005000000020200000001000000010099358df90e08000000060000000302000000010000001d950ab3df76b5af\"}\n  exp  {'pages': ['00000000', '99000000'], 'valid_bytes': 138, 'last_seq': 6}\n  got  {'pages': ['00000000', '99000000'], 'valid_bytes': 133, 'last_seq': 6}\nFAIL cp-closes\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 3, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b60700000004000000020100000000000200010055eaac1677080000000500000003010000000100000052436ffd370d2c48\"}\n  exp  {'pages': ['00005500', '00000000'], 'valid_bytes': 113, 'last_seq': 5}\n  got  {'pages': ['00000000', '00000000'], 'valid_bytes': 116, 'last_seq': 5}\nFAIL overlap\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d08000000020000000201000000000000000200aabbf25361e907000000030000000201000000000001000100ccaf059c440800000004000000030100000002000000b9b5d9db0f84a091\"}\n  exp  {'pages': ['aacc0000', '00000000'], 'valid_bytes': 88, 'last_seq': 4}\n  got  {'pages': ['aacc0000', '00000000'], 'valid_bytes': 91, 'last_seq': 4}\nFAIL eight-pages\n  req  {\"pages\": [\"00000000\", \"01010101\", \"02020202\", \"03030303\", \"04040404\", \"05050505\", \"06060606\", \"07070707\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d08000000020000000201000000070002000200ffee8af7a1720800000003000000030100000001000000fd8db05c884250c6\"}\n  exp  {'pages': ['00000000', '01010101', '02020202', '03030303', '04040404', '05050505', '06060606', '0707ffee'], 'valid_bytes': 63, 'last_seq': 3}\n  got  {'pages': ['00000000', '01010101', '02020202', '03030303', '04040404', '05050505', '06060606', '0707ffee'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL one-byte-page\n  req  {\"pages\": [\"00\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d070000000200000002010000000000000001007fb85ffc850800000003000000030100000001000000e4d9145c1ca59f4a\"}\n  exp  {'pages': ['7f'], 'valid_bytes': 60, 'last_seq': 3}\n  got  {'pages': ['7f'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL rebegin-digest\n  req  {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f836700000000030000000101000000923425b30700000004000000020100000000000200010055eaac1677080000000500000003010000000100000052436ffd370d2c48\"}\n  exp  {'pages': ['00005500', '00000000'], 'valid_bytes': 96, 'last_seq': 5}\n  got  {'pages': ['00005500', '00000000'], 'valid_bytes': 108, 'last_seq': 5}\nhandcrafted: FAILURES (42 cases)\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 19762,
+      "time": "2026-10-08T18:54:19.519517+00:00",
+      "tool_call_id": "call_c8cf6153ad5c43a9bbc8ab73",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/tests/difftest.py\", line 150, in <module>\n    reqs = [gen(rng) for _ in range(CASES)]\n            ^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in gen\n    log = b\"\".join(rec(*r) for r in records)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in <genexpr>\n    log = b\"\".join(rec(*r) for r in records)\n                   ^^^^^^^\n  File \"/app/tests/difftest.py\", line 71, in rec\n    hdr = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nstruct.error: 'I' format requires 0 <= number <= 4294967295\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/tests/difftest.py\", line 150, in <module>\n    reqs = [gen(rng) for _ in range(CASES)]\n            ^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in gen\n    log = b\"\".join(rec(*r) for r in records)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in <genexpr>\n    log = b\"\".join(rec(*r) for r in records)\n                   ^^^^^^^\n  File \"/app/tests/difftest.py\", line 71, in rec\n    hdr = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nstruct.error: 'I' format requires 0 <= number <= 4294967295\n"
+    },
+    {
+      "step": 20096,
+      "time": "2026-10-08T18:54:33.562353+00:00",
+      "tool_call_id": "call_aad21c8f892e4a09a9196456",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/tests/difftest.py\", line 150, in <module>\n    reqs = [gen(rng) for _ in range(CASES)]\n            ^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in gen\n    log = b\"\".join(rec(*r) for r in records)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in <genexpr>\n    log = b\"\".join(rec(*r) for r in records)\n                   ^^^^^^^\n  File \"/app/tests/difftest.py\", line 71, in rec\n    hdr = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nstruct.error: 'I' format requires 0 <= number <= 4294967295\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/tests/difftest.py\", line 150, in <module>\n    reqs = [gen(rng) for _ in range(CASES)]\n            ^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in gen\n    log = b\"\".join(rec(*r) for r in records)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in <genexpr>\n    log = b\"\".join(rec(*r) for r in records)\n                   ^^^^^^^\n  File \"/app/tests/difftest.py\", line 71, in rec\n    hdr = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nstruct.error: 'I' format requires 0 <= number <= 4294967295\n"
+    }
+  ],
+  "last_events": [
+    {
+      "step": 17694,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nsrc = open('tests/harness.py').read()\nstart = src.index('add(\"interleave-rev\",')\nend = src.index('# true reversed')\nsrc = src[:start] + src[end:]\nopen('tests/harness.py','w').write(src)\nEOF\npython3 /app/tests/harness.py"
+    },
+    {
+      "step": 17695,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "handcrafted: ALL PASS (53 cases)\n"
+    },
+    {
+      "step": 19761,
+      "kind": "terminal_call",
+      "summary": "cat > /app/tests/difftest.py <<'EOF'\nimport json, struct, zlib, random, subprocess, sys\n\n# ---------- independent two-pass reference ----------\ndef reference(request):\n    pages = [bytearray(bytes.fromhex(p)) for p in request[\"pages\"]]\n    checkpoint = request[\"checkpoint\"]\n    log = bytes.fromhex(request[\"log\"]) if request[\"log\"] else b\"\"\n    n, pos, last_seq = len(log), 0, 0\n    records = []\n    while pos < n:\n        if n - pos < 13:\n            break\n        plen, seq, kind, txid = struct.unpack_from(\"<IIBI\", log, pos)\n        if plen > 4096:\n            break\n        end = pos + 13 + plen + 4\n        if end > n:\n            break\n        payload = log[pos + 13: pos + 13 + plen]\n        (crc_stored,) = struct.unpack_from(\"<I\", log, pos + 13 + plen)\n        if zlib.crc32(log[pos:pos + 13 + plen]) & 0xFFFFFFFF != crc_stored:\n            break\n        if seq == 0 or seq <= last_seq or txid == 0:\n            break\n        if kind in (1, 4):\n            if plen != 0:\n                bre"
+    },
+    {
+      "step": 19762,
+      "kind": "terminal_result",
+      "return_code": 1,
+      "summary": "Traceback (most recent call last):\n  File \"/app/tests/difftest.py\", line 150, in <module>\n    reqs = [gen(rng) for _ in range(CASES)]\n            ^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in gen\n    log = b\"\".join(rec(*r) for r in records)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in <genexpr>\n    log = b\"\".join(rec(*r) for r in records)\n                   ^^^^^^^\n  File \"/app/tests/difftest.py\", line 71, in rec\n    hdr = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nstruct.error: 'I' format requires 0 <= number <= 4294967295\n"
+    },
+    {
+      "step": 20095,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nsrc = open('tests/difftest.py').read()\nsrc = src.replace(\"        seq += rng.randint(1, 5)\\n\",\n                  \"        seq = min(seq + rng.randint(1, 5), 2**32 - 1)\\n\")\nopen('tests/difftest.py','w').write(src)\nEOF\npython3 /app/tests/difftest.py"
+    },
+    {
+      "step": 20096,
+      "kind": "terminal_result",
+      "return_code": 1,
+      "summary": "Traceback (most recent call last):\n  File \"/app/tests/difftest.py\", line 150, in <module>\n    reqs = [gen(rng) for _ in range(CASES)]\n            ^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in gen\n    log = b\"\".join(rec(*r) for r in records)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/tests/difftest.py\", line 131, in <genexpr>\n    log = b\"\".join(rec(*r) for r in records)\n                   ^^^^^^^\n  File \"/app/tests/difftest.py\", line 71, in rec\n    hdr = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nstruct.error: 'I' format requires 0 <= number <= 4294967295\n"
+    },
+    {
+      "step": 20284,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nsrc = open('tests/difftest.py').read()\nsrc = src.replace(\"                if seq <= prev:\\n                    seq = prev + 1\\n\",\n                  \"                if seq <= prev:\\n                    seq = min(prev + 1, 2**32 - 1)\\n\")\nopen('tests/difftest.py','w').write(src)\nEOF\npython3 /app/tests/difftest.py"
+    },
+    {
+      "step": 20285,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "difftest: ALL MATCH (4000 cases)\n"
+    },
+    {
+      "step": 21196,
+      "kind": "terminal_call",
+      "summary": "cat > /app/tests/stress.py <<'EOF'\nimport json, struct, zlib, random, subprocess, sys, time\n\ndef rec(seq, kind, txid, payload=b\"\"):\n    hdr = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n    return hdr + payload + struct.pack(\"<I\", zlib.crc32(hdr + payload) & 0xffffffff)\n\ndef pp(page, off, data):\n    return struct.pack(\"<HHH\", page, off, len(data)) + data\n\nrng = random.Random(7)\nreqs = []\nfor _ in range(200):\n    pages = [\"00\" * 64] * 8\n    seq = 0\n    log = b\"\"\n    staged = {}\n    # fill close to 64 KiB\n    while len(log) < 60000:\n        seq += 1\n        k = rng.choice([1, 2, 2, 2, 3, 4])\n        t = rng.randint(1, 6)\n        if k == 1:\n            r = rec(seq, k, t); staged[t] = []\n        elif k == 2:\n            off = rng.randrange(64); cnt = rng.randint(1, 64 - off)\n            p = pp(rng.randrange(8), off, rng.randbytes(cnt))\n            r = rec(seq, k, t, p)\n            if t in staged: staged[t].append(p)\n        elif k == 3:\n            st = staged.pop(t, [])\n          "
+    },
+    {
+      "step": 21197,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "stress: 200 requests, ~11722 KiB total logs, 0.47s\ndifftest: ALL MATCH (4000 cases)\nhandcrafted: ALL PASS (53 cases)\nPassed 3 public examples\n"
+    },
+    {
+      "step": 22028,
+      "kind": "terminal_call",
+      "summary": "cd /app && printf '' | python3 main.py | wc -l && printf '%s\\n' '{\"pages\":[\"AABBCCDD\"],\"checkpoint\":0,\"log\":\"\"}' '{\"pages\":[\"00\"],\"checkpoint\":5,\"log\":\"00000000010000000101000000141cd39d\"}' | python3 main.py && python3 tests/harness.py && python3 tests/difftest.py && python3 smoke.py"
+    },
+    {
+      "step": 22029,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "0\n{\"pages\": [\"aabbccdd\"], \"valid_bytes\": 0, \"last_seq\": 0}\n{\"pages\": [\"00\"], \"valid_bytes\": 17, \"last_seq\": 1}\nhandcrafted: ALL PASS (53 cases)\ndifftest: ALL MATCH (4000 cases)\nPassed 3 public examples\n"
+    }
+  ]
+}

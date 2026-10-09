@@ -1,0 +1,61 @@
+# Completed-panel audit · revision 1.5.0
+
+**Verified:** This is an offline review of the development panel, not the evaluator's overnight phase. It made no paid model calls, changed no task package, and did not create `report.md`. The original Day 1 registration and archive remain frozen.
+
+## Outcome
+
+**Verified:** All 120 completed primary solutions reproduce their recorded full rewards against the frozen graders in fresh, CPU-only Docker containers with networking disabled. There are 24 completed trials per task: eight Kimi K3, eight GLM-5.3, and eight DeepSeek V4.1 Flash. The inference ledger contains only these three allowed model IDs. No target-model result is recorded or claimed.
+
+**Verified:** Artifact-only replay passes 119/120. The remaining journal submission imports an allowed helper, `journal.py`, that the original harness failed to archive. Re-executing the exact recorded helper writes in an isolated container, then grading the original archived `main.py`, passes all 377 journal cases. The helper and reconstruction commands are preserved in [helper evidence](helper-reconstruction/result.json). **Inferred:** This is an archival defect, not evidence of an incorrect solution. Future harness versions should capture every submitted dependency, not just the entry point.
+
+**Verified:** The first audit replay had an incorrect directory-copy command, so none of its graders started. That audit infrastructure error is preserved under `preflight-copy-error/`. A corrected preflight passed, followed by the full replay. These preliminary errors are not model outcomes. The original `replay-summary.json` deliberately still says 119 artifact-only passes; [combined audit](audit-summary.json) records the helper-assisted 120th pass separately.
+
+| Task | Completed passes | Trace finishes within 30 min | Median / maximum trace minutes |
+|---|---:|---:|---:|
+| atomic-range-history | 24/24 | 13/24 | 29.0 / 55.7 |
+| exact-fused-dot | 24/24 | 17/24 | 21.2 / 48.3 |
+| typecheck-soundness-witness | 24/24 | 19/24 | 17.8 / 178.8 |
+| mixed-width-tso | 24/24 | 20/24 | 12.8 / 42.3 |
+| checkpointed-journal | 24/24 | 24/24 | 8.3 / 13.8 |
+
+**Verified:** The follow-up allowed 24 hours per trial and requested maximal reasoning; the task packages specify 1,800 agent seconds. Ninety-three traces finish within 30 minutes; 27 finish later. **Unknown:** The graded outcome at a 30-minute cutoff for those 27, and the evaluator's exact scaffold/token allowance. A correct artifact can exist before the final response; later completion is not a measured task failure. Exact final-file writes provide additional positive availability signals, but not full graded snapshots at cutoff. Trace duration also omits some setup. Do not report the table as 30-minute pass rates.
+
+## Validity and independence
+
+**Verified:** All 108 frozen task-file hashes and the original submission archive SHA-256 match. Every successful trial's saved artifact and referenced compressed trajectory hashes match. Every successful trial starts from the task instruction and a system message, uses real terminal calls, and has a distinct container ID with network mode `none`. Response token totals and terminal-call counts reconcile with saved agent metadata. Each task has 24 distinct normalized final artifacts. See [metrics](trajectory-metrics.json), [inventory](inventory.json), and `replays/`.
+
+**Inferred:** These checks support fresh starts and real work, not statistical independence of model behavior. Families share a scaffold, host, and task specifications. Distinct code does not prove absence of training contamination. **Unknown:** Target training exposure and same-task proxy-to-target transfer.
+
+**Verified source inspection and replay:** Grading uses protected reference code and actual candidate behavior, not agent-authored test logs or claims. The witness is checked by trusted checker/interpreter copies. The history grader accepts equivalent serial orders. Agent-created `/app/tests/` directories are ordinary self-tests. Two exact root-path probes were found in the command index: one lists an empty `/solution` directory; the other returns only `/app` contents. Neither recorded result reveals hidden test or canonical solution content. [Exact probe records](root-probe-review.json). **Inferred:** There is no observed hidden-answer exposure in these probes; lexical screening cannot establish complete absence of other access paths.
+
+**Verified from earlier records, not rerun here:** Canonical/alternative solution gates, authored wrong-solution gates, isolation checks, and Harbor oracle validation are in `portfolio/evidence/final-validation-v1.1.0.json` and `harbor-oracles-v1.1.0.json`. This review adds fresh candidate replays, not a new oracle validation claim.
+
+## Exclusions and selection
+
+**Verified:** The merged study has 178 attempts: three smokes and 175 panel attempts. Of the panel attempts, 120 are valid primary slots and 55 are excluded: 21 setup `RuntimeError`, 21 `InterruptedHostProcess`, ten scheduler duplicates, two transport failures, and one protocol failure. Corrections are separate records; raw outcomes remain unchanged. Earlier blanket memory-pressure exclusions were corrected before this audit. First attempts alone contain 80 valid completions, 21 setup errors, 18 host interruptions, and one protocol failure. [Excluded records](exclusions.json).
+
+**Verified:** The protocol case is model-originated: GLM requests `timeout_sec=620` against a declared maximum of 600, and the harness ends the trial immediately. It is not a transport error. The preceding local tests pass; there is no trusted final grading result. **Inferred:** Keep this in end-to-end reliability reporting while excluding it from task-semantic difficulty. As a diagnostic sensitivity only, counting it as unsuccessful gives 120/121 completed-or-protocol-ended attempts; this is not a randomized primary-slot success estimate. A future harness should return recoverable validation feedback for malformed calls rather than end the trial.
+
+**Unknown:** True final task outcomes of interrupted attempts. Excluded snapshots, where present, are not authenticated final submissions. This review did not recover and grade all partial attempts. **Inferred:** Replacing interrupted attempts until completion can favor survivable runs; 120/120 is conditional on the completion protocol. Do not silently merge exclusions into failures or present the panel as 120 pristine first attempts.
+
+## Trajectory findings
+
+**Verified scope:** Automated metadata/command review covers all 120 successful trajectories. Semantic review reads selected reasoning, commands, results, and final-code excerpts from 30 trajectories: the least- and most-expensive completed trial in each model/task cell. It is not a line-by-line reading of all tokens. Selection by cost spans effort, but is not random. Step indices below refer to transcript events, which include streamed chunks; they are not reasoning-step counts. Agent-written test totals are reported claims unless their actual outputs were inspected; replay results are separate verified evidence.
+
+- **typecheck-soundness-witness — verified:** DeepSeek trial 5 rejects an initial closure attempt at event 3774, constructs a nested-function loop at 22167, and receives an accepted runtime type error at 22168. GLM trial 3 explains the missing nested write effects at 47590 and verifies in copied reference files at 47591. Kimi trial 6 repeatedly investigates alternative explanations; at 373685 it identifies disagreement between memoized and non-memoized joins, writes its witness at 374682, and verifies at 376481. That trace takes 178.8 minutes. **Inferred:** The flaw can cause sustained search for one trial, but independent source reasoning routinely finds it. The negative random baseline does not imply agent hardness.
+- **exact-fused-dot — verified:** DeepSeek trial 3 reaches exact integer accumulation at 35142, triggers a negative shift at 37367, reasons about rounding across a binade at 38555, and eventually passes the frozen grader. GLM trial 6 investigates a mismatch at 29355; its following analysis distinguishes an erroneous self-authored reference from the implementation. Kimi trial 4 explicitly decodes the representation at 20005 and completes in 15.7 minutes. **Inferred:** Rounding details produce recoverable implementation/test errors, not demonstrated persistent failure. Arbitrary-precision integers remove much of the numerical difficulty.
+- **atomic-range-history — verified:** GLM trial 7 commits to an overly broad greedy reduction, receives a missed-witness counterexample at 47062, and revises the reduction after 53962 to transactions that never change a key. GLM trial 6's mismatch at 44520 instead comes from reversed real-time precedence in its own test reference, identified at 45589. Kimi trial 4 uses bounded search and finishes in 9.2 minutes. **Inferred:** Bounds permit effective enumeration and pruning. This has the greatest observed deadline sensitivity, not established intrinsic frontier difficulty.
+- **mixed-width-tso — verified:** Kimi trial 4 states the complete buffered-state transition model at 3391, fixes a self-test import issue at 4602, and finishes in 4.6 minutes. GLM trial 4 derives core-state memoization and reports it at 30873; DeepSeek trial 6 likewise uses memoized future outcomes, ultimately passing despite a 42.3-minute trace. **Inferred:** The byte-forwarding and draining semantics are handled explicitly; finite bounds make exhaustive exploration practical. No persistent sequential-consistency substitution is demonstrated in the reviewed completions.
+- **checkpointed-journal — verified:** GLM trial 7 initially expects the wrong result for interleaved commits at 18998; at 20168 it recognizes COMMIT order and corrects its self-test. DeepSeek trial 6 similarly corrects record-length and offset expectations after 14140/15059. All 24 traces finish within 13.8 minutes and all recovered submissions pass. **Inferred:** This is the clearest easy control. Lifecycle semantics are specified well enough for systematic implementation and testing.
+
+**Verified from the frozen baseline record:** The 900-second random/coverage-guided checker baseline generated 3,245,426 programs, accepted 1,581,430, and found zero qualifying type errors. [Record](../../portfolio/evidence/typecheck-baseline-hardened-v1.json). **Inferred:** This tests that generator's distribution, not arbitrary structured discovery. The panel directly refutes a strong inference from generator failure to agent failure.
+
+## Forecast and next decision
+
+**Inferred:** The revised low-confidence ranking under the packaged 30-minute limit is atomic-range-history, exact-fused-dot, typecheck-soundness-witness, mixed-width-tso, checkpointed-journal. Rounded forecasts are 6, 7, 7, 7, 7 passes out of eight. The ordering is mostly deadline sensitivity; ample-time evidence does not distinguish these as hard tasks. Full distributions and sensitivity scenarios are in [forecast revision](forecast-revision.json) and [forecast explanation](forecasts.md). The original preregistration is preserved, not retrospectively replaced.
+
+**Inferred recommendation:** Do not buy more repetitions of this unchanged portfolio to establish hardness. Keep journal as the easy control. If the user authorizes a new task revision, concentrate on replacing one or two specification-to-implementation tasks with an existing-code debugging exercise whose behavior exposes a subtle lifecycle bug. Validate any replacement independently and preregister its forecast before new paid evidence. SQLite remains dropped; this audit adds no replacement or new task scope.
+
+## Accounting
+
+**Verified calculation:** This follow-up ledger totals $312.2043932 at recorded uncached usage rates; conservative booked accounting is $485.099328, including reservations for 15 unknown-usage requests and margins. These are not invoice totals. There are 4,090 reported-usage requests, six rejected before generation, and 15 with unknown usage. **Unknown:** Actual reconciled provider charge and cache discounts. [Cost audit](cost-audit.json). The original panel's estimate is separate; this audit incurs no new inference spend.

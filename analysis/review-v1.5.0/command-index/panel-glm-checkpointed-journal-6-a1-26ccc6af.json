@@ -1,0 +1,321 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-glm-checkpointed-journal-6-a1-26ccc6af",
+    "task": "checkpointed-journal",
+    "model": "accounts/fireworks/models/glm-5p3",
+    "replicate": 6,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-glm-checkpointed-journal-6-a1-26ccc6af.json",
+    "tool_calls": 19,
+    "agent_elapsed_seconds": 506.754973,
+    "input_tokens": 534419,
+    "output_tokens": 38244,
+    "uncached_cost_estimate": 0.9164602000000001,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "181cc1a90ee58a1dbe627131716fced9081daaf9d3bdfac777e40cc9c757b0fb",
+    "network_mode": "none",
+    "artifact_sha256": "990b878edffb41301c93944fb1e0fd175abdc643273e1d21c528482b8fcd7d6e",
+    "normalized_artifact_sha256": "08f264eae49f5f72b3bd995a22fc0630be4cbbf48b43c7f80dfbcc97eb27a64c",
+    "terminal_nonzero_or_error_text_events": 7,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 36099,
+        "time": "2026-10-08T20:41:07.550097+00:00",
+        "artifact_sha256": "990b878edffb41301c93944fb1e0fd175abdc643273e1d21c528482b8fcd7d6e",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 461.036305,
+    "event_counts": {
+      "initial": 1,
+      "request": 19,
+      "stream_chunk": 38246,
+      "response": 19,
+      "terminal_call": 19,
+      "terminal_result": 19,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 5728,
+      "time": "2026-10-08T20:34:32.777958+00:00",
+      "tool_call_id": "chatcmpl-tool-ba1a6f9ebbea0bf3",
+      "command": "ls -la /app && cat /app/smoke.py 2>/dev/null",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 5730,
+      "time": "2026-10-08T20:34:32.968773+00:00",
+      "tool_call_id": "chatcmpl-tool-913a2b38395417b6",
+      "command": "python3 --version && python3 -c \"import zlib; print(zlib.crc32(b''))\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 5781,
+      "time": "2026-10-08T20:34:34.665216+00:00",
+      "tool_call_id": "chatcmpl-tool-8288f0e0914dc42b",
+      "command": "cat /app/main.py; echo ---; cat /app/public_contract.py; echo ---; cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6949,
+      "time": "2026-10-08T20:34:47.929799+00:00",
+      "tool_call_id": "chatcmpl-tool-a1149b75f3c8520a",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, zlib\ncases=json.loads(open('examples.json').read())\nfor c in cases:\n    log=bytes.fromhex(c['request']['log'])\n    print('=== case',c['id'],'checkpoint',c['request']['checkpoint'],'loglen',len(log))\n    off=0\n    while off<len(log):\n        if len(log)-off<13: print('  leftover',len(log)-off); break\n        pl=int.from_bytes(log[off:off+4],'little'); seq=int.from_bytes(log[off+4:off+8],'little')\n        kind=log[off+8]; tx=int.from_bytes(log[off+9:off+13],'little')\n        end=off+13+pl+4\n        if end>len(log): print('  incomplete at',off); break\n        payload=log[off+13:off+13+pl]; crc=int.from_bytes(log[end-4:end],'little')\n        ok = zlib.crc32(log[off:off+13+pl])==crc\n        print(f'  off={off} pl={pl} seq={seq} kind={kind} tx={tx} payload={payload.hex()} crcok={ok}')\n        off=end\n    print('  expected:',c['expected'])\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 8704,
+      "time": "2026-10-08T20:35:05.745740+00:00",
+      "tool_call_id": "chatcmpl-tool-a78809cc067463f6",
+      "command": "cat > /app/main.py <<'PYEOF'\n#!/usr/bin/env python3\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nInput : newline-delimited JSON requests on stdin, one per line.\nOutput: one JSON response per input line, in the same order.\n\nRequest  := {\"pages\": [hex...], \"checkpoint\": int, \"log\": hex}\nResponse := {\"pages\": [hex...], \"valid_bytes\": int, \"last_seq\": int}\n\nRecord layout (all integers unsigned little-endian, no padding):\n    payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32 | payload | crc:u32\nThe fixed header is 13 bytes; crc covers header + payload.\n\"\"\"\n\nimport json\nimport sys\nimport zlib\n\nHEADER_SIZE = 13          # payload_length:u32 + sequence:u32 + kind:u8 + transaction_id:u32\nCRC_SIZE = 4              # trailing crc:u32\nMAX_PAYLOAD = 4096        # payload length bound\n\nKIND_BEGIN = 1\nKIND_PATCH = 2\nKIND_COMMIT = 3\nKIND_ABORT = 4\n\n# struct helpers (little-endian)\n_U16 = \"<H\"\n_U32 = \"<I\"\n\n\ndef _u16(buf, off):\n    \"\"\"Read an unsigned 16-bit little-endian integer from *buf* at *off*.\"\"\"\n    return buf[off] | (buf[off + 1] << 8)\n\n\ndef _u32(buf, off):\n    \"\"\"Read an unsigned 32-bit little-endian integer from *buf* at *off*.\"\"\"\n    return (buf[off]\n            | (buf[off + 1] << 8)\n            | (buf[off + 2] << 16)\n            | (buf[off + 3] << 24))\n\n\ndef recover(pages_hex, checkpoint, log_hex):\n    \"\"\"Replay the journal *log_hex* over *pages_hex* beyond *checkpoint*.\n\n    Returns a dict with the recovered pages, the length in bytes of the valid\n    prefix of the log, and the sequence number of the last valid record.\n    \"\"\"\n    page",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 12698,
+      "time": "2026-10-08T20:35:54.226029+00:00",
+      "tool_call_id": "chatcmpl-tool-8eb69927901944b8",
+      "command": "mkdir -p /tmp/t && cat > /tmp/t/build.py <<'PYEOF'\n\"\"\"Journal record builder for tests.\"\"\"\nimport zlib\n\ndef rec(seq, kind, txid, payload=b\"\", crc=None, plen=None):\n    n = len(payload) if plen is None else plen\n    body = (n.to_bytes(4, \"little\") + seq.to_bytes(4, \"little\")\n            + bytes([kind]) + txid.to_bytes(4, \"little\") + payload)\n    c = zlib.crc32(body) if crc is None else crc\n    return body + c.to_bytes(4, \"little\")\n\ndef begin(seq, txid, **kw):\n    return rec(seq, 1, txid, b\"\", **kw)\n\ndef patch(seq, txid, page, off, data, **kw):\n    p = (page.to_bytes(2, \"little\") + off.to_bytes(2, \"little\")\n         + len(data).to_bytes(2, \"little\") + data)\n    return rec(seq, 2, txid, p, **kw)\n\ndef commit(seq, txid, count, digest, **kw):\n    return rec(seq, 3, txid, count.to_bytes(4, \"little\") + digest.to_bytes(4, \"little\"), **kw)\n\ndef abort(seq, txid, **kw):\n    return rec(seq, 4, txid, b\"\", **kw)\n\ndef seal(payloads):\n    \"\"\"Correct seal for a list of PATCH payloads.\"\"\"\n    return zlib.crc32(b\"\".join(payloads))\nPYEOF\necho ok",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 17594,
+      "time": "2026-10-08T20:36:40.712897+00:00",
+      "tool_call_id": "chatcmpl-tool-855c544890d6220c",
+      "command": "cat > /tmp/t/cases.py <<'PYEOF'\n\"\"\"Hand-computed edge case suite.\"\"\"\nimport sys, json\nsys.path.insert(0, \"/tmp/t\")\nfrom build import *\n\nP2 = [\"00000000\", \"00000000\"]          # two 4-byte pages\n\ndef pp(page, off, data):\n    return (page.to_bytes(2, \"little\") + off.to_bytes(2, \"little\")\n            + len(data).to_bytes(2, \"little\") + data)\n\nCASES = []\ndef case(name, pages, ckpt, log, exp_pages, exp_vb, exp_ls):\n    CASES.append((name, {\"pages\": pages, \"checkpoint\": ckpt, \"log\": log.hex()},\n                  {\"pages\": exp_pages, \"valid_bytes\": exp_vb, \"last_seq\": exp_ls}))\n\n# ---- basics -------------------------------------------------------------\ncase(\"empty\", P2, 0, b\"\", P2, 0, 0)\ncase(\"single-begin\", P2, 0, begin(1, 1), P2, 17, 1)\n\n# begin/patch/abort -> nothing applied\ncase(\"abort-discards\", P2, 0,\n     begin(1, 1) + patch(2, 1, 0, 0, b\"\\x11\\x22\") + abort(3, 1),\n     P2, 17 + 25 + 17, 3)\n\n# begin/patch/commit -> applied\ncase(\"commit-applies\", P2, 0,\n     begin(1, 1) + patch(2, 1, 0, 0, b\"\\x11\\x22\")\n     + commit(3, 1, 1, seal([pp(0, 0, b\"\\x11\\x22\")])),\n     [\"11220000\", \"00000000\"], 67, 3)\n\n# commit with empty incarnation: count 0, digest 0\ncase(\"empty-commit-ok\", P2, 0, begin(1, 1) + commit(2, 1, 0, 0), P2, 34, 2)\ncase(\"empty-commit-bad-digest\", P2, 0, begin(1, 1) + commit(2, 1, 0, 1), P2, 34, 2)\ncase(\"empty-commit-bad-count\", P2, 0, begin(1, 1) + commit(2, 1, 1, 0), P2, 34, 2)\n\n# ---- seal mismatch: prefix intact, incarnation closed, nothing applied ----\nmismatch = (begin(1, 1) + patch(2, 1, 0, 0, b\"\\x11\\x22\")\n            + commit(3, 1, 1, seal([pp(0, 0, b\"\\x11\\x22\")])",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 24904,
+      "time": "2026-10-08T20:37:52.174750+00:00",
+      "tool_call_id": "chatcmpl-tool-afe996cbe8a32ee5",
+      "command": "cat > /tmp/t/cases.py <<'PYEOF'\n\"\"\"Hand-computed edge case suite (valid_bytes derived from the built prefix).\"\"\"\nimport sys, json\nsys.path.insert(0, \"/tmp/t\")\nfrom build import *\n\nP2 = [\"00000000\", \"00000000\"]          # two 4-byte pages\n\ndef pp(page, off, data):\n    return (page.to_bytes(2, \"little\") + off.to_bytes(2, \"little\")\n            + len(data).to_bytes(2, \"little\") + data)\n\nCASES = []\ndef case(name, pages, ckpt, valid, bad=b\"\", exp_pages=None, exp_ls=0):\n    \"\"\"valid = bytes of the records that form the valid prefix (None => empty).\"\"\"\n    if valid is None:\n        valid = b\"\"\n    CASES.append((name, {\"pages\": pages, \"checkpoint\": ckpt,\n                         \"log\": (valid + bad).hex()},\n                  {\"pages\": exp_pages if exp_pages is not None else pages,\n                   \"valid_bytes\": len(valid), \"last_seq\": exp_ls}))\n\nok = seal([pp(0, 0, b\"\\x11\\x22\")])\n\n# ---- basics -------------------------------------------------------------\ncase(\"empty\", P2, 0, None)\ncase(\"single-begin\", P2, 0, begin(1, 1), exp_ls=1)\ncase(\"abort-discards\", P2, 0,\n     begin(1, 1) + patch(2, 1, 0, 0, b\"\\x11\\x22\") + abort(3, 1), exp_ls=3)\ncase(\"commit-applies\", P2, 0,\n     begin(1, 1) + patch(2, 1, 0, 0, b\"\\x11\\x22\") + commit(3, 1, 1, ok),\n     exp_pages=[\"11220000\", \"00000000\"], exp_ls=3)\n\n# ---- empty incarnations -------------------------------------------------\ncase(\"empty-commit-ok\", P2, 0, begin(1, 1) + commit(2, 1, 0, 0), exp_ls=2)\ncase(\"empty-commit-bad-digest\", P2, 0, begin(1, 1) + commit(2, 1, 0, 1), exp_ls=2)\ncase(\"empty-commit-bad-count\", P2, 0, begin(1, 1) + commit(2, 1,",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 25286,
+      "time": "2026-10-08T20:38:00.141502+00:00",
+      "tool_call_id": "chatcmpl-tool-96f9fd6fd656bacb",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport re\nsrc = open('cases.py').read()\nbad = '''case(\"orphan-commit-after-abort\", P2, 0,\n     begin(1, 7) + patch(2, 7, 0, 0, b\"\\\\x11\") + abort(3, 7)\n     + commit(4, 7, 1, seal([pp(0, 0, b\"\\\\x11\")]), exp_ls=4) if False else\n     begin(1, 7) + patch(2, 7, 0, 0, b\"\\\\x11\") + abort(3, 7)\n     + commit(4, 7, 1, seal([pp(0, 0, b\"\\\\x11\")]), exp_ls=4), exp_ls=4)'''\ngood = '''case(\"orphan-commit-after-abort\", P2, 0,\n     begin(1, 7) + patch(2, 7, 0, 0, b\"\\\\x11\") + abort(3, 7)\n     + commit(4, 7, 1, seal([pp(0, 0, b\"\\\\x11\")])), exp_ls=4)'''\nassert bad in src\nopen('cases.py','w').write(src.replace(bad, good))\nprint('patched')\nEOF\ncd /tmp/t && python3 cases.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 25731,
+      "time": "2026-10-08T20:38:07.451412+00:00",
+      "tool_call_id": "chatcmpl-tool-8bd3fcf64a946911",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nsrc = open('cases.py').read()\nbad = 'case(\"ckpt-equal-first-commit\", P2, 6, inter, exp_pages=[\"0000ccdd\", \"00000000\"], exp_ls=6)'\ngood = 'case(\"ckpt-equal-all-commits\", P2, 6, inter, exp_ls=6)\\ncase(\"ckpt-between-commits-5b\", P2, 5, inter, exp_pages=[\"aabb0000\", \"00000000\"], exp_ls=6)'\nassert bad in src\nopen('cases.py','w').write(src.replace(bad, good))\nprint('patched')\nEOF\ncd /tmp/t && python3 cases.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 27446,
+      "time": "2026-10-08T20:38:36.225592+00:00",
+      "tool_call_id": "chatcmpl-tool-b7cbc34065b432bc",
+      "command": "cat > /tmp/t/ref.py <<'PYEOF'\n\"\"\"Independently structured reference model of the journal recovery spec.\"\"\"\nimport struct\nimport zlib\n\ndef ref(pages_hex, checkpoint, log_hex):\n    pages = [bytearray.fromhex(p) for p in pages_hex]\n    log = bytearray.fromhex(log_hex)\n    n = len(log)\n    pos = 0\n    last_seq = 0\n    valid = 0\n    open_tx = {}                      # txid -> list of (payload, page, off, cnt)\n\n    while pos < n:\n        if pos + 13 > n:\n            break\n        plen, seq, kind, txid = struct.unpack_from(\"<IIBI\", log, pos)\n        total = 13 + plen + 4\n        if plen > 4096 or pos + total > n:\n            break\n        body = bytes(log[pos:pos + 13 + plen])\n        (crc,) = struct.unpack_from(\"<I\", log, pos + 13 + plen)\n        if zlib.crc32(body) != crc:\n            break\n        if last_seq >= seq:           # covers seq == 0 too\n            break\n        if txid == 0:\n            break\n        payload = bytes(log[pos + 13:pos + 13 + plen])\n        staged = None\n        if kind == 1:\n            if plen != 0:\n                break\n            open_tx[txid] = []\n        elif kind == 2:\n            if plen < 6:\n                break\n            page, off, cnt = struct.unpack_from(\"<HHH\", payload, 0)\n            if cnt < 1 or plen != 6 + cnt:\n                break\n            if page >= len(pages) or off + cnt > len(pages[page]):\n                break\n            staged = (payload, page, off, cnt)\n        elif kind == 3:\n            if plen != 8:\n                break\n        elif kind == 4:\n            if plen != 0:\n                break\n        else:\n         ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 29900,
+      "time": "2026-10-08T20:39:12.940084+00:00",
+      "tool_call_id": "chatcmpl-tool-885c02d532de22a2",
+      "command": "cat > /tmp/t/fuzz.py <<'PYEOF'\n\"\"\"Randomized differential test: /app/main.py vs the independent reference.\"\"\"\nimport json, random, subprocess, sys\nsys.path.insert(0, \"/tmp/t\")\nfrom build import rec\nfrom ref import ref\n\ndef pp(page, off, data):\n    return (page.to_bytes(2, \"little\") + off.to_bytes(2, \"little\")\n            + len(data).to_bytes(2, \"little\") + data)\n\ndef gen_head(rng):\n    n_pages = rng.randint(1, 8)\n    page_len = rng.randint(1, 16)\n    pages = [\"%02x\" % rng.randrange(256) * page_len for _ in range(n_pages)]\n    seq = rng.choice([1, 1, 1, rng.randint(1, 5)])\n    active = {}                      # txid -> list of patch payloads\n    out = b\"\"\n    n = rng.randint(0, 60)\n    for _ in range(n):\n        seq += rng.randint(1, 3)\n        kind = rng.choice([1, 1, 2, 2, 2, 3, 3, 3, 4])\n        txid = rng.randint(1, 5) if rng.random() < 0.92 else 1\n        if kind == 1:\n            active[txid] = []\n            out += rec(seq, 1, txid)\n        elif kind == 2:\n            page = rng.randrange(n_pages)\n            room = page_len\n            off = rng.randrange(room)\n            cnt = rng.randint(1, room - off)\n            data = bytes(rng.randrange(256) for _ in range(cnt))\n            payload = pp(page, off, data)\n            if txid in active:\n                active[txid].append(payload)\n            out += rec(seq, 2, txid, payload)\n        elif kind == 3:\n            staged = active.pop(txid, None)\n            if staged is None and rng.random() < 0.5:\n                staged = []          # orphan commit sealed as empty\n            if staged is not None:\n               ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 30172,
+      "time": "2026-10-08T20:39:18.356336+00:00",
+      "tool_call_id": "chatcmpl-tool-bf976eaaa002cbcb",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nsrc = open('fuzz.py').read()\nbad = \"                        cnt, dig = good[0] + rng.choice([-1, 1, 2]), good[1]\"\ngood = \"                        wrong = [c for c in (good[0] + 1, good[0] + 2, 0) if c != good[0]]\\n                        cnt, dig = rng.choice(wrong), good[1]\"\nassert bad in src\nopen('fuzz.py','w').write(src.replace(bad, good))\nprint('patched')\nEOF\ncd /tmp/t && python3 fuzz.py 3000 1234",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 30386,
+      "time": "2026-10-08T20:39:22.705534+00:00",
+      "tool_call_id": "chatcmpl-tool-b374166502862188",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nsrc = open('fuzz.py').read()\nbad = \"        return rec(rng.choice([0, last_seq, last_seq - 1, last_seq + 0]), 1, 1) + rec(last_seq + 9, 1, 1)\"\ngood = \"        return rec(rng.choice([0, last_seq, max(0, last_seq - 1)]), 1, 1) + rec(last_seq + 9, 1, 1)\"\nassert bad in src\nopen('fuzz.py','w').write(src.replace(bad, good))\nprint('patched')\nEOF\ncd /tmp/t && python3 fuzz.py 3000 1234",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 31233,
+      "time": "2026-10-08T20:39:38.235666+00:00",
+      "tool_call_id": "chatcmpl-tool-a1d1a4de9ed33a6e",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport json, random, subprocess, sys\nsys.path.insert(0, \"/tmp/t\")\nimport fuzz\nfrom ref import ref\n\ntotal = changed = truncated = empty_prefix = 0\nmaxrec = 0\nfor seed in (7, 99, 2024, 31337, 5150):\n    rng = random.Random(seed)\n    reqs, exps = [], []\n    for _ in range(2000):\n        pages, ckpt, head = fuzz.gen_head(rng)\n        # last seq of head\n        import struct\n        pos, last = 0, 0\n        while pos + 13 <= len(head):\n            plen, s = struct.unpack_from(\"<II\", head, pos)\n            if pos + 13 + plen + 4 > len(head): break\n            last = s; pos += 13 + plen + 4\n        log = head + fuzz.gen_tail(rng, pages, last) if rng.random() < 0.65 else head\n        reqs.append({\"pages\": pages, \"checkpoint\": ckpt, \"log\": log.hex()})\n        exps.append(ref(pages, ckpt, log.hex()))\n    p = subprocess.run([sys.executable, \"/app/main.py\"],\n                       input=\"\".join(json.dumps(r) + \"\\n\" for r in reqs),\n                       text=True, capture_output=True, cwd=\"/app\")\n    assert p.returncode == 0, p.stderr\n    lines = p.stdout.splitlines()\n    assert len(lines) == len(reqs)\n    bad = 0\n    for req, exp, line in zip(reqs, exps, lines):\n        got = json.loads(line)\n        if got != exp:\n            bad += 1\n            if bad <= 3:\n                print(\"MISMATCH\", json.dumps(req)); print(\"  ref:\", exp); print(\"  got:\", got)\n        total += 1\n        if got[\"pages\"] != req[\"pages\"]: changed += 1\n        if got[\"valid_bytes\"] < len(bytes.fromhex(req[\"log\"])): truncated += 1\n        if got[\"valid_bytes\"] == 0: empty_prefix += ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 33171,
+      "time": "2026-10-08T20:40:10.273407+00:00",
+      "tool_call_id": "chatcmpl-tool-a974ce854535189c",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport json, random, subprocess, sys, time\nsys.path.insert(0, \"/tmp/t\")\nfrom build import begin, patch, commit, abort\nfrom ref import ref\nrng = random.Random(0)\n\ndef big_tx_log(n_pages=8, page_len=64, target=65536):\n    pages = [\"00\" * page_len for _ in range(n_pages)]\n    out, seq, tx = b\"\", 0, 0\n    while len(out) < target - 130:\n        tx += 1; seq += 1\n        recs = [begin(seq, tx)]\n        seq += 1\n        payloads = []\n        for _ in range(rng.randint(1, 6)):\n            page = rng.randrange(n_pages); off = rng.randrange(page_len)\n            cnt = rng.randint(1, page_len - off)\n            data = bytes(rng.randrange(256) for _ in range(cnt))\n            pl = (page.to_bytes(2,\"little\") + off.to_bytes(2,\"little\")\n                  + cnt.to_bytes(2,\"little\") + data)\n            payloads.append(pl); seq += 1\n            recs.append(patch(seq, tx, page, off, data))\n        seq += 1\n        dig = 0\n        for p in payloads: dig = __import__(\"zlib\").crc32(p, dig)\n        recs.append(commit(seq, tx, len(payloads), dig))\n        out += b\"\".join(recs)\n    out = out[:target]\n    # trim back to a record boundary so the log is exactly 64 KiB of whole records\n    pos = 0\n    while True:\n        plen = int.from_bytes(out[pos:pos+4], \"little\")\n        if pos + 13 + plen + 4 > target: break\n        pos += 13 + plen + 4\n    out = out[:pos]\n    return pages, out\n\ndef tiny_log(target=65536):\n    out, seq = b\"\", 0\n    while len(out) + 17 <= target:\n        seq += 1\n        out += abort(seq, 1)\n    return out\n\npagesA, logA = big_tx_log()\nlogB = tiny_log",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 36099,
+      "time": "2026-10-08T20:41:07.550097+00:00",
+      "tool_call_id": "chatcmpl-tool-9c2d911ef4e4f455",
+      "command": "cat > /app/main.py <<'PYEOF'\n#!/usr/bin/env python3\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nRequests are newline-delimited JSON objects on stdin; one JSON response is\nwritten per input line, in order:\n\n    request  := {\"pages\": [hex, ...], \"checkpoint\": int, \"log\": hex}\n    response := {\"pages\": [hex, ...], \"valid_bytes\": int, \"last_seq\": int}\n\n`pages` is the authoritative durable checkpoint image, `checkpoint` a sequence\nwatermark, and `log` the journal to replay.\n\nRecord layout (all integers unsigned little-endian, no implicit padding):\n\n    payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32 | payload | crc:u32\n\nThe fixed header is 13 bytes and crc covers header + payload.\n\nKinds: 1 BEGIN (empty payload), 2 PATCH (page_index:u16 | byte_offset:u16 |\nbyte_count:u16 | data), 3 COMMIT (patch_count:u32 | digest:u32),\n4 ABORT (empty payload).\n\nRecovery replays only the structurally valid prefix of the log and applies only\ncomplete, correctly sealed transactions whose COMMIT is newer than the\ncheckpoint; the durable image is never re-derived from journal records.\n\"\"\"\n\nimport json\nimport sys\nimport zlib\n\nHEADER_SIZE = 13   # payload_length:u32 + sequence:u32 + kind:u8 + transaction_id:u32\nCRC_SIZE = 4       # trailing crc:u32\nMAX_PAYLOAD = 4096\n\nKIND_BEGIN = 1\nKIND_PATCH = 2\nKIND_COMMIT = 3\nKIND_ABORT = 4\n\n\ndef _u16(buf, off):\n    \"\"\"Unsigned 16-bit little-endian integer at *off*.\"\"\"\n    return buf[off] | (buf[off + 1] << 8)\n\n\ndef _u32(buf, off):\n    \"\"\"Unsigned 32-bit little-endian integer at *off*.\"\"\"\n    return (buf[off]\n         ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 37475,
+      "time": "2026-10-08T20:41:31.217427+00:00",
+      "tool_call_id": "chatcmpl-tool-9bdfa23148150013",
+      "command": "cd /tmp/t && python3 - <<'EOF'\nimport json, subprocess, sys\nsys.path.insert(0, \"/tmp/t\")\nfrom build import begin, patch, commit\nfrom ref import ref\n\ndef pp(page, off, data):\n    return (page.to_bytes(2,\"little\") + off.to_bytes(2,\"little\")\n            + len(data).to_bytes(2,\"little\") + data)\n\n# 8 pages x 64 bytes, patches on the last byte of the last page, full-width patch\npages = [\"00\" * 64 for _ in range(8)]\nlog = (begin(1, 1) + patch(2, 1, 7, 63, b\"\\xab\") + patch(3, 1, 0, 0, b\"\\xcd\" * 64)\n       + commit(4, 1, 2, __import__(\"zlib\").crc32(pp(7, 63, b\"\\xab\") + pp(0, 0, b\"\\xcd\" * 64))))\nr = {\"pages\": pages, \"checkpoint\": 0, \"log\": log.hex()}\ngot = json.loads(subprocess.run([sys.executable, \"/app/main.py\"], input=json.dumps(r),\n                                text=True, capture_output=True, cwd=\"/app\").stdout)\nexp = ref(r[\"pages\"], r[\"checkpoint\"], r[\"log\"])\nassert got == exp and len(got[\"pages\"]) == 8 and all(len(p) == 128 for p in got[\"pages\"]), (got, exp)\nassert bytes.fromhex(got[\"pages\"][7])[63] == 0xAB and got[\"pages\"][0] == \"cd\" * 64\nprint(\"8x64 geometry ok:\", got[\"valid_bytes\"], got[\"last_seq\"])\n\n# 1 page x 1 byte, single-byte patches\nr1 = {\"pages\": [\"7f\"], \"checkpoint\": 0,\n      \"log\": (begin(1, 3) + patch(2, 3, 0, 0, b\"\\x01\")\n              + commit(3, 3, 1, __import__(\"zlib\").crc32(pp(0, 0, b\"\\x01\")))).hex()}\ngot = json.loads(subprocess.run([sys.executable, \"/app/main.py\"], input=json.dumps(r1),\n                                text=True, capture_output=True, cwd=\"/app\").stdout)\nassert got == ref(r1[\"pages\"], r1[\"checkpoint\"], r1[\"log\"]) == {\"pages\": [\"01\"], \"valid_by",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 37662,
+      "time": "2026-10-08T20:41:36.551853+00:00",
+      "tool_call_id": "chatcmpl-tool-8697d0b1c3040f5f",
+      "command": "rm -rf /app/__pycache__ && cd /app && python3 smoke.py && cd /tmp/t && python3 cases.py && python3 fuzz.py 5000 777 && python3 fuzz.py 5000 606060 && rm -rf /app/__pycache__ && ls -la /app",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 5729,
+      "time": "2026-10-08T20:34:32.968617+00:00",
+      "tool_call_id": "chatcmpl-tool-ba1a6f9ebbea0bf3",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:33 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:33 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 17595,
+      "time": "2026-10-08T20:36:41.123326+00:00",
+      "tool_call_id": "chatcmpl-tool-855c544890d6220c",
+      "return_code": 1,
+      "stdout": "FAIL empty-commit-ok\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d0800000002000000030100000000000000000000009b7ca596\"}\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 34, 'last_seq': 2}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 42, 'last_seq': 2}\nFAIL empty-commit-bad-digest\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000003010000000000000001000000fe1b192e\"}\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 34, 'last_seq': 2}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 42, 'last_seq': 2}\nFAIL empty-commit-bad-count\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000003010000000100000000000000057c0f5a\"}\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 34, 'last_seq': 2}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 42, 'last_seq': 2}\nFAIL mismatch-below-ckpt\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 99, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000000000000010011e713f62f080000000300000003010000000100000007000000ff8f7e40000000\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 130, 'last_seq': 6}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\nFAIL mismatch-below-ckpt-5\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 5, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000000000000010011e713f62f080000000300000003010000000100000007000000ff8f7e400000000\n   want: {'pages': ['00000077', '00000000'], 'valid_bytes': 130, 'last_seq': 6}\n   got : {'pages': ['00000077', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\nFAIL orphan-commit\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"080000000100000003090000000000000000000000e15133c3000000000200000001090000003e08ea6108000000030000000309000000000000000000000026c10f17\"}\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 51, 'last_seq': 3}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL patch-inactive-ignored\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"0800000001000000020500000000000000020011229a6f1f370000000002000000010500000086b73c2b080000000300000003050000000000000000000000a78c0512\"}\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 59, 'last_seq': 3}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL begin-restarts\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f836700000000030000000101000000923425b3070000000400000002010\n   want: {'pages': ['00003300', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\n   got : {'pages': ['00003300', '00000000'], 'valid_bytes': 108, 'last_seq': 5}\nFAIL patch-order-in-tx\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d07000000020000000201000000000000000100aae379457308000000030000000201000000000000000200bbcc3e5f7ff30800000\n   want: {'pages': ['bbcc0000', '00000000'], 'valid_bytes': 89, 'last_seq': 4}\n   got : {'pages': ['bbcc0000', '00000000'], 'valid_bytes': 91, 'last_seq': 4}\nFAIL second-page\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000001000200010055bacef0820800000003000000030100000001000000e648185bff65962e\"}\n   want: {'pages': ['00000000', '00005500'], 'valid_bytes': 65, 'last_seq': 3}\n   got : {'pages': ['00000000', '00005500'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL patch-len-mismatch\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d090000000200000002010000000000000003001122332a11487d\"}\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 17, 'last_seq': 1}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 43, 'last_seq': 2}\nFAIL tx-reuse\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000000000000010011e713f62f0800000003000000030100000001000000bb951ef6306c9d6c0000000\n   want: {'pages': ['11220000', '00000000'], 'valid_bytes': 130, 'last_seq': 6}\n   got : {'pages': ['11220000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\nFAIL upper-hex\n   req : {\"pages\": [\"AABBCCDD\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000000000100010011573a961208000000030000000301000000010000000bbc7ecb7378e67b\"}\n   want: {'pages': ['AA11CCDD'], 'valid_bytes': 65, 'last_seq': 3}\n   got : {'pages': ['aa11ccdd'], 'valid_bytes': 66, 'last_seq': 3}\n53/66 hand cases passed\n",
+      "stderr": "",
+      "stdout_tail": "\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"080000000100000003090000000000000000000000e15133c3000000000200000001090000003e08ea6108000000030000000309000000000000000000000026c10f17\"}\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 51, 'last_seq': 3}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL patch-inactive-ignored\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"0800000001000000020500000000000000020011229a6f1f370000000002000000010500000086b73c2b080000000300000003050000000000000000000000a78c0512\"}\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 59, 'last_seq': 3}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL begin-restarts\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f836700000000030000000101000000923425b3070000000400000002010\n   want: {'pages': ['00003300', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\n   got : {'pages': ['00003300', '00000000'], 'valid_bytes': 108, 'last_seq': 5}\nFAIL patch-order-in-tx\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d07000000020000000201000000000000000100aae379457308000000030000000201000000000000000200bbcc3e5f7ff30800000\n   want: {'pages': ['bbcc0000', '00000000'], 'valid_bytes': 89, 'last_seq': 4}\n   got : {'pages': ['bbcc0000', '00000000'], 'valid_bytes': 91, 'last_seq': 4}\nFAIL second-page\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000001000200010055bacef0820800000003000000030100000001000000e648185bff65962e\"}\n   want: {'pages': ['00000000', '00005500'], 'valid_bytes': 65, 'last_seq': 3}\n   got : {'pages': ['00000000', '00005500'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL patch-len-mismatch\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d090000000200000002010000000000000003001122332a11487d\"}\n   want: {'pages': ['00000000', '00000000'], 'valid_bytes': 17, 'last_seq': 1}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 43, 'last_seq': 2}\nFAIL tx-reuse\n   req : {\"pages\": [\"00000000\", \"00000000\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000000000000010011e713f62f0800000003000000030100000001000000bb951ef6306c9d6c0000000\n   want: {'pages': ['11220000', '00000000'], 'valid_bytes': 130, 'last_seq': 6}\n   got : {'pages': ['11220000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\nFAIL upper-hex\n   req : {\"pages\": [\"AABBCCDD\"], \"checkpoint\": 0, \"log\": \"00000000010000000101000000141cd39d0700000002000000020100000000000100010011573a961208000000030000000301000000010000000bbc7ecb7378e67b\"}\n   want: {'pages': ['AA11CCDD'], 'valid_bytes': 65, 'last_seq': 3}\n   got : {'pages': ['aa11ccdd'], 'valid_bytes': 66, 'last_seq': 3}\n53/66 hand cases passed\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 24905,
+      "time": "2026-10-08T20:37:52.409934+00:00",
+      "tool_call_id": "chatcmpl-tool-afe996cbe8a32ee5",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/t/cases.py\", line 83, in <module>\n    + commit(4, 7, 1, seal([pp(0, 0, b\"\\x11\")]), exp_ls=4), exp_ls=4)\n      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/t/build.py\", line 20, in commit\n    return rec(seq, 3, txid, count.to_bytes(4, \"little\") + digest.to_bytes(4, \"little\"), **kw)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: rec() got an unexpected keyword argument 'exp_ls'\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/tmp/t/cases.py\", line 83, in <module>\n    + commit(4, 7, 1, seal([pp(0, 0, b\"\\x11\")]), exp_ls=4), exp_ls=4)\n      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/t/build.py\", line 20, in commit\n    return rec(seq, 3, txid, count.to_bytes(4, \"little\") + digest.to_bytes(4, \"little\"), **kw)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: rec() got an unexpected keyword argument 'exp_ls'\n"
+    },
+    {
+      "step": 25287,
+      "time": "2026-10-08T20:38:00.569540+00:00",
+      "tool_call_id": "chatcmpl-tool-96f9fd6fd656bacb",
+      "return_code": 1,
+      "stdout": "patched\nFAIL ckpt-equal-first-commit\n   want: {'pages': ['0000ccdd', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n85/86 hand cases passed\n",
+      "stderr": "",
+      "stdout_tail": "patched\nFAIL ckpt-equal-first-commit\n   want: {'pages': ['0000ccdd', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n   got : {'pages': ['00000000', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n85/86 hand cases passed\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 29901,
+      "time": "2026-10-08T20:39:13.316481+00:00",
+      "tool_call_id": "chatcmpl-tool-885c02d532de22a2",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/t/fuzz.py\", line 139, in <module>\n    main(*[int(x) for x in sys.argv[1:]])\n  File \"/tmp/t/fuzz.py\", line 100, in main\n    pages, ckpt, head = gen_head(rng)\n                        ^^^^^^^^^^^^^\n  File \"/tmp/t/fuzz.py\", line 54, in gen_head\n    out += rec(seq, 3, txid, cnt.to_bytes(4, \"little\") + (dig & 0xFFFFFFFF).to_bytes(4, \"little\"))\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^\nOverflowError: can't convert negative int to unsigned\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/tmp/t/fuzz.py\", line 139, in <module>\n    main(*[int(x) for x in sys.argv[1:]])\n  File \"/tmp/t/fuzz.py\", line 100, in main\n    pages, ckpt, head = gen_head(rng)\n                        ^^^^^^^^^^^^^\n  File \"/tmp/t/fuzz.py\", line 54, in gen_head\n    out += rec(seq, 3, txid, cnt.to_bytes(4, \"little\") + (dig & 0xFFFFFFFF).to_bytes(4, \"little\"))\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^\nOverflowError: can't convert negative int to unsigned\n"
+    },
+    {
+      "step": 30173,
+      "time": "2026-10-08T20:39:18.838526+00:00",
+      "tool_call_id": "chatcmpl-tool-bf976eaaa002cbcb",
+      "return_code": 1,
+      "stdout": "patched\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/t/fuzz.py\", line 140, in <module>\n    main(*[int(x) for x in sys.argv[1:]])\n  File \"/tmp/t/fuzz.py\", line 114, in main\n    log = head + gen_tail(rng, pages, last_seq)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/t/fuzz.py\", line 77, in gen_tail\n    return rec(rng.choice([0, last_seq, last_seq - 1, last_seq + 0]), 1, 1) + rec(last_seq + 9, 1, 1)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/t/build.py\", line 6, in rec\n    body = (n.to_bytes(4, \"little\") + seq.to_bytes(4, \"little\")\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^\nOverflowError: can't convert negative int to unsigned\n",
+      "stdout_tail": "patched\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/tmp/t/fuzz.py\", line 140, in <module>\n    main(*[int(x) for x in sys.argv[1:]])\n  File \"/tmp/t/fuzz.py\", line 114, in main\n    log = head + gen_tail(rng, pages, last_seq)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/t/fuzz.py\", line 77, in gen_tail\n    return rec(rng.choice([0, last_seq, last_seq - 1, last_seq + 0]), 1, 1) + rec(last_seq + 9, 1, 1)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/t/build.py\", line 6, in rec\n    body = (n.to_bytes(4, \"little\") + seq.to_bytes(4, \"little\")\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^\nOverflowError: can't convert negative int to unsigned\n"
+    },
+    {
+      "step": 31234,
+      "time": "2026-10-08T20:39:41.759667+00:00",
+      "tool_call_id": "chatcmpl-tool-a1d1a4de9ed33a6e",
+      "return_code": 0,
+      "stdout": "seed 7: 2000 cases, 0 mismatches\nseed 99: 2000 cases, 0 mismatches\nseed 2024: 2000 cases, 0 mismatches\nseed 31337: 2000 cases, 0 mismatches\nseed 5150: 2000 cases, 0 mismatches\nTOTAL 10000: pages-changed=1995 (19%), prefix-cut=6472 (64%), empty-prefix=171, max valid records=85\n",
+      "stderr": "",
+      "stdout_tail": "seed 7: 2000 cases, 0 mismatches\nseed 99: 2000 cases, 0 mismatches\nseed 2024: 2000 cases, 0 mismatches\nseed 31337: 2000 cases, 0 mismatches\nseed 5150: 2000 cases, 0 mismatches\nTOTAL 10000: pages-changed=1995 (19%), prefix-cut=6472 (64%), empty-prefix=171, max valid records=85\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 30386,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && python3 - <<'EOF'\nsrc = open('fuzz.py').read()\nbad = \"        return rec(rng.choice([0, last_seq, last_seq - 1, last_seq + 0]), 1, 1) + rec(last_seq + 9, 1, 1)\"\ngood = \"        return rec(rng.choice([0, last_seq, max(0, last_seq - 1)]), 1, 1) + rec(last_seq + 9, 1, 1)\"\nassert bad in src\nopen('fuzz.py','w').write(src.replace(bad, good))\nprint('patched')\nEOF\ncd /tmp/t && python3 fuzz.py 3000 1234"
+    },
+    {
+      "step": 30387,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "patched\n3000/3000 randomized cases matched the reference\n"
+    },
+    {
+      "step": 31233,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && python3 - <<'EOF'\nimport json, random, subprocess, sys\nsys.path.insert(0, \"/tmp/t\")\nimport fuzz\nfrom ref import ref\n\ntotal = changed = truncated = empty_prefix = 0\nmaxrec = 0\nfor seed in (7, 99, 2024, 31337, 5150):\n    rng = random.Random(seed)\n    reqs, exps = [], []\n    for _ in range(2000):\n        pages, ckpt, head = fuzz.gen_head(rng)\n        # last seq of head\n        import struct\n        pos, last = 0, 0\n        while pos + 13 <= len(head):\n            plen, s = struct.unpack_from(\"<II\", head, pos)\n            if pos + 13 + plen + 4 > len(head): break\n            last = s; pos += 13 + plen + 4\n        log = head + fuzz.gen_tail(rng, pages, last) if rng.random() < 0.65 else head\n        reqs.append({\"pages\": pages, \"checkpoint\": ckpt, \"log\": log.hex()})\n        exps.append(ref(pages, ckpt, log.hex()))\n    p = subprocess.run([sys.executable, \"/app/main.py\"],\n                       input=\"\".join(json.dumps(r) + \"\\n\" for r in reqs),\n                       text=True, ca"
+    },
+    {
+      "step": 31234,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "seed 7: 2000 cases, 0 mismatches\nseed 99: 2000 cases, 0 mismatches\nseed 2024: 2000 cases, 0 mismatches\nseed 31337: 2000 cases, 0 mismatches\nseed 5150: 2000 cases, 0 mismatches\nTOTAL 10000: pages-changed=1995 (19%), prefix-cut=6472 (64%), empty-prefix=171, max valid records=85\n"
+    },
+    {
+      "step": 33171,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && python3 - <<'EOF'\nimport json, random, subprocess, sys, time\nsys.path.insert(0, \"/tmp/t\")\nfrom build import begin, patch, commit, abort\nfrom ref import ref\nrng = random.Random(0)\n\ndef big_tx_log(n_pages=8, page_len=64, target=65536):\n    pages = [\"00\" * page_len for _ in range(n_pages)]\n    out, seq, tx = b\"\", 0, 0\n    while len(out) < target - 130:\n        tx += 1; seq += 1\n        recs = [begin(seq, tx)]\n        seq += 1\n        payloads = []\n        for _ in range(rng.randint(1, 6)):\n            page = rng.randrange(n_pages); off = rng.randrange(page_len)\n            cnt = rng.randint(1, page_len - off)\n            data = bytes(rng.randrange(256) for _ in range(cnt))\n            pl = (page.to_bytes(2,\"little\") + off.to_bytes(2,\"little\")\n                  + cnt.to_bytes(2,\"little\") + data)\n            payloads.append(pl); seq += 1\n            recs.append(patch(seq, tx, page, off, data))\n        seq += 1\n        dig = 0\n        for p in payloads: dig = __import__(\"zlib\")."
+    },
+    {
+      "step": 33172,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "big-tx log bytes: 65519  tiny log bytes: 65535\n600 max-size requests in 2.37s; stderr=''\nckpt 0 -> valid_bytes 65519 last_seq 2311 changed pages 8\nckpt 0 -> valid_bytes 65535 last_seq 3855 changed pages 0\nckpt 1000000000 -> valid_bytes 65519 last_seq 2311 changed pages 0\n"
+    },
+    {
+      "step": 36099,
+      "kind": "terminal_call",
+      "summary": "cat > /app/main.py <<'PYEOF'\n#!/usr/bin/env python3\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nRequests are newline-delimited JSON objects on stdin; one JSON response is\nwritten per input line, in order:\n\n    request  := {\"pages\": [hex, ...], \"checkpoint\": int, \"log\": hex}\n    response := {\"pages\": [hex, ...], \"valid_bytes\": int, \"last_seq\": int}\n\n`pages` is the authoritative durable checkpoint image, `checkpoint` a sequence\nwatermark, and `log` the journal to replay.\n\nRecord layout (all integers unsigned little-endian, no implicit padding):\n\n    payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32 | payload | crc:u32\n\nThe fixed header is 13 bytes and crc covers header + payload.\n\nKinds: 1 BEGIN (empty payload), 2 PATCH (page_index:u16 | byte_offset:u16 |\nbyte_count:u16 | data), 3 COMMIT (patch_count:u32 | digest:u32),\n4 ABORT (empty payload).\n\nRecovery replays only the structurally valid prefix of the log and applies only\ncomplete, correctly s"
+    },
+    {
+      "step": 36100,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\n87/87 hand cases passed\n4000/4000 randomized cases matched the reference\n4000/4000 randomized cases matched the reference\n"
+    },
+    {
+      "step": 37475,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && python3 - <<'EOF'\nimport json, subprocess, sys\nsys.path.insert(0, \"/tmp/t\")\nfrom build import begin, patch, commit\nfrom ref import ref\n\ndef pp(page, off, data):\n    return (page.to_bytes(2,\"little\") + off.to_bytes(2,\"little\")\n            + len(data).to_bytes(2,\"little\") + data)\n\n# 8 pages x 64 bytes, patches on the last byte of the last page, full-width patch\npages = [\"00\" * 64 for _ in range(8)]\nlog = (begin(1, 1) + patch(2, 1, 7, 63, b\"\\xab\") + patch(3, 1, 0, 0, b\"\\xcd\" * 64)\n       + commit(4, 1, 2, __import__(\"zlib\").crc32(pp(7, 63, b\"\\xab\") + pp(0, 0, b\"\\xcd\" * 64))))\nr = {\"pages\": pages, \"checkpoint\": 0, \"log\": log.hex()}\ngot = json.loads(subprocess.run([sys.executable, \"/app/main.py\"], input=json.dumps(r),\n                                text=True, capture_output=True, cwd=\"/app\").stdout)\nexp = ref(r[\"pages\"], r[\"checkpoint\"], r[\"log\"])\nassert got == exp and len(got[\"pages\"]) == 8 and all(len(p) == 128 for p in got[\"pages\"]), (got, exp)\nassert bytes.fromhex(got[\"pag"
+    },
+    {
+      "step": 37476,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "8x64 geometry ok: 153 4\n1x1 geometry ok: {'pages': ['01'], 'valid_bytes': 66, 'last_seq': 3}\nno-trailing-newline + ordering ok; stderr empty\ncompiles clean\ntotal 36\ndrwxr-xr-x 1 agent agent 4096 Oct  8 20:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:33 ..\ndrwxr-xr-x 2 agent agent 4096 Oct  8 20:41 __pycache__\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent 6759 Oct  8 20:41 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\n"
+    },
+    {
+      "step": 37662,
+      "kind": "terminal_call",
+      "summary": "rm -rf /app/__pycache__ && cd /app && python3 smoke.py && cd /tmp/t && python3 cases.py && python3 fuzz.py 5000 777 && python3 fuzz.py 5000 606060 && rm -rf /app/__pycache__ && ls -la /app"
+    },
+    {
+      "step": 37663,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\n87/87 hand cases passed\n5000/5000 randomized cases matched the reference\n5000/5000 randomized cases matched the reference\ntotal 32\ndrwxr-xr-x 1 agent agent 4096 Oct  8 20:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:33 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent 6759 Oct  8 20:41 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\n"
+    }
+  ]
+}

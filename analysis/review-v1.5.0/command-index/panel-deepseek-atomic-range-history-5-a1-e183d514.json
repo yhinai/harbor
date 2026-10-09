@@ -1,0 +1,499 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-deepseek-atomic-range-history-5-a1-e183d514",
+    "task": "atomic-range-history",
+    "model": "accounts/fireworks/models/deepseek-v4p1-flash",
+    "replicate": 5,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcome-corrections/v1.4.3/panel-deepseek-atomic-range-history-5-a1-e183d514.json",
+    "tool_calls": 44,
+    "agent_elapsed_seconds": 1963.129319,
+    "input_tokens": 3100883,
+    "output_tokens": 94827,
+    "uncached_cost_estimate": 1.0440573,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "3d01225d6ebb0cdbc0e6630ada37cc1b6318b194242ccde118905e71d8e960ea",
+    "network_mode": "none",
+    "artifact_sha256": "7a79b34cac22c07649fa77ac1f352879bee3cb0e782ac9aa35e14078c9c53fa7",
+    "normalized_artifact_sha256": "8c9d511f16007b3c8da87543de647f5e756d08fac9f9ab10b8fa5c80bce9bd6d",
+    "terminal_nonzero_or_error_text_events": 8,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": false,
+    "final_artifact_literal_writes": [],
+    "final_artifact_literal_written_by_30_min": false,
+    "first_literal_final_artifact_seconds": null,
+    "event_counts": {
+      "initial": 1,
+      "request": 44,
+      "stream_chunk": 93486,
+      "response": 44,
+      "terminal_call": 44,
+      "terminal_result": 44,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 22451,
+      "time": "2026-10-08T18:49:43.445225+00:00",
+      "tool_call_id": "call_6085032c959c49ae8d0ff810",
+      "command": "ls -la /app && cat /app/smoke.py 2>/dev/null | head -100",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 22453,
+      "time": "2026-10-08T18:49:43.665473+00:00",
+      "tool_call_id": "call_636abca1326f4b4d8103d4c1",
+      "command": "python3 --version && nproc && free -m | head -3",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 22505,
+      "time": "2026-10-08T18:49:45.407040+00:00",
+      "tool_call_id": "call_764fbd21228f4754af93db01",
+      "command": "cat /app/main.py; echo ---; cat /app/public_contract.py; echo ---; cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 28487,
+      "time": "2026-10-08T18:50:31.179031+00:00",
+      "tool_call_id": "call_0fc84fea62e244f48e53393f",
+      "command": "cat > /app/main.py << 'PYEOF'\nimport json\nimport sys\n\n\ndef solve(request):\n    initial = request.get(\"initial\") or {}\n    final = request.get(\"final\") or {}\n    txns = request.get(\"transactions\") or []\n    n = len(txns)\n\n    # ------------------------------------------------------------------\n    # Collect the universe of keys (state is tracked only over these).\n    # ------------------------------------------------------------------\n    keyset = set(initial) | set(final)\n    for t in txns:\n        for op in t.get(\"ops\") or []:\n            c = op[0]\n            if c == \"scan\":\n                for kv in op[3]:\n                    keyset.add(kv[0])\n            else:\n                keyset.add(op[1])\n    keys = sorted(keyset)\n    nk = len(keys)\n    kidx = {k: i for i, k in enumerate(keys)}\n\n    # value -> bitmask bit; absent = None\n    def bit(v):\n        return 1 << (v + 9) if v is not None else (1 << 19)\n\n    initial_vec = tuple(initial.get(k) for k in keys)\n    final_vec = tuple(final.get(k) for k in keys)\n    final_bits = tuple(bit(final.get(k)) for k in keys)\n\n    # ------------------------------------------------------------------\n    # Compile transactions.\n    # ------------------------------------------------------------------\n    ops_list = []\n    pre = [0] * n                     # predecessor bitmask (real-time order)\n    writes_any = [0] * n              # bitmask of keys written (ever)\n    last_val = [dict() for _ in range(n)]   # key idx -> value of last write\n    all_vals = [dict() for _ in range(n)]   # key idx -> bitset of all written values\n    reqs = [dict(",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 30394,
+      "time": "2026-10-08T18:50:47.040382+00:00",
+      "tool_call_id": "call_af88899859004cdebbc9e71a",
+      "command": "cat > /app/test_diff.py << 'PYEOF'\nimport itertools, json, random, sys\nsys.path.insert(0, '/app')\nfrom main import solve\nfrom public_contract import valid_history\n\n\ndef simulate(req, order):\n    tx = {t['id']: t for t in req['transactions']}\n    d = dict(req['initial'])\n    for name in order:\n        for op in tx[name]['ops']:\n            if op[0] == 'get':\n                if d.get(op[1]) != op[2]: return False\n            elif op[0] == 'put':\n                d[op[1]] = op[2]\n            elif op[0] == 'del':\n                d.pop(op[1], None)\n            elif op[0] == 'cas':\n                _, key, old, new, want = op\n                ok = d.get(key) == old\n                if ok is not want: return False\n                if ok:\n                    if new is None: d.pop(key, None)\n                    else: d[key] = new\n            else:\n                if sorted([[k, v] for k, v in d.items() if op[1] <= k < op[2]]) != op[3]:\n                    return False\n    return d == req['final']\n\n\ndef brute(req):\n    ids = [t['id'] for t in req['transactions']]\n    tx = {t['id']: t for t in req['transactions']}\n    for perm in itertools.permutations(ids):\n        ranks = {x: i for i, x in enumerate(perm)}\n        ok = True\n        for a in ids:\n            for b in ids:\n                if tx[a]['end'] <= tx[b]['start'] and ranks[a] >= ranks[b]:\n                    ok = False; break\n            if not ok: break\n        if ok and simulate(req, perm):\n            return True\n    return False\n\n\ndef gen_sat(rng, maxn=6, maxkeys=3, maxops=4):\n    n = rng.randint(0, maxn)\n    keys = sorted(rng",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 30631,
+      "time": "2026-10-08T18:50:50.424788+00:00",
+      "tool_call_id": "call_7d66b74ed9de46438681292e",
+      "command": "cd /app && python3 - << 'PYEOF'\nimport re\ns = open('test_diff.py').read()\nold = \"\"\"        elif op[0] == 'scan':\n            op[3] = [] if op[3] else [['a', 7]]\n        else:\n            op[2] = rng.choice([-3, 3])\"\"\"\nnew = \"\"\"        elif op[0] == 'scan':\n            op[3] = [] if op[3] else [['a', 7]]\n        elif op[0] == 'put':\n            op[2] = rng.choice([-3, 3])\"\"\"\nassert old in s\nopen('test_diff.py','w').write(s.replace(old,new))\nPYEOF\npython3 test_diff.py 3000",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 32976,
+      "time": "2026-10-08T18:51:13.158443+00:00",
+      "tool_call_id": "call_50b9ca9d9cf44a059f87cc3b",
+      "command": "cd /app && python3 - << 'PYEOF'\ns = open('main.py').read()\n\nold = \"\"\"    reqs = [dict() for _ in range(n)]       # key idx -> bitset of values that must be possible\n\"\"\"\nnew = \"\"\"    reqs = [[] for _ in range(n)]           # list of (key idx, kind, bitset) requirements\n\"\"\"\nassert old in s\ns = s.replace(old, new)\n\nold = \"\"\"            if c == \"get\":\n                ki = kidx[op[1]]\n                ops.append((\"g\", ki, op[2]))\n                reqs[i][ki] = reqs[i].get(ki, 0) | bit(op[2])\"\"\"\nnew = \"\"\"            if c == \"get\":\n                ki = kidx[op[1]]\n                ops.append((\"g\", ki, op[2]))\n                reqs[i].append((ki, 0, bit(op[2])))\"\"\"\nassert old in s\ns = s.replace(old, new)\n\nold = \"\"\"                ops.append((\"c\", ki, old, new, want))\n                reqs[i][ki] = reqs[i].get(ki, 0) | bit(old)\n                # A valid execution of this transaction forces the CAS\n                # outcome, so its write behaviour is unconditional.\n                if want:\n                    writes_any[i] |= 1 << ki\n                    last_val[i][ki] = new\n                    all_vals[i][ki] = all_vals[i].get(ki, 0) | bit(new)\"\"\"\nnew = \"\"\"                ops.append((\"c\", ki, old, new, want))\n                # A valid execution of this transaction forces the CAS\n                # outcome, so its write behaviour is unconditional.\n                if want:\n                    reqs[i].append((ki, 0, bit(old)))\n                    writes_any[i] |= 1 << ki\n                    last_val[i][ki] = new\n                    all_vals[i][ki] = all_vals[i].get(ki, 0) | bit(new)\n        ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 34878,
+      "time": "2026-10-08T18:51:33.595226+00:00",
+      "tool_call_id": "call_3385a9c3490e467b9752a974",
+      "command": "cd /app && python3 - << 'PYEOF'\nimport test_diff as td, random, json, sys, time\nfrom main import solve\nfrom public_contract import valid_history\n\nrng = random.Random(999)\nbad = 0\nt0 = time.time()\nfor it in range(1200):\n    req = td.gen_sat(rng, maxn=7, maxkeys=6, maxops=5)\n    if rng.random() < 0.5:\n        req = td.mutate(rng, req)\n    expect = td.brute(req)\n    got = solve(req)\n    if expect:\n        if got['order'] is None or not valid_history(req, got['order']):\n            print('FAIL sat', it, json.dumps(req)); bad += 1\n    else:\n        if got['order'] is not None:\n            print('FAIL unsat', it, json.dumps(req), got); bad += 1\n    if bad > 3: break\nprint('done bad', bad, 'time %.1fs' % (time.time()-t0))\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 36417,
+      "time": "2026-10-08T18:51:46.346674+00:00",
+      "tool_call_id": "call_9ff7b0c0bbc5489e9babbccf",
+      "command": "cd /app && cat > bench.py << 'PYEOF'\nimport random, json, time, sys\nsys.path.insert(0, '/app')\nfrom main import solve\nfrom public_contract import valid_history\nimport test_diff as td\n\ndef gen(rng, n=10, maxkeys=6, maxops=5, span=12):\n    keys = sorted(rng.sample(['a','b','c','d','e','f'], maxkeys))\n    times = []\n    for _ in range(n):\n        s = rng.randint(0, span)\n        e = s + rng.randint(1, 4)\n        times.append((s, e))\n    remaining = list(range(n)); order = []\n    while remaining:\n        ready = [i for i in remaining if all(not (times[j][1] <= times[i][0]) for j in remaining if j != i)]\n        i = rng.choice(ready); order.append(i); remaining.remove(i)\n    state = {}\n    txns = []\n    for i in order:\n        s, e = times[i]; ops = []\n        for _ in range(rng.randint(1, maxops)):\n            c = rng.choice(['get','put','del','cas','scan'])\n            k = rng.choice(keys)\n            if c == 'get': ops.append(['get', k, state.get(k)])\n            elif c == 'put':\n                v = rng.randint(-9, 9); ops.append(['put', k, v]); state[k] = v\n            elif c == 'del': ops.append(['del', k]); state.pop(k, None)\n            elif c == 'cas':\n                old = state.get(k)\n                if rng.random() < 0.5:\n                    want = True; new = rng.choice([None] + list(range(-9, 10)))\n                else:\n                    want = False; new = rng.randint(-9, 9)\n                    tries = 0\n                    while state.get(k) == old and tries < 20:\n                        old = rng.choice([None] + list(range(-9, 10))); tries += 1\n                ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 37598,
+      "time": "2026-10-08T18:52:18.983417+00:00",
+      "tool_call_id": "call_c9aac15cc1f243f0b92ce242",
+      "command": "cd /app && python3 - << 'PYEOF'\nimport random, itertools\n\ndef reachable_count(W, nk):\n    # W[i] = set of key indices written; state = tuple last writer per key (-1 none)\n    full=(1<<len(W))-1\n    states={0: {(-1,)*nk}}\n    best=0\n    for mask in range(1<<len(W)):\n        pass\n    dp=[set() for _ in range(1<<len(W))]\n    dp[0].add((-1,)*nk)\n    total=0\n    for mask in range(1<<len(W)):\n        for s in dp[mask]:\n            for i in range(len(W)):\n                if (mask>>i)&1: continue\n                ns=list(s)\n                for k in W[i]: ns[k]=i\n                dp[mask|(1<<i)].add(tuple(ns))\n    return max(len(dp[m]) for m in range(1<<len(W))), len(dp[full])\n\nrng=random.Random(1)\nbest=(0,None)\nfor trial in range(20000):\n    n=10; nk=6\n    W=[]\n    for i in range(n):\n        sz=rng.randint(1,3)\n        W.append(frozenset(rng.sample(range(nk), sz)))\n    mx, fu = reachable_count(W, nk)\n    if mx>best[0]:\n        best=(mx,(W,fu))\n        print('new best max per mask', mx, 'full', fu, [sorted(w) for w in W])\nprint('best', best[0], [sorted(w) for w in best[1][0]])\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 39085,
+      "time": "2026-10-08T18:54:33.488007+00:00",
+      "tool_call_id": "call_c919bfdc837043edb082852b",
+      "command": "cd /app && cat > bench2.py << 'PYEOF'\nimport random, json, time, sys\nsys.path.insert(0, '/app')\nfrom main import solve\nfrom public_contract import valid_history\nfrom bench import gen, mutate\n\ndef gen_overlap(rng, n=10, maxkeys=6, maxops=5, weights=None):\n    keys = sorted(rng.sample(['a','b','c','d','e','f'], maxkeys))\n    times = [(0, 2) for _ in range(n)]  # all overlap\n    order = list(range(n)); rng.shuffle(order)\n    state = {}\n    txns = [None]*n\n    for i in order:\n        ops = []\n        for _ in range(rng.randint(1, maxops)):\n            c = rng.choices(['get','put','del','cas','scan'], weights=weights or [3,2,1,4,2])[0]\n            k = rng.choice(keys)\n            if c == 'get': ops.append(['get', k, state.get(k)])\n            elif c == 'put':\n                v = rng.randint(-9,9); ops.append(['put', k, v]); state[k]=v\n            elif c == 'del': ops.append(['del', k]); state.pop(k,None)\n            elif c == 'cas':\n                old = state.get(k)\n                if rng.random()<0.5:\n                    want=True; new=rng.choice([None]+list(range(-9,10)))\n                else:\n                    want=False; new=rng.randint(-9,9)\n                    tries=0\n                    while state.get(k)==old and tries<30:\n                        old=rng.choice([None]+list(range(-9,10))); tries+=1\n                ops.append(['cas',k,old,new,want])\n                if want:\n                    if new is None: state.pop(k,None)\n                    else: state[k]=new\n            else:\n                lo=rng.choice(keys); hi=rng.choice(keys+['z'])\n                if lo>=hi",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 39645,
+      "time": "2026-10-08T18:56:41.554324+00:00",
+      "tool_call_id": "call_2abab424631b4cc7b54b842f",
+      "command": "cd /app && python3 - << 'PYEOF'\ns = open('main.py').read()\ns = s.replace(\"\"\"    failed = set()\n\"\"\", \"\"\"    failed = set()\n    nodes = [0]\n\"\"\")\ns = s.replace(\"\"\"    def dfs(mask, vec):\n        if mask == full:\n            return () if vec == final_vec else None\n        nk_list = norm_keys[mask]\"\"\", \"\"\"    def dfs(mask, vec):\n        nodes[0] += 1\n        if mask == full:\n            return () if vec == final_vec else None\n        nk_list = norm_keys[mask]\"\"\")\ns = s.replace(\"\"\"    res = dfs(0, initial_vec)\n    if res is None:\"\"\", \"\"\"    res = dfs(0, initial_vec)\n    solve.last_nodes = nodes[0]\n    if res is None:\"\"\")\nopen('main.py','w').write(s)\nPYEOF\npython3 /app/smoke.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 40995,
+      "time": "2026-10-08T18:56:53.869648+00:00",
+      "tool_call_id": "call_e1bf6b2f1c574766b8b20019",
+      "command": "cd /app && cat > bench3.py << 'PYEOF'\nimport random, json, time, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\n\nKEYS=['a','b','c','d','e','f']\n\ndef gen_pattern(rng, n=10, nk=6, mode='putonly', sat=True):\n    W=[frozenset(rng.sample(range(nk), rng.randint(1,3))) for _ in range(n)]\n    # generate random execution to get observations\n    order=list(range(n)); rng.shuffle(order)\n    state={}\n    txns=[None]*n\n    for i in order:\n        ops=[]\n        # writes on W[i]\n        for k in sorted(W[i]):\n            if rng.random()<0.9:\n                v=rng.randint(-9,9)\n                ops.append(['put',KEYS[k],v]); state[KEYS[k]]=v\n        if mode=='mixed':\n            for _ in range(rng.randint(0,4)):\n                c=rng.random()\n                k=rng.choice(KEYS)\n                if c<0.4:\n                    ops.append(['get',k,state.get(k)])\n                elif c<0.6:\n                    old=state.get(k)\n                    if rng.random()<0.5:\n                        want=True; new=rng.choice([None]+list(range(-9,10)))\n                    else:\n                        want=False; new=rng.randint(-9,9)\n                        tries=0\n                        while state.get(k)==old and tries<30:\n                            old=rng.choice([None]+list(range(-9,10))); tries+=1\n                    ops.append(['cas',k,old,new,want])\n                    if want:\n                        if new is None: state.pop(k,None)\n                        else: state[k]=new\n                else:\n                    lo=rng.choice(KEYS); hi=rng.cho",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43569,
+      "time": "2026-10-08T18:58:01.773638+00:00",
+      "tool_call_id": "call_5fbf16a335ba46a28e434e2f",
+      "command": "cd /app && cat > pattern_search.py << 'PYEOF'\nimport random, time\n\ndef dp_stats(W, nk):\n    n=len(W)\n    dp=[set() for _ in range(1<<n)]\n    dp[0].add((-1,)*nk)\n    total=0; mx=0\n    for mask in range(1<<n):\n        s=dp[mask]\n        total+=len(s); mx=max(mx,len(s))\n        for i in range(n):\n            if (mask>>i)&1: continue\n            nm=mask|(1<<i)\n            wi=W[i]; d=dp[nm]\n            for st in s:\n                ns=list(st)\n                for k in wi: ns[k]=i\n                d.add(tuple(ns))\n    return total,mx,len(dp[-1])\n\ndef randW(rng,n=10,nk=6):\n    return [frozenset(rng.sample(range(nk), rng.randint(1,3))) for _ in range(n)]\n\nrng=random.Random(42)\nbest=(0,None)\nW=randW(rng)\ncur=dp_stats(W,6)[0]\nt0=time.time(); it=0\nwhile time.time()-t0<50:\n    it+=1\n    W2=list(W)\n    for _ in range(rng.randint(1,3)):\n        i=rng.randrange(10)\n        W2[i]=frozenset(rng.sample(range(6), rng.randint(1,3)))\n    s2=dp_stats(W2,6)[0]\n    if s2>=cur or rng.random()<0.02:\n        W,cur=W2,s2\n    if s2>best[0]:\n        best=(s2,list(W2)); print('best total',s2,'eval',it)\nprint('final',best[0],[sorted(x) for x in best[1]])\nPYEOF\ntimeout 70 python3 pattern_search.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 44233,
+      "time": "2026-10-08T18:58:58.703935+00:00",
+      "tool_call_id": "call_a6e07fc9cbc247bca0625192",
+      "command": "cd /app && python3 - << 'PYEOF'\nfrom pattern_search import dp_stats\nimport itertools, random, time\n\ndef show(name,W):\n    t0=time.time(); print(name, dp_stats(W,6), '%.0fms'%(1000*(time.time()-t0)), [sorted(x) for x in W])\n\nn=10;k=6\n# cyclic pairs\nshow('pairs i,i+1', [frozenset({i%k,(i+1)%k}) for i in range(n)])\nshow('pairs i,i+2', [frozenset({i%k,(i+2)%k}) for i in range(n)])\nshow('pairs i,i+3', [frozenset({i%k,(i+3)%k}) for i in range(n)])\nshow('singles mod6', [frozenset({i%k}) for i in range(n)])\nshow('triples i,i+1,i+2', [frozenset({i%k,(i+1)%k,(i+2)%k}) for i in range(n)])\nshow('all pairs from 6 keys (15 txns not allowed)', [frozenset(x) for x in itertools.combinations(range(k),2)][:10])\n# random dense: each txn writes 4 keys\nrng=random.Random(0)\nbest=(0,None)\nfor _ in range(300):\n    W=[frozenset(rng.sample(range(k),4)) for _ in range(n)]\n    t=dp_stats(W,6)[0]\n    if t>best[0]: best=(t,W)\nshow('best dense4', best[1])\nbest=(0,None)\nfor _ in range(300):\n    W=[frozenset(rng.sample(range(k),rng.randint(1,6))) for _ in range(n)]\n    t=dp_stats(W,6)[0]\n    if t>best[0]: best=(t,W)\nshow('best any', best[1])\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 49588,
+      "time": "2026-10-08T19:00:53.776483+00:00",
+      "tool_call_id": "call_a6fcd2d51602417793fa1896",
+      "command": "cd /app && cat > main.py << 'PYEOF'\nimport json\nimport sys\n\n\ndef solve(request):\n    initial = request.get(\"initial\") or {}\n    final = request.get(\"final\") or {}\n    txns = request.get(\"transactions\") or []\n    n = len(txns)\n\n    # ------------------------------------------------------------------\n    # Universe of keys.  The state is tracked only over these keys.\n    # ------------------------------------------------------------------\n    keyset = set(initial) | set(final)\n    for t in txns:\n        for op in t[\"ops\"]:\n            c = op[0]\n            if c == \"scan\":\n                for kv in op[3]:\n                    keyset.add(kv[0])\n            else:\n                keyset.add(op[1])\n    keys = sorted(keyset)\n    nk = len(keys)\n    kidx = {k: i for i, k in enumerate(keys)}\n\n    def bit(v):\n        # -9..9 -> bits 0..18, absent -> bit 19\n        return 1 << (v + 9) if v is not None else (1 << 19)\n\n    initial_vec = tuple(initial.get(k) for k in keys)\n    final_vec = tuple(final.get(k) for k in keys)\n    final_bits = tuple(bit(final.get(k)) for k in keys)\n\n    # ------------------------------------------------------------------\n    # Compile transactions.\n    # ------------------------------------------------------------------\n    ops_list = []\n    pre = [0] * n                    # real-time predecessors bitmask\n    writes_any = [0] * n             # keys written (ever), as bitmask\n    last_val = [None] * n            # key idx -> value of last write\n    all_vals = [None] * n            # key idx -> bitset of all written values\n    reqs = [None] * n                # l",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 54012,
+      "time": "2026-10-08T19:01:35.591333+00:00",
+      "tool_call_id": "call_5d226daa35aa46dfa103399f",
+      "command": "cd /app && cat > bench4.py << 'PYEOF'\nimport random, json, time, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\n\nKEYS=['a','b','c','d','e','f']\nBEST=[[0,3,5],[4,5],[0,1,4],[1,2,5],[1,3],[0,1,2],[0,2,4],[2,3,4],[2,3,5],[1,4,5]]\n\ndef build(W, vals, final, gets=None, scans=None):\n    txns=[]\n    for i,w in enumerate(W):\n        ops=[]\n        if gets:\n            for (k,v) in gets[i]:\n                ops.append(['get',KEYS[k],v])\n        for k in sorted(w):\n            ops.append(['put',KEYS[k],vals[i]])\n        if scans:\n            for (lo,hi,pairs) in scans[i]:\n                ops.append(['scan',KEYS[lo],KEYS[hi],pairs])\n        txns.append({'id':'t%d'%i,'start':0,'end':2,'ops':ops})\n    return {'initial':{},'final':final,'transactions':txns}\n\ndef run(tag, count, builder):\n    rng=random.Random(hash(tag)&0xffff)\n    worst=(0,None,None); total=0\n    for _ in range(count):\n        req=builder(rng)\n        t0=time.perf_counter(); got=solve(req); dt=time.perf_counter()-t0; total+=dt\n        if dt>worst[0]: worst=(dt,req,got)\n        if got['order'] is not None and not valid_history(req,got['order']):\n            print('INVALID',json.dumps(req)); return\n    print(tag,'avg %.2fms'%(1000*total/count),'max %.2fms'%(1000*worst[0]),'sat?',worst[2]['order'] is not None)\n    return worst\n\ndef b_putonly(rng):\n    n=10\n    nvals=rng.choice([1,2,3,10])\n    vals=[rng.randrange(nvals) for _ in range(n)]\n    final={}\n    for k in range(6):\n        writers=[i for i,w in enumerate(BEST) if k in w]\n        final[KEYS[k]]=rng.choice(vals[i] for i i",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 54067,
+      "time": "2026-10-08T19:01:37.476172+00:00",
+      "tool_call_id": "call_fcfc6289c5d54583be7cedee",
+      "command": "cd /app && sed -i 's/rng.choice(vals\\[i\\] for i in writers)/rng.choice([vals[i] for i in writers])/' bench4.py && python3 bench4.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 54704,
+      "time": "2026-10-08T19:01:54.062440+00:00",
+      "tool_call_id": "call_98ed2fa94d7d4557af20566f",
+      "command": "cd /app && python3 - << 'PYEOF'\ns=open('main.py').read()\ns=s.replace(\"\"\"    full = (1 << n) - 1\n    failed = set()\n    info_cache = {}\"\"\",\"\"\"    full = (1 << n) - 1\n    failed = set()\n    info_cache = {}\n    nodes = [0]\"\"\")\ns=s.replace(\"\"\"    def dfs(mask, vec):\n        if mask == full:\"\"\",\"\"\"    def dfs(mask, vec):\n        nodes[0] += 1\n        if mask == full:\"\"\")\ns=s.replace(\"\"\"    res = dfs(0, initial_vec)\n    if res is None:\"\"\",\"\"\"    res = dfs(0, initial_vec)\n    solve.last_nodes = nodes[0]\n    if res is None:\"\"\")\nopen('main.py','w').write(s)\nPYEOF\npython3 - << 'PYEOF'\ns=open('bench4.py').read()\ns=s.replace(\"pairs=sorted([[KEYS[kk],vv] for kk,vv in state.items() if KEYS[lo]<=kk<KEYS[hi]])\",\n            \"hiS = KEYS[hi] if hi<6 else 'z'\\n            pairs=sorted([[kk,vv] for kk,vv in state.items() if KEYS[lo]<=kk<hiS])\")\ns=s.replace(\"if dt>worst[0]: worst=(dt,req,got)\",\"nd=solve.last_nodes\\n        if dt>worst[0]: worst=(dt,req,got)\\n        if nd>globals().get('MAXN',0): globals()['MAXN']=nd; print('nodes',nd,'ms %.1f'%(1000*dt),'sat?',got['order'] is not None)\")\nopen('bench4.py','w').write(s)\nPYEOF\npython3 /app/smoke.py && python3 bench4.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 58573,
+      "time": "2026-10-08T19:02:39.528642+00:00",
+      "tool_call_id": "call_be96852c4c7a49fe8084f386",
+      "command": "cd /app && python3 - << 'PYEOF'\ns=open('bench4.py').read()\ns=s.replace(\"\"\"        if scans:\n            for (lo,hi,pairs) in scans[i]:\n                ops.append(['scan',KEYS[lo],KEYS[hi],pairs])\"\"\",\n\"\"\"        if scans:\n            for (lo,hi,pairs) in scans[i]:\n                ops.append(['scan',KEYS[lo],KEYS[hi] if hi<6 else 'z',pairs])\"\"\")\nopen('bench4.py','w').write(s)\n\ns=open('main.py').read()\nold = \"\"\"        rem = full ^ mask\n        lm = [0] * nk\n        am = [0] * nk\n        reqlist = []\n        m = rem\n        while m:\n            b = m & -m\n            i = b.bit_length() - 1\n            m ^= b\n            w = writes_any[i]\n            if w:\n                lvi = last_val[i]\n                avi = all_vals[i]\n                mm = w\n                while mm:\n                    kb = mm & -mm\n                    ki = kb.bit_length() - 1\n                    mm ^= kb\n                    lm[ki] |= bit(lvi[ki])\n                    am[ki] |= avi[ki]\n            if reqs[i]:\n                reqlist.extend(reqs[i])\n        norm = tuple(ki for ki in range(nk) if lm[ki])\n        info = (lm, am, tuple(reqlist), norm)\n        info_cache[mask] = info\n        return info\"\"\"\nnew = \"\"\"        rem = full ^ mask\n        lm = [0] * nk\n        am = [0] * nk\n        allreq = []\n        m = rem\n        while m:\n            b = m & -m\n            i = b.bit_length() - 1\n            m ^= b\n            w = writes_any[i]\n            if w:\n                lvi = last_val[i]\n                avi = all_vals[i]\n                mm = w\n                while mm:\n                    kb = mm & -mm\n     ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 60568,
+      "time": "2026-10-08T19:03:15.738959+00:00",
+      "tool_call_id": "call_8e886a3084784a6e87c37846",
+      "command": "cd /app && cat > test_unit.py << 'PYEOF'\nimport sys, json\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\n\ndef req(initial, final, txns):\n    return {'initial': initial, 'final': final, 'transactions': txns}\n\ndef T(i,s,e,ops): return {'id':i,'start':s,'end':e,'ops':ops}\n\ncases = []\ndef add(name, r, expect_sat, forced=None):\n    cases.append((name,r,expect_sat,forced))\n\n# absent vs zero\nadd('get zero vs absent', req({}, {}, [T('t0',0,2,[['get','a',0]])]), False)\nadd('get absent', req({}, {}, [T('t0',0,2,[['get','a',None]])]), True)\nadd('initial zero get null', req({'a':0}, {'a':0}, [T('t0',0,2,[['get','a',None]])]), False)\n# cas\nadd('cas absent->1 true', req({}, {'a':1}, [T('t0',0,2,[['cas','a',None,1,True]])]), True)\nadd('cas absent->1 false', req({}, {}, [T('t0',0,2,[['cas','a',None,1,False]])]), True)\nadd('cas 0->null delete', req({'a':0}, {}, [T('t0',0,2,[['cas','a',0,None,True]])]), True)\nadd('cas 0 expected absent', req({'a':0}, {'a':0}, [T('t0',0,2,[['cas','a',None,5,False]])]), True)\nadd('cas failure must not write', req({'a':0}, {'a':0}, [T('t0',0,2,[['cas','a',None,5,False],['get','a',0]])]), True)\n# scan\nadd('scan exclusive high', req({'a':1,'b':2}, {'a':1,'b':2}, [T('t0',0,2,[['scan','a','b',[['a',1]]]])]), True)\nadd('scan inclusive low', req({'a':1,'b':2}, {'a':1,'b':2}, [T('t0',0,2,[['scan','a','c',[['a',1],['b',2]]]])]), True)\nadd('scan own write', req({}, {'b':2}, [T('t0',0,2,[['put','b',2],['scan','a','c',[['b',2]]]])]), True)\nadd('scan empty', req({'b':2}, {'b':2}, [T('t0',0,2,[['scan','a','b',[]]])]), True)\nadd('s",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 60939,
+      "time": "2026-10-08T19:03:21.813639+00:00",
+      "tool_call_id": "call_0c132dcff5424162b605ae5a",
+      "command": "cd /app && sed -i \"s/add('cas absent->1 false', req({}, {}, \\[T('t0',0,2,\\[\\['cas','a',None,1,False\\]\\])\\]), True)/add('cas absent->1 false', req({}, {}, [T('t0',0,2,[['cas','a',None,1,False]])]), False)/\" test_unit.py && python3 test_unit.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 61435,
+      "time": "2026-10-08T19:03:27.433863+00:00",
+      "tool_call_id": "call_f98b42c360904e228a03baee",
+      "command": "cd /app && python3 - << 'PYEOF'\nimport random, json, sys\nsys.path.insert(0,'/app')\nimport test_diff as td\nimport bench4 as b4\n\nrng = random.Random(2024)\nout = open('/tmp/batch.jsonl','w')\nn_sat = 0\nfor i in range(30000):\n    if i % 10 == 0:\n        r = rng.random()\n        if r < 0.5:\n            req = b4.b_putonly(rng)\n        else:\n            req = b4.b_mixed(rng)\n    else:\n        req = td.gen_sat(rng, maxn=rng.choice([0,1,2,3,4,5,6,6,7,8,10]), maxkeys=6, maxops=5)\n        if rng.random() < 0.4:\n            req = td.mutate(rng, req)\n    out.write(json.dumps(req)+'\\n')\nout.close()\nprint('written')\nPYEOF\nwc -l /tmp/batch.jsonl && time python3 /app/main.py < /tmp/batch.jsonl > /tmp/batch.out && wc -l /tmp/batch.out",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 62134,
+      "time": "2026-10-08T19:03:55.204097+00:00",
+      "tool_call_id": "call_d4bcc804b1da4a259ed25a51",
+      "command": "cd /app && python3 - << 'PYEOF'\nimport json, sys, time\nsys.path.insert(0,'/app')\nfrom public_contract import valid_history\nfrom test_diff import brute\n\nreqs = [json.loads(l) for l in open('/tmp/batch.jsonl')]\nouts = [json.loads(l) for l in open('/tmp/batch.out')]\nassert len(reqs)==len(outs)\nbad=0; checked=0; t0=time.time()\nfor i,(r,o) in enumerate(zip(reqs,outs)):\n    if o['order'] is not None and not valid_history(r,o['order']):\n        print('INVALID witness at',i); bad+=1\n        if bad>3: break\n    n=len(r['transactions'])\n    if n<=7:\n        e=brute(r); checked+=1\n        if e != (o['order'] is not None):\n            print('MISMATCH at',i,'n',n,'brute',e,'got',o['order']); bad+=1\n            if bad>3: break\nprint('checked brute',checked,'bad',bad,'%.1fs'%(time.time()-t0))\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 63322,
+      "time": "2026-10-08T19:04:09.876185+00:00",
+      "tool_call_id": "call_6105b78a40aa4c078a3b6211",
+      "command": "cd /app && cat > test_big.py << 'PYEOF'\nimport random, json, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\nimport test_diff as td\n\ndef brute2(req):\n    tx = req['transactions']; n=len(tx)\n    ids=[t['id'] for t in tx]\n    pre=[0]*n\n    for i in range(n):\n        for j in range(n):\n            if j!=i and tx[j]['end']<=tx[i]['start']: pre[i]|=1<<j\n    full=(1<<n)-1\n    def sim(i,d):\n        d=dict(d)\n        for op in tx[i]['ops']:\n            if op[0]=='get':\n                if d.get(op[1])!=op[2]: return None\n            elif op[0]=='put': d[op[1]]=op[2]\n            elif op[0]=='del': d.pop(op[1],None)\n            elif op[0]=='cas':\n                _,k,old,new,want=op; ok=d.get(k)==old\n                if ok is not want: return None\n                if ok:\n                    if new is None: d.pop(k,None)\n                    else: d[k]=new\n            else:\n                if sorted([[k,v] for k,v in d.items() if op[1]<=k<op[2]])!=op[3]: return None\n        return d\n    def rec(mask,d):\n        if mask==full: return [] if d==req['final'] else None\n        for i in range(n):\n            if (mask>>i)&1 or (pre[i]&~mask): continue\n            nd=sim(i,d)\n            if nd is None: continue\n            r=rec(mask|1<<i,nd)\n            if r is not None: return [i]+r\n        return None\n    r=rec(0,req['initial'])\n    return r\n\nrng=random.Random(31337)\nbad=0; checked=0; t0=time.time()\nfor it in range(400):\n    n=rng.choice([8,8,8,9])\n    req=td.gen_sat(rng,maxn=n,maxkeys=6,maxops=5)\n    if rng.random()<0.5: req=td.mutate(rng,re",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 64768,
+      "time": "2026-10-08T19:04:23.810021+00:00",
+      "tool_call_id": "call_1460aa46d897499b9eea739e",
+      "command": "cd /app && cat > hard_search.py << 'PYEOF'\nimport random, time, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nKEYS=['a','b','c','d','e','f']\n\ndef build(W, vals, final):\n    txns=[]\n    for i,w in enumerate(W):\n        ops=[['put',KEYS[k],vals[i]] for k in sorted(w)]\n        if not ops: ops=[['put',KEYS[0],vals[i]]]\n        txns.append({'id':'t%d'%i,'start':0,'end':2,'ops':ops})\n    return {'initial':{},'final':final,'transactions':txns}\n\ndef evaluate(W, vals, final):\n    r=solve(build(W,vals,final))\n    return solve.last_nodes, r['order'] is not None\n\ndef rand_state(rng):\n    W=[frozenset(rng.sample(range(6),rng.randint(1,3))) for _ in range(10)]\n    vals=[rng.randrange(4) for _ in range(10)]\n    final={KEYS[k]:rng.randrange(4) for k in range(6) if rng.random()<0.8}\n    return W,vals,final\n\ndef mutate(rng, W, vals, final):\n    W=list(W); vals=list(vals); final=dict(final)\n    for _ in range(rng.randint(1,3)):\n        t=rng.random()\n        if t<0.4:\n            i=rng.randrange(10); W[i]=frozenset(rng.sample(range(6),rng.randint(1,3)))\n        elif t<0.7:\n            i=rng.randrange(10); vals[i]=rng.randrange(4)\n        else:\n            k=KEYS[rng.randrange(6)]\n            if rng.random()<0.5: final[k]=rng.randrange(4)\n            else: final.pop(k,None)\n    return W,vals,final\n\nrng=random.Random(1)\nW,vals,final=rand_state(rng)\ncur,sat=evaluate(W,vals,final)\nbest=(cur,W,vals,final,sat)\nt0=time.time(); it=0\nwhile time.time()-t0<55:\n    it+=1\n    W2,vals2,final2=mutate(rng,W,vals,final)\n    sc,sat2=evaluate(W2,vals2,final2)\n    if sc>=cur or rng.random()<0.03:\n        ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 68126,
+      "time": "2026-10-08T19:05:52.053307+00:00",
+      "tool_call_id": "call_9f6c0465eeec4ff6ba4745dd",
+      "command": "cd /app && cat > test_dp.py << 'PYEOF'\nimport random, json, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\nimport test_diff as td\n\ndef apply_naive(t, d):\n    d = dict(d)\n    for op in t['ops']:\n        if op[0]=='get':\n            if d.get(op[1])!=op[2]: return None\n        elif op[0]=='put': d[op[1]]=op[2]\n        elif op[0]=='del': d.pop(op[1],None)\n        elif op[0]=='cas':\n            _,k,old,new,want=op; ok=d.get(k)==old\n            if ok is not want: return None\n            if ok:\n                if new is None: d.pop(k,None)\n                else: d[k]=new\n        else:\n            if sorted([[k,v] for k,v in d.items() if op[1]<=k<op[2]])!=op[3]: return None\n    return d\n\ndef dp_solve(req):\n    tx=req['transactions']; n=len(tx)\n    pre=[0]*n\n    for i in range(n):\n        for j in range(n):\n            if j!=i and tx[j]['end']<=tx[i]['start']: pre[i]|=1<<j\n    full=(1<<n)-1\n    init=tuple(sorted(req['initial'].items()))\n    dp=[set() for _ in range(1<<n)]\n    dp[0].add(init)\n    for mask in range(1<<n):\n        if not dp[mask]: continue\n        for i in range(n):\n            if (mask>>i)&1 or (pre[i]&~mask): continue\n            nm=mask|1<<i\n            for st in dp[mask]:\n                nd=apply_naive(tx[i],dict(st))\n                if nd is not None: dp[nm].add(tuple(sorted(nd.items())))\n    return tuple(sorted(req['final'].items())) in dp[full]\n\nrng=random.Random(555)\nbad=0; t0=time.time()\nfor it in range(4000):\n    req=td.gen_sat(rng,maxn=10,maxkeys=6,maxops=5)\n    if rng.random()<0.6: req=td.mutate(rng,req)\n",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 69420,
+      "time": "2026-10-08T19:06:02.550611+00:00",
+      "tool_call_id": "call_47075a0365144de4838dc45b",
+      "command": "cd /app && cat > test_dp2.py << 'PYEOF'\nimport random, json, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\nfrom test_dp import dp_solve\n\nKEYS=['a','b','c','d','e','f']\n\ndef gen_overlap(rng, n=10, maxkeys=6, maxops=5, weights=(3,2,1,4,2)):\n    keys=sorted(rng.sample(KEYS,maxkeys))\n    order=list(range(n)); rng.shuffle(order)\n    state={}; txns=[None]*n\n    for i in order:\n        ops=[]\n        for _ in range(rng.randint(1,maxops)):\n            c=rng.choices(['get','put','del','cas','scan'],weights=weights)[0]\n            k=rng.choice(keys)\n            if c=='get': ops.append(['get',k,state.get(k)])\n            elif c=='put':\n                v=rng.randint(-9,9); ops.append(['put',k,v]); state[k]=v\n            elif c=='del': ops.append(['del',k]); state.pop(k,None)\n            elif c=='cas':\n                old=state.get(k)\n                if rng.random()<0.5:\n                    want=True; new=rng.choice([None]+list(range(-9,10)))\n                else:\n                    want=False; new=rng.randint(-9,9); tries=0\n                    while state.get(k)==old and tries<30:\n                        old=rng.choice([None]+list(range(-9,10))); tries+=1\n                ops.append(['cas',k,old,new,want])\n                if want:\n                    if new is None: state.pop(k,None)\n                    else: state[k]=new\n            else:\n                lo=rng.choice(keys); hi=rng.choice(keys+['z'])\n                if lo>=hi: lo,hi=hi,lo\n                if lo==hi: hi=chr(ord(hi)+1)\n                pairs=sorted([[kk,vv] for kk,vv ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 70101,
+      "time": "2026-10-08T19:06:35.903106+00:00",
+      "tool_call_id": "call_97d0cfd6e8e04b6ea295eb44",
+      "command": "cd /app && python3 - << 'PYEOF'\ns=open('test_dp.py').read()\ni=s.index(\"rng=random.Random(555)\")\ns=s[:i]+\"if __name__=='__main__':\\n    \"+s[i:].replace(\"\\n\",\"\\n    \").rstrip()+\"\\n\"\nopen('test_dp.py','w').write(s)\nPYEOF\ncat > /app/test_dp3.py << 'PYEOF'\nimport random, json, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\nfrom test_dp import dp_solve\nimport test_diff as td\n\nrng=random.Random(4242)\nbad=0; t0=time.time(); cnt=0\nfor it in range(30000):\n    n=rng.choice([9,10,10,10])\n    req=td.gen_sat(rng,maxn=n,maxkeys=6,maxops=5)\n    if rng.random()<0.5: req=td.mutate(rng,req)\n    e=dp_solve(req); g=solve(req); cnt+=1\n    if e!=(g['order'] is not None):\n        print('MISMATCH',it,'dp',e,'got',g['order']); print(json.dumps(req)); bad+=1\n        if bad>2: break\n    if g['order'] is not None and not valid_history(req,g['order']):\n        print('INVALID'); bad+=1; break\n    if time.time()-t0>200: break\nprint('checked',cnt,'bad',bad,'%.1fs'%(time.time()-t0))\nPYEOF\ncd /app && timeout 240 python3 test_dp3.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 71123,
+      "time": "2026-10-08T19:06:51.066043+00:00",
+      "tool_call_id": "call_61fe308f9d234ddcabd194c8",
+      "command": "cd /app && python3 - << 'PYEOF'\ns=open('bench4.py').read()\ns=s.replace(\"run('putonly',6000,b_putonly)\\nrun('putonly_sat',6000,b_putonly_sat)\\nrun('mixed',6000,b_mixed)\",\n            \"if __name__=='__main__':\\n    run('putonly',6000,b_putonly)\\n    run('putonly_sat',6000,b_putonly_sat)\\n    run('mixed',6000,b_mixed)\")\nopen('bench4.py','w').write(s)\nPYEOF\ncat > /app/test_dp4.py << 'PYEOF'\nimport random, json, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\nfrom test_dp import dp_solve\nfrom bench4 import b_putonly, b_putonly_sat, b_mixed\n\nrng=random.Random(888)\nbad=0; t0=time.time(); cnt=0; worst=(0,None)\ngens=[b_putonly,b_putonly_sat,b_mixed]\nfor it in range(3000):\n    req=gens[it%3](rng)\n    e=dp_solve(req)\n    t1=time.perf_counter(); g=solve(req); dt=time.perf_counter()-t1; cnt+=1\n    if dt>worst[0]: worst=(dt,req,g,e)\n    if e!=(g['order'] is not None):\n        print('MISMATCH',it,'dp',e,'got',g['order']); print(json.dumps(req)); bad+=1\n        if bad>2: break\n    if g['order'] is not None and not valid_history(req,g['order']):\n        print('INVALID'); bad+=1; break\nprint('checked',cnt,'bad',bad,'%.1fs'%(time.time()-t0),'worst %.1fms'%(1000*worst[0]))\nPYEOF\ntimeout 280 python3 test_dp4.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 73241,
+      "time": "2026-10-08T19:09:08.292067+00:00",
+      "tool_call_id": "call_37d3c8673a25449ea02c1737",
+      "command": "cd /app && python3 - << 'PYEOF'\nimport random, time, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nimport test_diff as td\nfrom bench4 import b_putonly, b_mixed\n\ndef bench(name, gen, count=3000):\n    rng=random.Random(123)\n    reqs=[gen(rng) for _ in range(count)]\n    t0=time.perf_counter()\n    for r in reqs: solve(r)\n    dt=time.perf_counter()-t0\n    print('%-22s %6.3f ms/req  (%d req/s)'%(name,1000*dt/count,count/dt))\n\nbench('n10 random sat', lambda r: td.gen_sat(r,maxn=10,maxkeys=6,maxops=5))\nbench('n10 random mutated', lambda r: td.mutate(r,td.gen_sat(r,maxn=10,maxkeys=6,maxops=5)))\nbench('n<=6 random', lambda r: td.gen_sat(r,maxn=6,maxkeys=6,maxops=5))\nbench('n10 putonly pattern', b_putonly)\nbench('n10 mixed pattern', b_mixed)\nbench('n0-n2 tiny', lambda r: td.gen_sat(r,maxn=2,maxkeys=3,maxops=2))\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 74565,
+      "time": "2026-10-08T19:09:29.414061+00:00",
+      "tool_call_id": "call_3f11f8cc5e0e4716aea2ccf0",
+      "command": "cd /app && cat > pattern_max.py << 'PYEOF'\nimport random, time\n\ndef encoded_stats(W, nk=6):\n    n=len(W)\n    clear=[]; setb=[]\n    for i,w in enumerate(W):\n        c=0; s=0\n        for k in w:\n            c |= 0xF << (4*k)\n            s |= (i+1) << (4*k)\n        clear.append(c); setb.append(s)\n    dp=[set() for _ in range(1<<n)]\n    dp[0].add(0)\n    total=0; mx=0\n    for mask in range(1<<n):\n        cur=dp[mask]\n        if not cur: continue\n        total+=len(cur); mx=max(mx,len(cur))\n        for i in range(n):\n            if (mask>>i)&1: continue\n            nm=mask|(1<<i)\n            ci=clear[i]; si=setb[i]; d=dp[nm]\n            for st in cur:\n                d.add((st & ci) | si)\n    return total,mx,len(dp[-1])\n\ndef randW(rng,n=10,nk=6,smax=3):\n    return [frozenset(rng.sample(range(nk), rng.randint(1,smax))) for _ in range(n)]\n\nrng=random.Random(1234)\nbest=(0,None)\nt0=time.time(); it=0\nwhile time.time()-t0<55:\n    # random restart\n    W=randW(rng, smax=rng.choice([2,3,4,5,6]))\n    cur=encoded_stats(W)[0]\n    for step in range(200):\n        it+=1\n        W2=list(W)\n        for _ in range(rng.randint(1,2)):\n            i=rng.randrange(10)\n            W2[i]=frozenset(rng.sample(range(6), rng.randint(1,rng.choice([2,3,4,5,6]))))\n        s2=encoded_stats(W2)[0]\n        if s2>=cur or rng.random()<0.05:\n            W,cur=W2,s2\n        if s2>best[0]:\n            best=(s2,list(W2)); print('best total',s2,'it',it)\n    if time.time()-t0>55: break\nprint('FINAL',best[0],[sorted(x) for x in best[1]])\nPYEOF\ntimeout 70 python3 pattern_max.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 75530,
+      "time": "2026-10-08T19:10:37.850497+00:00",
+      "tool_call_id": "call_327a96e45a134442a5b7f09d",
+      "command": "cd /app && cat > hard2.py << 'PYEOF'\nimport random, time, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nKEYS=['a','b','c','d','e','f']\nW=[[0,1,2,3,4],[2,4,5],[0,2,3,4,5],[0,2,3,4,5],[0,1,2,4,5],[1,3,4,5],[0,1,2,3,5],[0,1,2,4,5],[0,1,3,4,5],[1,2,3,5]]\n\ndef build(vals, final):\n    txns=[]\n    for i,w in enumerate(W):\n        ops=[['put',KEYS[k],vals[i]] for k in w]\n        txns.append({'id':'t%d'%i,'start':0,'end':2,'ops':ops})\n    return {'initial':{},'final':final,'transactions':txns}\n\nrng=random.Random(5)\nworst=(0,None); t0=time.time(); cnt=0\nwhile time.time()-t0<40:\n    cnt+=1\n    vals=[rng.randrange(4) for _ in range(10)]\n    final={}\n    for k in range(6):\n        writers=[i for i,w in enumerate(W) if k in w]\n        if rng.random()<0.9:\n            final[KEYS[k]]=rng.choice([vals[i] for i in writers])\n        else:\n            final[KEYS[k]]=rng.randrange(4)\n    req=build(vals,final)\n    t1=time.perf_counter(); r=solve(req); dt=time.perf_counter()-t1\n    if dt>worst[0]: worst=(dt,req,r)\n    if dt>0.2: print('slow %.0fms nodes %d sat %s'%(1000*dt,solve.last_nodes,r['order'] is not None))\nprint('cnt',cnt,'worst %.1fms nodes %d sat %s'%(1000*worst[0],solve.last_nodes,worst[2]['order'] is not None))\nPYEOF\ntimeout 60 python3 hard2.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 79074,
+      "time": "2026-10-08T19:11:58.956891+00:00",
+      "tool_call_id": "call_aa93b73429e849fc9673dc0c",
+      "command": "cd /app && python3 - << 'PYEOF'\nimport sys, json\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\nr={'initial':{},'final':{'a':1},'transactions':[\n {'id':'t0','start':0,'end':2,'ops':[['put','a',1]]},\n {'id':'t1','start':0,'end':2,'ops':[['put','a',2]]},\n {'id':'t2','start':0,'end':2,'ops':[['get','a',1]]}]}\ng=solve(r)\nprint(g, 'valid' if g['order'] and valid_history(r,g['order']) else 'BAD')\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 83588,
+      "time": "2026-10-08T19:12:49.441974+00:00",
+      "tool_call_id": "call_9502083ad81c45a6b062b96a",
+      "command": "cd /app && python3 - << 'PYEOF'\ns=open('main.py').read()\nold = \"\"\"        ok = static_ok\n        if ok:\n            for ki in range(nk):\n                if lm[ki]:\n                    if not (final_bits[ki] & lm[ki]):\n                        ok = False\n                        break\n                elif vec[ki] != final_vec[ki]:\n                    ok = False\n                    break\"\"\"\nnew = \"\"\"        ok = static_ok\n        nonnorm_bad = False\n        if ok:\n            for ki in range(nk):\n                if lm[ki]:\n                    if not (final_bits[ki] & lm[ki]):\n                        ok = False\n                        break\n                elif vec[ki] != final_vec[ki]:\n                    # This node is dead, but its normalized state does not\n                    # determine the offending value, so do not memoize it.\n                    nonnorm_bad = True\n                    ok = False\n                    break\"\"\"\nassert old in s\ns = s.replace(old, new)\nold = \"\"\"        if not ok:\n            failed.add(mkey)\n            return None\"\"\"\nnew = \"\"\"        if not ok:\n            if not nonnorm_bad:\n                failed.add(mkey)\n            return None\"\"\"\nassert old in s\ns = s.replace(old, new)\nopen('main.py','w').write(s)\nPYEOF\npython3 /app/smoke.py && python3 test_unit.py && python3 test_diff.py 4000 && python3 test_dp.py && timeout 240 python3 test_dp3.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 84259,
+      "time": "2026-10-08T19:13:04.088834+00:00",
+      "tool_call_id": "call_0a86c83ebf564fd8b9c79ee9",
+      "command": "cd /app && python3 - << 'PYEOF'\nimport json, random, sys\nsys.path.insert(0,'/app')\nimport test_diff as td\nrng=random.Random(9)\nwith open('/tmp/tiny.jsonl','w') as f:\n    for _ in range(100000):\n        f.write(json.dumps(td.gen_sat(rng,maxn=4,maxkeys=4,maxops=3))+'\\n')\nprint('written')\nPYEOF\ntime python3 /app/main.py < /tmp/tiny.jsonl > /tmp/tiny.out && wc -l /tmp/tiny.out",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 85781,
+      "time": "2026-10-08T19:13:26.439466+00:00",
+      "tool_call_id": "call_9cd7195b15654d548acc29ab",
+      "command": "cd /app && cat main.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 87455,
+      "time": "2026-10-08T19:13:46.302821+00:00",
+      "tool_call_id": "call_22ba26e3503d4090a938824a",
+      "command": "cd /app && python3 smoke.py && python3 test_unit.py && python3 test_diff.py 10000 && timeout 120 python3 test_big.py && timeout 240 python3 test_dp3.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 89275,
+      "time": "2026-10-08T19:14:12.744687+00:00",
+      "tool_call_id": "call_88fc11e8bff4448e91220451",
+      "command": "cd /app && sed -e 's/random.Random(1234)/random.Random(99)/' -e 's/<55:/<100:/' -e 's/>55: break/>100: break/' -e 's/range(200)/range(400)/' pattern_max.py > pattern_max2.py && timeout 130 python3 pattern_max2.py 2>&1 | tail -5",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 91665,
+      "time": "2026-10-08T19:16:19.705233+00:00",
+      "tool_call_id": "call_cb99dadf804c4ceca4b90001",
+      "command": "cd /app && python3 - << 'PYEOF'\ns=open('main.py').read()\ns=s.replace(\"\"\"        req = json.loads(line)\n        out.write(json.dumps(solve(req)))\n        out.write(\"\\\\n\")\n    out.flush()\"\"\",\"\"\"        req = json.loads(line)\n        out.write(json.dumps(solve(req)))\n        out.write(\"\\\\n\")\n        out.flush()\n    out.flush()\"\"\")\nopen('main.py','w').write(s)\nPYEOF\ntime python3 /app/main.py < /tmp/tiny.jsonl > /tmp/tiny2.out && cmp /tmp/tiny.out /tmp/tiny2.out && echo same",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 92337,
+      "time": "2026-10-08T19:16:29.040594+00:00",
+      "tool_call_id": "call_55d7b3e3d9bb47c498f73dab",
+      "command": "cd /app && rm -f bench.py bench2.py bench3.py hard_search.py hard2.py pattern_search.py pattern_max.py pattern_max2.py && rm -rf __pycache__ && ls -la && echo '{\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]}' | python3 main.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 92563,
+      "time": "2026-10-08T19:16:33.251387+00:00",
+      "tool_call_id": "call_211cf0f13b2f469d9ccd9ec4",
+      "command": "cd /app && python3 smoke.py && python3 test_unit.py && python3 test_diff.py 5000 && python3 test_big.py && python3 test_dp3.py && timeout 60 python3 test_dp4.py 2>/dev/null | tail -1",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 92716,
+      "time": "2026-10-08T19:17:41.157288+00:00",
+      "tool_call_id": "call_8939706d08914919972bb9e3",
+      "command": "cd /app && timeout 150 python3 test_dp2.py && time python3 main.py < /tmp/batch.jsonl > /tmp/batch2.out && cmp /tmp/batch.out /tmp/batch2.out && echo 'batch output identical'",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 93226,
+      "time": "2026-10-08T19:18:14.283609+00:00",
+      "tool_call_id": "call_230fe928fc8348a4b0dfcadd",
+      "command": "cd /app && python3 -m py_compile main.py && echo compile-ok && python3 smoke.py && python3 - << 'PYEOF'\n# boundary values / scans / real-time chain quick check\nimport sys, json\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\nr={'initial':{'a':-9},'final':{'a':9,'z':-9},'transactions':[\n {'id':'x','start':0,'end':2,'ops':[['scan','a','zz',[['a',-9]]],['cas','a',-9,9,True]]},\n {'id':'y','start':2,'end':4,'ops':[['get','a',9],['put','z',-9],['scan','a','zz',[['a',9],['z',-9]]]]}]}\ng=solve(r); print(g); print('valid', valid_history(r,g['order']))\nPYEOF",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 22452,
+      "time": "2026-10-08T18:49:43.665125+00:00",
+      "tool_call_id": "call_6085032c959c49ae8d0ff810",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:42 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:45 ..\n-rw-r--r-- 1 agent agent 1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('atomic-range-history',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:42 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:45 ..\n-rw-r--r-- 1 agent agent 1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('atomic-range-history',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 30395,
+      "time": "2026-10-08T18:50:47.312837+00:00",
+      "tool_call_id": "call_af88899859004cdebbc9e71a",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/test_diff.py\", line 151, in <module>\n    main()\n  File \"/app/test_diff.py\", line 138, in main\n    req = mutate(rng, req)\n          ^^^^^^^^^^^^^^^^\n  File \"/app/test_diff.py\", line 121, in mutate\n    op[2] = rng.choice([-3, 3])\n    ~~^^^\nIndexError: list assignment index out of range\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/test_diff.py\", line 151, in <module>\n    main()\n  File \"/app/test_diff.py\", line 138, in main\n    req = mutate(rng, req)\n          ^^^^^^^^^^^^^^^^\n  File \"/app/test_diff.py\", line 121, in mutate\n    op[2] = rng.choice([-3, 3])\n    ~~^^^\nIndexError: list assignment index out of range\n"
+    },
+    {
+      "step": 37599,
+      "time": "2026-10-08T18:54:19.226987+00:00",
+      "tool_call_id": "call_c9aac15cc1f243f0b92ce242",
+      "return_code": 124,
+      "stdout": "new best max per mask 206 full 206 [[4], [2], [3], [3, 5], [0], [0, 3], [0, 4], [1, 2, 3], [0, 2, 5], [0]]\nnew best max per mask 660 full 660 [[0, 3, 4], [0, 1, 3], [1, 3, 4], [1, 2, 5], [1, 2, 3], [3], [0, 1, 5], [0, 2, 5], [2, 3, 4], [1, 2, 5]]\nnew best max per mask 740 full 740 [[3, 4], [0, 3, 4], [1, 3], [1, 5], [2, 4], [3], [0, 1, 4], [2, 3, 5], [0, 3, 5], [4, 5]]\nnew best max per mask 781 full 781 [[2], [1, 4, 5], [4, 5], [2, 5], [1, 3, 5], [0, 4], [3, 4, 5], [2, 4], [0, 3, 5], [0, 1, 2]]\nnew best max per mask 797 full 797 [[0, 2, 5], [3], [2], [2, 3], [1, 2, 5], [3, 4, 5], [1, 3], [0, 1], [2, 4], [0, 4]]\nnew best max per mask 819 full 819 [[0, 2, 3], [2, 3], [1, 3], [1, 2, 4], [0, 5], [4, 5], [0, 1, 5], [0, 4], [1, 2, 3], [2, 4]]\nnew best max per mask 822 full 822 [[0, 2, 5], [0], [1, 2, 3], [2, 4, 5], [0, 1, 4], [2, 4], [1, 3], [3, 5], [3, 4, 5], [0, 1, 4]]\nnew best max per mask 849 full 849 [[0, 1, 5], [4], [2, 3, 5], [1, 4], [1, 4, 5], [2, 4], [5], [0, 3, 4], [0, 2], [1, 2, 3]]\nnew best max per mask 853 full 853 [[1, 2], [0, 1, 5], [0, 2, 4], [2, 3, 5], [2], [3, 4], [0, 1], [2, 3], [1, 3, 4], [1, 4, 5]]\nnew best max per mask 864 full 864 [[3], [0, 5], [2, 4, 5], [0, 2, 3], [1, 2], [0, 1, 4], [2, 4], [3, 4, 5], [0, 4], [1, 3]]\nnew best max per mask 867 full 867 [[3, 4], [3, 4, 5], [0, 3, 4], [0, 2], [2, 4], [0, 1, 5], [2, 4, 5], [1, 3], [5], [1, 2]]\nnew best max per mask 973 full 973 [[1, 3, 4], [0, 3, 5], [0, 2], [2, 4, 5], [0, 4], [1, 2], [0, 3], [3, 5], [0, 1, 5], [2, 3, 4]]\n",
+      "stderr": "",
+      "stdout_tail": "new best max per mask 206 full 206 [[4], [2], [3], [3, 5], [0], [0, 3], [0, 4], [1, 2, 3], [0, 2, 5], [0]]\nnew best max per mask 660 full 660 [[0, 3, 4], [0, 1, 3], [1, 3, 4], [1, 2, 5], [1, 2, 3], [3], [0, 1, 5], [0, 2, 5], [2, 3, 4], [1, 2, 5]]\nnew best max per mask 740 full 740 [[3, 4], [0, 3, 4], [1, 3], [1, 5], [2, 4], [3], [0, 1, 4], [2, 3, 5], [0, 3, 5], [4, 5]]\nnew best max per mask 781 full 781 [[2], [1, 4, 5], [4, 5], [2, 5], [1, 3, 5], [0, 4], [3, 4, 5], [2, 4], [0, 3, 5], [0, 1, 2]]\nnew best max per mask 797 full 797 [[0, 2, 5], [3], [2], [2, 3], [1, 2, 5], [3, 4, 5], [1, 3], [0, 1], [2, 4], [0, 4]]\nnew best max per mask 819 full 819 [[0, 2, 3], [2, 3], [1, 3], [1, 2, 4], [0, 5], [4, 5], [0, 1, 5], [0, 4], [1, 2, 3], [2, 4]]\nnew best max per mask 822 full 822 [[0, 2, 5], [0], [1, 2, 3], [2, 4, 5], [0, 1, 4], [2, 4], [1, 3], [3, 5], [3, 4, 5], [0, 1, 4]]\nnew best max per mask 849 full 849 [[0, 1, 5], [4], [2, 3, 5], [1, 4], [1, 4, 5], [2, 4], [5], [0, 3, 4], [0, 2], [1, 2, 3]]\nnew best max per mask 853 full 853 [[1, 2], [0, 1, 5], [0, 2, 4], [2, 3, 5], [2], [3, 4], [0, 1], [2, 3], [1, 3, 4], [1, 4, 5]]\nnew best max per mask 864 full 864 [[3], [0, 5], [2, 4, 5], [0, 2, 3], [1, 2], [0, 1, 4], [2, 4], [3, 4, 5], [0, 4], [1, 3]]\nnew best max per mask 867 full 867 [[3, 4], [3, 4, 5], [0, 3, 4], [0, 2], [2, 4], [0, 1, 5], [2, 4, 5], [1, 3], [5], [1, 2]]\nnew best max per mask 973 full 973 [[1, 3, 4], [0, 3, 5], [0, 2], [2, 4, 5], [0, 4], [1, 2], [0, 3], [3, 5], [0, 1, 5], [2, 3, 4]]\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 39086,
+      "time": "2026-10-08T18:56:33.714529+00:00",
+      "tool_call_id": "call_c919bfdc837043edb082852b",
+      "return_code": 124,
+      "stdout": "sat10 count 4000 avg 3.27ms p99 10.10ms max 19.82ms\n  worst got order: True\nmut10 count 4000 avg 2.85ms p99 7.91ms max 13.97ms\n  worst got order: True\noverlap_w[3, 2, 1, 4, 2] count 8000 avg 2.69ms max 15.21ms worst sat? True\noverlap_mut_w[3, 2, 1, 4, 2] count 8000 avg 2.97ms max 19.16ms worst sat? False\noverlap_w[5, 1, 0, 6, 3] count 8000 avg 2.32ms max 16.09ms worst sat? True\noverlap_mut_w[5, 1, 0, 6, 3] count 8000 avg 2.06ms max 15.70ms worst sat? False\n",
+      "stderr": "",
+      "stdout_tail": "sat10 count 4000 avg 3.27ms p99 10.10ms max 19.82ms\n  worst got order: True\nmut10 count 4000 avg 2.85ms p99 7.91ms max 13.97ms\n  worst got order: True\noverlap_w[3, 2, 1, 4, 2] count 8000 avg 2.69ms max 15.21ms worst sat? True\noverlap_mut_w[3, 2, 1, 4, 2] count 8000 avg 2.97ms max 19.16ms worst sat? False\noverlap_w[5, 1, 0, 6, 3] count 8000 avg 2.32ms max 16.09ms worst sat? True\noverlap_mut_w[5, 1, 0, 6, 3] count 8000 avg 2.06ms max 15.70ms worst sat? False\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 54013,
+      "time": "2026-10-08T19:01:35.833894+00:00",
+      "tool_call_id": "call_5d226daa35aa46dfa103399f",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/bench4.py\", line 87, in <module>\n    run('putonly',6000,b_putonly)\n  File \"/app/bench4.py\", line 28, in run\n    req=builder(rng)\n        ^^^^^^^^^^^^\n  File \"/app/bench4.py\", line 43, in b_putonly\n    final[KEYS[k]]=rng.choice(vals[i] for i in writers) if rng.random()<0.8 else rng.randrange(nvals)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 346, in choice\n    if not len(seq):\n           ^^^^^^^^\nTypeError: object of type 'generator' has no len()\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/bench4.py\", line 87, in <module>\n    run('putonly',6000,b_putonly)\n  File \"/app/bench4.py\", line 28, in run\n    req=builder(rng)\n        ^^^^^^^^^^^^\n  File \"/app/bench4.py\", line 43, in b_putonly\n    final[KEYS[k]]=rng.choice(vals[i] for i in writers) if rng.random()<0.8 else rng.randrange(nvals)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 346, in choice\n    if not len(seq):\n           ^^^^^^^^\nTypeError: object of type 'generator' has no len()\n"
+    },
+    {
+      "step": 54068,
+      "time": "2026-10-08T19:01:47.203438+00:00",
+      "tool_call_id": "call_fcfc6289c5d54583be7cedee",
+      "return_code": 1,
+      "stdout": "putonly avg 1.36ms max 42.69ms sat? False\nputonly_sat avg 0.18ms max 10.48ms sat? True\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/bench4.py\", line 89, in <module>\n    run('mixed',6000,b_mixed)\n  File \"/app/bench4.py\", line 28, in run\n    req=builder(rng)\n        ^^^^^^^^^^^^\n  File \"/app/bench4.py\", line 71, in b_mixed\n    pairs=sorted([[KEYS[kk],vv] for kk,vv in state.items() if KEYS[lo]<=kk<KEYS[hi]])\n                                                                           ~~~~^^^^\nIndexError: list index out of range\n",
+      "stdout_tail": "putonly avg 1.36ms max 42.69ms sat? False\nputonly_sat avg 0.18ms max 10.48ms sat? True\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/bench4.py\", line 89, in <module>\n    run('mixed',6000,b_mixed)\n  File \"/app/bench4.py\", line 28, in run\n    req=builder(rng)\n        ^^^^^^^^^^^^\n  File \"/app/bench4.py\", line 71, in b_mixed\n    pairs=sorted([[KEYS[kk],vv] for kk,vv in state.items() if KEYS[lo]<=kk<KEYS[hi]])\n                                                                           ~~~~^^^^\nIndexError: list index out of range\n"
+    },
+    {
+      "step": 54705,
+      "time": "2026-10-08T19:02:04.394332+00:00",
+      "tool_call_id": "call_98ed2fa94d7d4557af20566f",
+      "return_code": 1,
+      "stdout": "Passed 3 public examples\nnodes 17 ms 0.1 sat? True\nnodes 6195 ms 9.0 sat? False\nnodes 7816 ms 9.8 sat? False\nnodes 9611 ms 13.0 sat? False\nnodes 12098 ms 12.8 sat? False\nnodes 15421 ms 17.0 sat? False\nnodes 16216 ms 17.8 sat? False\nnodes 19227 ms 21.3 sat? False\nnodes 20934 ms 25.0 sat? False\nnodes 22734 ms 20.8 sat? False\nnodes 31015 ms 40.1 sat? False\nputonly avg 1.42ms max 49.90ms sat? False\nputonly_sat avg 0.21ms max 11.93ms sat? True\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/bench4.py\", line 92, in <module>\n    run('mixed',6000,b_mixed)\n  File \"/app/bench4.py\", line 28, in run\n    req=builder(rng)\n        ^^^^^^^^^^^^\n  File \"/app/bench4.py\", line 76, in b_mixed\n    req=build(BEST,vals,dict(state),gets,scans)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/bench4.py\", line 20, in build\n    ops.append(['scan',KEYS[lo],KEYS[hi],pairs])\n                                ~~~~^^^^\nIndexError: list index out of range\n",
+      "stdout_tail": "Passed 3 public examples\nnodes 17 ms 0.1 sat? True\nnodes 6195 ms 9.0 sat? False\nnodes 7816 ms 9.8 sat? False\nnodes 9611 ms 13.0 sat? False\nnodes 12098 ms 12.8 sat? False\nnodes 15421 ms 17.0 sat? False\nnodes 16216 ms 17.8 sat? False\nnodes 19227 ms 21.3 sat? False\nnodes 20934 ms 25.0 sat? False\nnodes 22734 ms 20.8 sat? False\nnodes 31015 ms 40.1 sat? False\nputonly avg 1.42ms max 49.90ms sat? False\nputonly_sat avg 0.21ms max 11.93ms sat? True\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/bench4.py\", line 92, in <module>\n    run('mixed',6000,b_mixed)\n  File \"/app/bench4.py\", line 28, in run\n    req=builder(rng)\n        ^^^^^^^^^^^^\n  File \"/app/bench4.py\", line 76, in b_mixed\n    req=build(BEST,vals,dict(state),gets,scans)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/bench4.py\", line 20, in build\n    ops.append(['scan',KEYS[lo],KEYS[hi],pairs])\n                                ~~~~^^^^\nIndexError: list index out of range\n"
+    },
+    {
+      "step": 85782,
+      "time": "2026-10-08T19:13:26.629676+00:00",
+      "tool_call_id": "call_9cd7195b15654d548acc29ab",
+      "return_code": 0,
+      "stdout": "import json\nimport sys\n\n\ndef solve(request):\n    initial = request.get(\"initial\") or {}\n    final = request.get(\"final\") or {}\n    txns = request.get(\"transactions\") or []\n    n = len(txns)\n\n    # ------------------------------------------------------------------\n    # Universe of keys.  The state is tracked only over these keys.\n    # ------------------------------------------------------------------\n    keyset = set(initial) | set(final)\n    for t in txns:\n        for op in t[\"ops\"]:\n            c = op[0]\n            if c == \"scan\":\n                for kv in op[3]:\n                    keyset.add(kv[0])\n            else:\n                keyset.add(op[1])\n    keys = sorted(keyset)\n    nk = len(keys)\n    kidx = {k: i for i, k in enumerate(keys)}\n\n    def bit(v):\n        # -9..9 -> bits 0..18, absent -> bit 19\n        return 1 << (v + 9) if v is not None else (1 << 19)\n\n    initial_vec = tuple(initial.get(k) for k in keys)\n    final_vec = tuple(final.get(k) for k in keys)\n    final_bits = tuple(bit(final.get(k)) for k in keys)\n\n    # ------------------------------------------------------------------\n    # Compile transactions.\n    # ------------------------------------------------------------------\n    ops_list = []\n    pre = [0] * n                    # real-time predecessors bitmask\n    writes_any = [0] * n             # keys written (ever), as bitmask\n    last_val = [None] * n            # key idx -> value of last write\n    all_vals = [None] * n            # key idx -> bitset of all written values\n    reqs = [None] * n                # list of (key idx, kind, bitset)\n    starts = [0] * n\n    ends = [0] * n\n\n    for i, t in enumerate(txns):\n        starts[i] = t[\"start\"]\n        ends[i] = t[\"end\"]\n        ops = []\n        rq = []\n        lv = {}\n        av = {}\n        wa = 0\n        for op in t[\"ops\"]:\n            c = op[0]\n            if c == \"get\":\n                ki = kidx[op[1]]\n                ops.append((\"g\", ki, op[2]))\n                rq.append((ki, 0, bit(op[2])))\n            elif c == \"put\":\n                ki = kidx[op[1]]\n                v = op[2]\n                ops.append((\"p\", ki, v))\n                wa |= 1 << ki\n                lv[ki] = v\n                av[ki] = av.get(ki, 0) | bit(v)\n            elif c == \"del\":\n                ki = kidx[op[1]]\n                ops.append((\"d\", ki))\n                wa |= 1 << ki\n                lv[ki] = None\n                av[ki] = av.get(ki, 0) | bit(None)\n            elif c == \"cas\":\n                _, key, old, new, want = op\n                ki = kidx[key]\n                want = bool(want)\n                ops.append((\"c\", ki, old, new, want))\n                # The required return value forces the CAS outcome, so a\n                # valid execution has a deterministic effect.\n                if want:\n                    rq.append((ki, 0, bit(old)))\n                    wa |= 1 << ki\n                    lv[ki] = new\n                    av[ki] = av.get(ki, 0) | bit(new)\n                else:\n                    rq.append((ki, 1, bit(old)))\n            else:  # scan\n                _, low, high, pairs = op\n                rng = tuple(ki for ki in range(nk) if low <= keys[ki] < high)\n                exp = []\n                expmap = {}\n                for kv in pairs:\n                    ki = kidx[kv[0]]\n                    exp.append((ki, kv[1]))\n                    expmap[ki] = kv[1]\n                ops.append((\"s\", rng, tuple(exp)))\n                for ki in rng:\n                    if ki in expmap:\n                        rq.append((ki, 0, bit(expmap[ki])))\n                    else:\n                        rq.append((ki, 0, bit(None)))\n        ops_list.append(tuple(ops))\n        writes_any[i] = wa\n        last_val[i] = lv\n        all_vals[i] = av\n        reqs[i] = tuple(rq)\n        m = 0\n        for j in range(n):\n            if j != i and txns[j][\"end\"] <= t[\"start\"]:\n                m |= 1 << j\n        pre[i] = m\n\n    full = (1 << n) - 1\n    failed = set()\n    info_cache = {}\n    nodes = [0]\n\n    def maskinfo(mask):\n        \"\"\"(last_mask per key, all_vals mask per key, requirements, norm keys).\"\"\"\n        info = info_cache.get(mask)\n        if info is not None:\n            return info\n        rem = full ^ mask\n        lm = [0] * nk\n        am = [0] * nk\n        allreq = []\n        m = rem\n        while m:\n            b = m & -m\n            i = b.bit_length() - 1\n            m ^= b\n            w = writes_any[i]\n            if w:\n                lvi = last_val[i]\n                avi = all_vals[i]\n                mm = w\n                while mm:\n                    kb = mm & -mm\n                    ki = kb.bit_length() - 1\n                    mm ^= kb\n                    lm[ki] |= bit(lvi[ki])\n                    am[ki] |= avi[ki]\n            if reqs[i]:\n                allreq.extend(reqs[i])\n        norm = tuple(ki for ki in range(nk) if lm[ki])\n        # Requirements on keys with no remaining writer are already pinned\n        # to their final value, so they can be checked statically.\n        static_ok = True\n        exact = {}\n        nots = []\n        for ki, kind, rq in allreq:\n            if lm[ki]:\n                if kind == 0:\n                    exact[ki] = exact.get(ki, 0) | rq\n                else:\n                    nots.append((ki, rq))\n            else:\n                fb = final_bits[ki]\n                if kind == 0:\n                    if not (rq & fb):\n                        static_ok = False\n                        break\n                elif not (fb & ~rq):\n                    static_ok = False\n                    break\n        info = (lm, am, static_ok, exact, tuple(nots), norm)\n        info_cache[mask] = info\n        return info\n\n    # ------------------------------------------------------------------\n    # Execute transaction i atomically from vec; None on failed observation.\n    # ------------------------------------------------------------------\n    def apply(i, vec):\n        st = list(vec)\n        for op in op",
+      "stderr": "",
+      "stdout_tail": "        else:\n                _, rng, exp = op\n                ne = len(exp)\n                j = 0\n                for ki in rng:\n                    v = st[ki]\n                    if v is not None:\n                        if j >= ne or exp[j][0] != ki or exp[j][1] != v:\n                            return None\n                        j += 1\n                if j != ne:\n                    return None\n        return tuple(st)\n\n    # ------------------------------------------------------------------\n    # Depth-first search over serial orders with memoization of failed\n    # (remaining-set, normalized-state) pairs.\n    # ------------------------------------------------------------------\n    def dfs(mask, vec):\n        nodes[0] += 1\n        if mask == full:\n            return () if vec == final_vec else None\n        lm, am, static_ok, exact, nots, norm = maskinfo(mask)\n        mkey = (mask, tuple(vec[ki] for ki in norm))\n        if mkey in failed:\n            return None\n        # Necessary conditions: final reachability and observation feasibility.\n        ok = static_ok\n        nonnorm_bad = False\n        if ok:\n            for ki in range(nk):\n                if lm[ki]:\n                    if not (final_bits[ki] & lm[ki]):\n                        ok = False\n                        break\n                elif vec[ki] != final_vec[ki]:\n                    # This node is dead, but its normalized state does not\n                    # determine the offending value, so do not memoize it.\n                    nonnorm_bad = True\n                    ok = False\n                    break\n        if ok:\n            for ki, rq in exact.items():\n                if not (rq & (bit(vec[ki]) | am[ki])):\n                    ok = False\n                    break\n        if ok:\n            for ki, rq in nots:\n                if not ((bit(vec[ki]) | am[ki]) & ~rq):\n                    ok = False\n                    break\n        if not ok:\n            if not nonnorm_bad:\n                failed.add(mkey)\n            return None\n\n        notmask = full ^ mask\n        cands = []\n        for i in range(n):\n            if not (mask >> i) & 1 and (pre[i] & notmask) == 0:\n                cands.append(i)\n        if n > 1:\n            cands.sort(key=lambda i: (ends[i], starts[i], i))\n        for i in cands:\n            ns = apply(i, vec)\n            if ns is None:\n                continue\n            res = dfs(mask | (1 << i), ns)\n            if res is not None:\n                return (i,) + res\n        failed.add(mkey)\n        return None\n\n    res = dfs(0, initial_vec)\n    solve.last_nodes = nodes[0]\n    if res is None:\n        return {\"order\": None}\n    return {\"order\": [txns[i][\"id\"] for i in res]}\n\n\ndef main():\n    out = sys.stdout\n    for line in sys.stdin:\n        line = line.strip()\n        if not line:\n            continue\n        req = json.loads(line)\n        out.write(json.dumps(solve(req)))\n        out.write(\"\\n\")\n    out.flush()\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 89275,
+      "kind": "terminal_call",
+      "summary": "cd /app && sed -e 's/random.Random(1234)/random.Random(99)/' -e 's/<55:/<100:/' -e 's/>55: break/>100: break/' -e 's/range(200)/range(400)/' pattern_max.py > pattern_max2.py && timeout 130 python3 pattern_max2.py 2>&1 | tail -5"
+    },
+    {
+      "step": 89276,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "best total 109201 it 199\nbest total 122672 it 603\nbest total 126831 it 714\nbest total 129132 it 749\nFINAL 129132 [[0, 1, 2, 4, 5], [0, 2, 3, 4], [1, 2, 3, 4, 5], [0, 1, 2, 3, 4], [1, 2, 3, 5], [0, 2, 3, 5], [0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 5], [0, 1, 3, 4, 5], [0, 1, 2, 4]]\n"
+    },
+    {
+      "step": 91665,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - << 'PYEOF'\ns=open('main.py').read()\ns=s.replace(\"\"\"        req = json.loads(line)\n        out.write(json.dumps(solve(req)))\n        out.write(\"\\\\n\")\n    out.flush()\"\"\",\"\"\"        req = json.loads(line)\n        out.write(json.dumps(solve(req)))\n        out.write(\"\\\\n\")\n        out.flush()\n    out.flush()\"\"\")\nopen('main.py','w').write(s)\nPYEOF\ntime python3 /app/main.py < /tmp/tiny.jsonl > /tmp/tiny2.out && cmp /tmp/tiny.out /tmp/tiny2.out && echo same"
+    },
+    {
+      "step": 91666,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "same\n\nreal\t0m1.727s\nuser\t0m1.582s\nsys\t0m0.065s\n"
+    },
+    {
+      "step": 92337,
+      "kind": "terminal_call",
+      "summary": "cd /app && rm -f bench.py bench2.py bench3.py hard_search.py hard2.py pattern_search.py pattern_max.py pattern_max2.py && rm -rf __pycache__ && ls -la && echo '{\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]}' | python3 main.py"
+    },
+    {
+      "step": 92338,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "total 72\ndrwxr-xr-x 1 agent agent 4096 Oct  8 19:16 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:45 ..\n-rw-r--r-- 1 agent agent 3576 Oct  8 19:06 bench4.py\n-rw-r--r-- 1 agent agent 1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent 9498 Oct  8 19:16 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\n-rw-r--r-- 1 agent agent 1942 Oct  8 19:04 test_big.py\n-rw-r--r-- 1 agent agent 5327 Oct  8 18:50 test_diff.py\n-rw-r--r-- 1 agent agent 1970 Oct  8 19:06 test_dp.py\n-rw-r--r-- 1 agent agent 2877 Oct  8 19:06 test_dp2.py\n-rw-r--r-- 1 agent agent  766 Oct  8 19:06 test_dp3.py\n-rw-r--r-- 1 agent agent  835 Oct  8 19:06 test_dp4.py\n-rw-r--r-- 1 agent agent 3049 Oct  8 19:03 test_unit.py\n{\"order\": [\"t0\"]}\n"
+    },
+    {
+      "step": 92563,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 smoke.py && python3 test_unit.py && python3 test_diff.py 5000 && python3 test_big.py && python3 test_dp3.py && timeout 60 python3 test_dp4.py 2>/dev/null | tail -1"
+    },
+    {
+      "step": 92564,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\nunit cases 22 fail 0\ndone 5000 bad 0\nchecked 400 bad 0 0.0s\nchecked 30000 bad 0 3.6s\n"
+    },
+    {
+      "step": 92716,
+      "kind": "terminal_call",
+      "summary": "cd /app && timeout 150 python3 test_dp2.py && time python3 main.py < /tmp/batch.jsonl > /tmp/batch2.out && cmp /tmp/batch.out /tmp/batch2.out && echo 'batch output identical'"
+    },
+    {
+      "step": 92717,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "checked 20000 bad 0 22.5s\nbatch output identical\n\nreal\t0m3.493s\nuser\t0m3.295s\nsys\t0m0.037s\n"
+    },
+    {
+      "step": 93226,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 -m py_compile main.py && echo compile-ok && python3 smoke.py && python3 - << 'PYEOF'\n# boundary values / scans / real-time chain quick check\nimport sys, json\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\nr={'initial':{'a':-9},'final':{'a':9,'z':-9},'transactions':[\n {'id':'x','start':0,'end':2,'ops':[['scan','a','zz',[['a',-9]]],['cas','a',-9,9,True]]},\n {'id':'y','start':2,'end':4,'ops':[['get','a',9],['put','z',-9],['scan','a','zz',[['a',9],['z',-9]]]]}]}\ng=solve(r); print(g); print('valid', valid_history(r,g['order']))\nPYEOF"
+    },
+    {
+      "step": 93227,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "compile-ok\nPassed 3 public examples\n{'order': ['x', 'y']}\nvalid True\n"
+    }
+  ]
+}

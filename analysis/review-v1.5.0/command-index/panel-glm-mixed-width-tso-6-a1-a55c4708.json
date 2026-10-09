@@ -1,0 +1,530 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-glm-mixed-width-tso-6-a1-a55c4708",
+    "task": "mixed-width-tso",
+    "model": "accounts/fireworks/models/glm-5p3",
+    "replicate": 6,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-glm-mixed-width-tso-6-a1-a55c4708.json",
+    "tool_calls": 36,
+    "agent_elapsed_seconds": 1094.136437,
+    "input_tokens": 1138774,
+    "output_tokens": 48662,
+    "uncached_cost_estimate": 1.8083964,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "b3cdb9711bf3f142a86000ce45c1c4427032aeea14f98de8813e72b543f17de0",
+    "network_mode": "none",
+    "artifact_sha256": "846cbdc277990ab88bd2b523954103aeed50cb02ecd7603b3c4fdffdbeff6d06",
+    "normalized_artifact_sha256": "e785c27ef416f4af79a5d06f0297072c50a91a615351ca919a48d9c3753a154f",
+    "terminal_nonzero_or_error_text_events": 16,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 40790,
+        "time": "2026-10-08T20:48:29.984296+00:00",
+        "artifact_sha256": "846cbdc277990ab88bd2b523954103aeed50cb02ecd7603b3c4fdffdbeff6d06",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 948.347947,
+    "event_counts": {
+      "initial": 1,
+      "request": 33,
+      "stream_chunk": 48761,
+      "response": 33,
+      "terminal_call": 36,
+      "terminal_result": 36,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 67,
+      "time": "2026-10-08T20:32:43.760184+00:00",
+      "tool_call_id": "chatcmpl-tool-ac180449fc3afe6f",
+      "command": "ls -la /app && cat /app/main.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 69,
+      "time": "2026-10-08T20:32:44.051627+00:00",
+      "tool_call_id": "chatcmpl-tool-86619f4511d6c728",
+      "command": "cat /app/smoke.py 2>/dev/null; ls /app/*.json 2>/dev/null",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 112,
+      "time": "2026-10-08T20:32:45.514974+00:00",
+      "tool_call_id": "chatcmpl-tool-acfef70bca2fb6eb",
+      "command": "cat /app/public_contract.py; echo ---; cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 13444,
+      "time": "2026-10-08T20:36:34.004462+00:00",
+      "tool_call_id": "chatcmpl-tool-912685b792e8f2a0",
+      "command": "cat > /app/main.py <<'EOF'\n#!/usr/bin/env python3\n\"\"\"Enumerate all terminal observable outcomes of a small mixed-width\nTSO-like teaching machine (see instruction.md).\n\nState space exploration: every transition either advances a program counter\nor drains one buffered store, so the transition graph is a DAG and all\nexecutions are finite.  We enumerate reachable states (deduplicated on the\nfull state: memory + pcs + buffers + observations) and collect the\nobservation/memory pairs of the states with no enabled transition (all\nthreads finished and all buffers empty).\n\"\"\"\n\nimport json\nimport sys\n\nSTORE, LOAD, FENCE, XCHG = 0, 1, 2, 3\n\n\ndef compile_threads(threads):\n    \"\"\"Turn instructions into compact tuples (kind, addr, width, bytes).\"\"\"\n    progs = []\n    for thr in threads:\n        prog = []\n        for ins in thr:\n            kind = ins[0]\n            if kind == 'store':\n                a, w, v = ins[1], ins[2], ins[3]\n                nb = (v & ((1 << (8 * w)) - 1)).to_bytes(w, 'little')\n                prog.append((STORE, a, w, nb))\n            elif kind == 'load':\n                prog.append((LOAD, ins[1], ins[2], b''))\n            elif kind == 'fence':\n                prog.append((FENCE, 0, 0, b''))\n            elif kind == 'xchg':\n                a, w, v = ins[1], ins[2], ins[3]\n                nb = (v & ((1 << (8 * w)) - 1)).to_bytes(w, 'little')\n                prog.append((XCHG, a, w, nb))\n            else:\n                raise ValueError('unknown instruction %r' % (kind,))\n        progs.append(tuple(prog))\n    return progs\n\n\ndef explore(mem0, progs):\n    \"\"\"Return t",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 14805,
+      "time": "2026-10-08T20:36:58.707319+00:00",
+      "tool_call_id": "chatcmpl-tool-914848cee98e21d9",
+      "command": "cat > /app/naive.py <<'EOF'\n\"\"\"Independent, deliberately naive reference: enumerate every execution\n(no state deduplication, explicit path exploration).\"\"\"\nimport json, sys\n\ndef key_state(st): return json.dumps(st, sort_keys=True)\n\ndef run(req):\n    mem0 = list(req['memory'])\n    threads = req['threads']\n    n = len(threads)\n    start = {'mem': list(mem0),\n             'pc': [0]*n,\n             'buf': [[] for _ in range(n)],\n             'obs': [[] for _ in range(n)]}\n    outcomes = set()\n    def term(st):\n        return all(st['pc'][t] == len(threads[t]) for t in range(n)) and \\\n               all(not st['buf'][t] for t in range(n))\n    def enabled(st):\n        acts = []\n        for t in range(n):\n            pc = st['pc'][t]\n            if pc < len(threads[t]):\n                ins = threads[t][pc]\n                if ins[0] == 'fence' and st['buf'][t]:\n                    pass\n                elif ins[0] == 'xchg' and st['buf'][t]:\n                    pass\n                else:\n                    acts.append(('exec', t))\n        for t in range(n):\n            if st['buf'][t]:\n                acts.append(('drain', t))\n        return acts\n    def step(st, act):\n        s = {'mem': list(st['mem']), 'pc': list(st['pc']),\n             'buf': [list(b) for b in st['buf']], 'obs': [list(o) for o in st['obs']]}\n        t = act[1]\n        if act[0] == 'drain':\n            a, w, v = s['buf'][t].pop(0)\n            nb = v.to_bytes(w, 'little') if isinstance(v, int) else bytes(v)\n            for i in range(w):\n                s['mem'][a+i] = nb[i]\n            return s\n        ins = thr",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 15192,
+      "time": "2026-10-08T20:37:05.575313+00:00",
+      "tool_call_id": "chatcmpl-tool-af5b8961cc85eaea",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, subprocess, sys\ncases=json.loads(open('examples.json').read())\ninp=''.join(json.dumps(c['request'])+'\\n' for c in cases)\nfor name in ('main.py','naive.py'):\n    p=subprocess.run([sys.executable,name],input=inp,text=True,capture_output=True,cwd='/app')\n    print(name, p.returncode, repr(p.stdout[:200]), p.stderr[:500])\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 15932,
+      "time": "2026-10-08T20:37:17.004987+00:00",
+      "tool_call_id": "chatcmpl-tool-8a8b699cd9350cec",
+      "command": "cd /app && python3 - <<'EOF'\nimport re,pathlib\np=pathlib.Path('naive.py'); s=p.read_text()\ns=s.replace(\"    return [{'reads':[list(o) for o in obs],'memory':list(m)} for obs,m in outcomes]\",\n            \"    return {'outcomes':[{'reads':[list(o) for o in obs],'memory':list(m)} for obs,m in outcomes]}\")\np.write_text(s)\nEOF\ncat > /app/crosscheck.py <<'EOF'\nimport json, sys, random\nsys.path.insert(0, '/app')\nimport main as M\nimport naive as N\n\ndef key(o): return json.dumps({'reads': o['reads'], 'memory': o['memory']}, sort_keys=True, separators=(',', ':'))\ndef kset(resp): return set(map(key, resp['outcomes']))\n\ndef rand_case(rng, allow_fence_xchg=True):\n    nmem = rng.randint(1, 8)\n    nthreads = rng.randint(1, 3)\n    total = rng.randint(0, 10)\n    # split total among threads, each 0..4\n    counts = [0]*nthreads\n    for _ in range(total):\n        t = rng.randrange(nthreads)\n        if counts[t] < 4: counts[t] += 1\n    threads = []\n    kinds = ['store','load','load','store'] + (['fence','xchg'] if allow_fence_xchg else [])\n    for c in counts:\n        prog = []\n        for _ in range(c):\n            k = rng.choice(kinds)\n            w = rng.choice([1,1,2,4])\n            a = rng.randint(0, nmem-w)\n            if k == 'store': prog.append(['store', a, w, rng.randint(0,(1<<(8*w))-1)])\n            elif k == 'load': prog.append(['load', a, w])\n            elif k == 'fence': prog.append(['fence'])\n            else: prog.append(['xchg', a, w, rng.randint(0,(1<<(8*w))-1)])\n        threads.append(prog)\n    return {'memory':[rng.randint(0,255) for _ in range(nmem)], 'threads':threads}\n\nd",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 16108,
+      "time": "2026-10-08T20:37:20.788632+00:00",
+      "tool_call_id": "chatcmpl-tool-8e593308cc56ff1c",
+      "command": "cd /app && python3 - <<'EOF'\nimport pathlib\np=pathlib.Path('crosscheck.py'); s=p.read_text()\ns=s.replace(\"            w = rng.choice([1,1,2,4])\\n            a = rng.randint(0, nmem-w)\",\n            \"            w = rng.choice([x for x in (1,1,2,4) if x <= nmem])\\n            a = rng.randint(0, nmem-w)\")\np.write_text(s)\nEOF\ncd /app && python3 crosscheck.py 1 200",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 16948,
+      "time": "2026-10-08T20:37:50.489278+00:00",
+      "tool_call_id": "chatcmpl-tool-ac0c17406ad3f060",
+      "command": "cd /app && for s in 2 3 4 5; do python3 crosscheck.py $s 250; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 16950,
+      "time": "2026-10-08T20:39:50.930651+00:00",
+      "tool_call_id": "chatcmpl-tool-8a13abdee09a28ae",
+      "command": "cd /app && cat > /app/perf.py <<'EOF'\nimport json, sys, time, random\nsys.path.insert(0,'/app')\nimport main as M\n\ncases = {\n 'sb': {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]},\n 'sb_fence': {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"fence\"],[\"load\",1,1]],[[\"store\",1,1,1],[\"fence\"],[\"load\",0,1]]]},\n 'iriw': {\"memory\":[0,0],\"threads\":[[[\"load\",0,1],[\"load\",1,1]],[[\"load\",1,1],[\"load\",0,1]],[[\"store\",0,1,1],[\"store\",1,1,1]]]},\n 'mp': {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"store\",1,1,1]],[[\"load\",1,1],[\"load\",0,1]]]},\n 'xchg3': {\"memory\":[0,0,0],\"threads\":[[[\"xchg\",0,1,1],[\"load\",1,1]],[[\"xchg\",1,1,1],[\"load\",0,1]],[[\"xchg\",2,1,7]]]},\n 'wide3': {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n    [[\"store\",0,4,0x04030201],[\"load\",0,4],[\"store\",4,4,0x44332211]],\n    [[\"store\",2,4,0x08070605],[\"load\",2,4],[\"store\",0,2,0xBEEF]],\n    [[\"xchg\",6,2,0xCAFE],[\"load\",4,4]]]},\n 'tenstores': {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n    [[\"store\",0,4,1],[\"store\",4,4,2],[\"load\",0,4],[\"load\",4,4]],\n    [[\"store\",0,4,3],[\"load\",0,4],[\"fence\"]],\n    [[\"store\",4,4,4],[\"load\",4,4]]]},\n 'maxmix': {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n    [[\"store\",0,2,0x1122],[\"load\",0,4],[\"store\",2,2,0x3344],[\"load\",0,4]],\n    [[\"store\",0,2,0x5566],[\"load\",0,4],[\"fence\"]],\n    [[\"xchg\",0,4,0x0A0B0C0D],[\"load\",0,4]]]},\n}\nfor name, req in cases.items():\n    t=time.time(); r=M.solve(req); dt=time.time()-t\n    print(f\"{name:12s} outcomes={len(r['outcomes']):6d} time={dt:.3f}s\")\nEOF\npython3 /app/perf.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 17620,
+      "time": "2026-10-08T20:40:02.164046+00:00",
+      "tool_call_id": "chatcmpl-tool-b5448e2143701a77",
+      "command": "cd /app && python3 - <<'EOF'\nimport pathlib\np=pathlib.Path('naive.py'); s=p.read_text()\ns=s.replace(\"    # DFS over executions\\n    stack = [(start, enabled(start))]\\n\",\n            \"    # DFS over executions (bounded, for cross-checking only)\\n    limit = CAP[0]\\n    stack = [(start, enabled(start))]\\n\")\ns=s.replace(\"    while stack:\\n        st, acts = stack.pop()\\n\",\n            \"    while stack:\\n        limit -= 1\\n        if limit < 0:\\n            raise KeyboardInterrupt('too many executions')\\n        st, acts = stack.pop()\\n\")\ns=s.replace(\"import json, sys\",\"import json, sys\\n\\nCAP = [2_000_000]\")\ns=s.replace(\"import json, sys\\n\\nCAP = [2_000_000]\\n\\ndef run(req):\",\"import json, sys\\n\\nCAP = [2_000_000]\\n\\ndef run(req):\")\np.write_text(s)\nprint(s[:200])\nEOF\ngrep -n \"CAP\\|limit\" /app/naive.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 17746,
+      "time": "2026-10-08T20:40:04.885186+00:00",
+      "tool_call_id": "chatcmpl-tool-8544f2cefdbefbf6",
+      "command": "cd /app && python3 - <<'EOF'\nimport pathlib\np=pathlib.Path('crosscheck.py'); s=p.read_text()\ns=s.replace(\"    total = rng.randint(0, 10)\",\"    total = rng.randint(0, int(sys.argv[3]) if len(sys.argv)>3 else 10)\")\np.write_text(s)\nEOF\ncd /app && for s in 3 4 5 6 7; do timeout 300 python3 crosscheck.py $s 200 5; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 17899,
+      "time": "2026-10-08T20:40:08.301007+00:00",
+      "tool_call_id": "chatcmpl-tool-ae0f95cde4e075e1",
+      "command": "cd /app && python3 - <<'EOF'\nimport pathlib\np=pathlib.Path('crosscheck.py'); s=p.read_text()\ns=s.replace(\"        except Exception as e:\",\"        except KeyboardInterrupt:\\n            continue\\n        except Exception as e:\")\np.write_text(s)\nEOF\ncd /app && for s in 11 12 13; do timeout 400 python3 crosscheck.py $s 150 7; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 19218,
+      "time": "2026-10-08T20:40:27.852957+00:00",
+      "tool_call_id": "chatcmpl-tool-80b4ae5705813266",
+      "command": "cat > /app/perfsearch.py <<'EOF'\n\"\"\"Random search over full-bound requests to find the worst-case state count.\"\"\"\nimport json, sys, time, random\nsys.path.insert(0,'/app')\nfrom main import compile_threads, STORE, LOAD, FENCE, XCHG\n\ndef explore_count(mem0, progs):\n    n = len(progs); lens=[len(p) for p in progs]; nrange=range(n)\n    start=(mem0,(0,)*n,((),)*n,((),)*n)\n    visited={start}; stack=[start]; outcomes=set(); gen=0\n    while stack:\n        state=stack.pop(); mem,pcs,bufs,obs=state; moved=False\n        for t in nrange:\n            pc=pcs[t]\n            if pc==lens[t]: continue\n            kind,a,w,nb=progs[t][pc]; buf=bufs[t]\n            gen+=1\n            if kind==STORE:\n                st=(mem,pcs[:t]+(pc+1,)+pcs[t+1:],bufs[:t]+(buf+((a,nb),),)+bufs[t+1:],obs)\n            elif kind==LOAD:\n                val=0;shift=0\n                for i in range(w):\n                    addr=a+i;b=None\n                    for ent in reversed(buf):\n                        sa,snb=ent\n                        if sa<=addr<sa+len(snb): b=snb[addr-sa]; break\n                    if b is None: b=mem[addr]\n                    val|=b<<shift; shift+=8\n                st=(mem,pcs[:t]+(pc+1,)+pcs[t+1:],bufs,obs[:t]+(obs[t]+(val,),)+obs[t+1:])\n            elif kind==FENCE:\n                if buf: continue\n                st=(mem,pcs[:t]+(pc+1,)+pcs[t+1:],bufs,obs)\n            else:\n                if buf: continue\n                val=int.from_bytes(mem[a:a+w],'little'); nmem=mem[:a]+nb+mem[a+w:]\n                st=(nmem,pcs[:t]+(pc+1,)+pcs[t+1:],bufs,obs[:t]+(obs[t]+(val,),)+obs[t+1:])\n        ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 20743,
+      "time": "2026-10-08T20:40:54.471594+00:00",
+      "tool_call_id": "chatcmpl-tool-8279159dc78d21b1",
+      "command": "cd /app && cat > /app/adversarial.py <<'EOF'\nimport json,sys,time\nsys.path.insert(0,'/app')\nfrom perfsearch import explore_count, rand_case\nfrom main import compile_threads\nC = {\n 'overlap9': {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n   [[\"store\",0,4,0x11111111],[\"store\",0,4,0x22222222],[\"load\",0,4]],\n   [[\"store\",0,4,0x33333333],[\"store\",0,4,0x44444444],[\"load\",0,4]],\n   [[\"store\",0,4,0x55555555],[\"store\",0,4,0x66666666],[\"load\",0,4]]]},\n 'overlap9b': {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n   [[\"store\",0,4,0x11111111],[\"store\",0,4,0x22222222],[\"load\",0,2]],\n   [[\"store\",2,4,0x33333333],[\"store\",2,4,0x44444444],[\"load\",2,2]],\n   [[\"store\",0,2,0x5555],[\"store\",2,2,0x6666],[\"load\",4,4]]]},\n 'xchgload': {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n   [[\"xchg\",0,4,0x11111111],[\"xchg\",4,4,0x22222222],[\"load\",0,4],[\"load\",4,4]],\n   [[\"xchg\",0,4,0x33333333],[\"load\",0,4],[\"load\",4,4]],\n   [[\"xchg\",4,4,0x44444444],[\"load\",0,4]]]},\n 'storeloadmix': {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n   [[\"store\",0,1,1],[\"load\",0,4],[\"store\",1,1,2],[\"load\",0,4]],\n   [[\"store\",2,1,3],[\"load\",0,4],[\"store\",3,1,4],[\"load\",0,4]],\n   [[\"store\",4,1,5],[\"load\",0,4]]]},\n 'fencemix': {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n   [[\"store\",0,4,1],[\"fence\"],[\"load\",0,4],[\"load\",4,4]],\n   [[\"store\",2,4,2],[\"load\",2,4],[\"fence\"]],\n   [[\"xchg\",6,2,0xBEEF],[\"load\",0,8]] if False else [[\"xchg\",6,2,0xBEEF],[\"load\",0,4]]]},\n 'loads10': {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n   [[\"store\",0,1,1],[\"load\",0,1],[\"store\",1,1,2],[\"load\",1,1]],\n   [[\"store\",2,1,3],[\"load\",2,1],[\"store\",3,1,4],[\"load\",3,1]],\n   [[\"store\",4,1,5],[\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 20894,
+      "time": "2026-10-08T20:40:58.868563+00:00",
+      "tool_call_id": "chatcmpl-tool-bf7229100c5cc713",
+      "command": "cd /app && python3 - <<'EOF'\nimport pathlib\np=pathlib.Path('perfsearch.py'); s=p.read_text()\ni=s.index(\"def main():\")\nhead, tail = s[:i], s[i:]\ntail = tail.replace(\"main()\\n\",\"\",1)\np.write_text(head + \"if __name__=='__main__':\\n    \" + tail.replace(\"\\n\",\"\\n    \").rstrip()+\"\\n\")\nEOF\ncd /app && tail -5 perfsearch.py && python3 adversarial.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 22546,
+      "time": "2026-10-08T20:41:29.216107+00:00",
+      "tool_call_id": "chatcmpl-tool-beb7c874827df90c",
+      "command": "cd /app && cat > /app/search2.py <<'EOF'\nimport json,sys,time,random\nsys.path.insert(0,'/app')\nfrom perfsearch import explore_count\nfrom main import compile_threads\n\ndef rand_case(rng, nmem=8, nthreads=3, total=10):\n    counts=[0]*nthreads\n    for _ in range(total):\n        t=rng.randrange(nthreads)\n        if counts[t]<4: counts[t]+=1\n    threads=[]\n    for c in counts:\n        prog=[]\n        for _ in range(c):\n            w=rng.choice([x for x in (1,1,2,4) if x<=nmem])\n            a=rng.randint(0,nmem-w)\n            if rng.random()<0.55: prog.append(['store',a,w,rng.randint(0,(1<<(8*w))-1)])\n            else: prog.append(['load',a,w])\n        threads.append(prog)\n    return {'memory':[rng.randint(0,255) for _ in range(nmem)],'threads':threads}\n\nrng=random.Random(int(sys.argv[1]))\niters=int(sys.argv[2])\nworst=(0,None); tot=0; mx=[]\nfor i in range(iters):\n    req=rand_case(rng)\n    t=time.time(); nv,no,gen=explore_count(bytes(req['memory']),compile_threads(req['threads'])); dt=time.time()-t\n    tot+=dt; mx.append(nv)\n    if nv>worst[0]: worst=(nv,json.dumps(req))\nmx.sort()\nprint('iters',iters,'median',mx[len(mx)//2],'p99',mx[int(len(mx)*0.99)],'max',mx[-1],'total time %.1fs'%tot)\nprint('worst:',worst[1])\nEOF\ntimeout 580 python3 /app/search2.py 7 2000",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 23353,
+      "time": "2026-10-08T20:41:51.050255+00:00",
+      "tool_call_id": "chatcmpl-tool-9032a4174e86e3ba",
+      "command": "cd /app && cat > /app/search3.py <<'EOF'\nimport json,sys,time,random\nsys.path.insert(0,'/app')\nfrom perfsearch import explore_count\nfrom main import compile_threads\n\ndef rand_case(rng,nmem,nthreads,total,kinds,addrspread):\n    counts=[0]*nthreads\n    for _ in range(total):\n        t=rng.randrange(nthreads)\n        if counts[t]<4: counts[t]+=1\n    threads=[]\n    for c in counts:\n        prog=[]\n        for _ in range(c):\n            k=rng.choice(kinds)\n            if k=='fence': prog.append(['fence']); continue\n            w=rng.choice([x for x in (1,1,2,2,4) if x<=nmem])\n            hi=max(0,nmem-w)\n            lo=max(0,hi-addrspread)\n            a=rng.randint(lo,hi)\n            if k in ('store','xchg'): prog.append([k,a,w,rng.randint(0,(1<<(8*w))-1)])\n            else: prog.append(['load',a,w])\n        threads.append(prog)\n    return {'memory':[rng.randint(0,255) for _ in range(nmem)],'threads':threads}\n\nrng=random.Random(int(sys.argv[1])); iters=int(sys.argv[2])\ncfgs=[('all-overlap',8,3,10,['store','load'],0),\n      ('all-overlap-x',8,3,10,['store','load','xchg','xchg','fence'],0),\n      ('all-overlap-f',8,3,10,['store','store','load','load','fence'],1),\n      ('smallmem',4,3,10,['store','load','xchg','fence'],0),\n      ('2thr',8,2,8,['store','load','xchg','fence'],2)]\nfor name,nmem,nt,tot,kinds,spread in cfgs:\n    worst=(0,None,None); tot_t=0; mxx=[]\n    for i in range(iters):\n        req=rand_case(rng,nmem,nt,tot,kinds,spread)\n        t=time.time(); nv,no,gen=explore_count(bytes(req['memory']),compile_threads(req['threads'])); dt=time.time()-t\n        tot_t+=dt; mxx.app",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 24449,
+      "time": "2026-10-08T20:42:14.015100+00:00",
+      "tool_call_id": "chatcmpl-tool-b7496fff8197937a",
+      "command": "cd /app && cat > /app/worst.py <<'EOF'\nimport json,sys,time\nsys.path.insert(0,'/app')\nfrom perfsearch import explore_count\nfrom main import compile_threads\nC={\n 'sameaddr':{\"memory\":[0]*8,\"threads\":[\n   [[\"store\",0,4,0x11111111],[\"load\",0,4],[\"store\",0,4,0x22222222],[\"load\",0,4]],\n   [[\"store\",0,4,0x33333333],[\"load\",0,4],[\"store\",0,4,0x44444444],[\"load\",0,4]],\n   [[\"store\",0,4,0x55555555],[\"load\",0,4]]]},\n 'w2shift':{\"memory\":[0]*8,\"threads\":[\n   [[\"store\",0,4,0x11111111],[\"load\",0,4],[\"store\",2,4,0x22222222],[\"load\",0,4]],\n   [[\"store\",0,2,0x3333],[\"load\",2,4],[\"store\",2,4,0x44444444],[\"load\",0,4]],\n   [[\"store\",0,4,0x55555555],[\"load\",0,4]]]},\n 'bytespread':{\"memory\":[0]*8,\"threads\":[\n   [[\"store\",0,1,1],[\"load\",0,4],[\"store\",1,1,2],[\"load\",0,4]],\n   [[\"store\",2,1,3],[\"load\",0,4],[\"store\",3,1,4],[\"load\",0,4]],\n   [[\"store\",4,1,5],[\"load\",0,4]]]},\n 'xchgstorm':{\"memory\":[0]*8,\"threads\":[\n   [[\"xchg\",0,4,0x11111111],[\"load\",0,4],[\"xchg\",0,4,0x22222222],[\"load\",0,4]],\n   [[\"xchg\",0,4,0x33333333],[\"load\",0,4],[\"xchg\",0,4,0x44444444],[\"load\",0,4]],\n   [[\"xchg\",0,4,0x55555555],[\"load\",0,4]]]},\n 'mixedmax':{\"memory\":[0]*8,\"threads\":[\n   [[\"store\",0,4,0x01020304],[\"load\",0,4],[\"store\",4,4,0x05060708],[\"load\",0,4]],\n   [[\"store\",2,4,0x090A0B0C],[\"load\",2,4],[\"store\",0,2,0xD0E0],[\"load\",4,4]],\n   [[\"xchg\",6,2,0xF0A0],[\"load\",0,4]]]},\n}\nfor n,r in C.items():\n    t=time.time(); nv,no,g=explore_count(bytes(r['memory']),compile_threads(r['threads'])); dt=time.time()-t\n    print(f\"{n:11s} states={nv:7d} outcomes={no:6d} gen={g:7d} time={dt:.3f}\")\nEOF\npython3 /app/worst.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 30156,
+      "time": "2026-10-08T20:43:41.260390+00:00",
+      "tool_call_id": "chatcmpl-tool-8e336a8b2240f78a",
+      "command": "cd /app && python3 - <<'EOF'\nimport json,sys\nsys.path.insert(0,'/app')\nimport main as M, naive as N\ncases={\n 'mp (T2: load b, load a)':{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"store\",1,1,1]],[[\"load\",1,1],[\"load\",0,1]]]},\n 'sb+fence':{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"fence\"],[\"load\",1,1]],[[\"store\",1,1,1],[\"fence\"],[\"load\",0,1]]]},\n 'iriw':{\"memory\":[0,0],\"threads\":[[[\"load\",0,1],[\"load\",1,1]],[[\"load\",1,1],[\"load\",0,1]],[[\"store\",0,1,1],[\"store\",1,1,1]]]},\n 'lb-ish (T1: store,load / T2: load,store)':{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"load\",0,1],[\"store\",1,1,1]]]},\n}\nfor name,req in cases.items():\n    a=M.solve(req); b=N.run(req)\n    ka=lambda o: json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True,separators=(',',':'))\n    A={ka(o) for o in a['outcomes']}; B={ka(o) for o in b['outcomes']}\n    print(name, 'match' if A==B else 'MISMATCH', 'count', len(A))\n    for o in sorted(A): print('   ', json.loads(o)['reads'])\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 32062,
+      "time": "2026-10-08T20:44:11.835436+00:00",
+      "tool_call_id": "chatcmpl-tool-b2ec1f7350c8b6e5",
+      "command": "cd /app && cat > /app/hill.py <<'EOF'\nimport json,sys,time,random\nsys.path.insert(0,'/app')\nfrom perfsearch import explore_count\nfrom main import compile_threads\n\nNMEM=8; NT=3; TOTAL=10\nKINDS=['store','load','load','store','xchg','fence']\n\ndef rand_prog(rng):\n    counts=[0]*NT\n    for _ in range(TOTAL):\n        t=rng.randrange(NT)\n        if counts[t]<4: counts[t]+=1\n    th=[]\n    for c in counts:\n        p=[]\n        for _ in range(c):\n            k=rng.choice(KINDS)\n            if k=='fence': p.append(['fence']); continue\n            w=rng.choice([1,2,4]); a=rng.randint(0,NMEM-w)\n            if k=='load': p.append(['load',a,w])\n            else: p.append([k,a,w,rng.randint(0,(1<<(8*w))-1)])\n        th.append(p)\n    return {'memory':[rng.randint(0,255) for _ in range(NMEM)],'threads':th}\n\ndef mutate(rng,req):\n    r=json.loads(json.dumps(req))\n    th=r['threads']\n    t=rng.randrange(len(th))\n    if not th[t]: return r\n    i=rng.randrange(len(th[t])); ins=th[t][i]\n    op=rng.choice(['kind','addr','width','value','mem'])\n    if op=='mem':\n        r['memory'][rng.randrange(NMEM)]=rng.randint(0,255)\n    elif ins[0]=='fence':\n        w=rng.choice([1,2,4]); a=rng.randint(0,NMEM-w)\n        th[t][i]=['load',a,w] if rng.random()<.5 else ['store',a,w,rng.randint(0,(1<<(8*w))-1)]\n    elif op=='kind':\n        k=rng.choice(KINDS)\n        if k=='fence': th[t][i]=['fence']\n        else:\n            w=ins[2] if len(ins)>2 else rng.choice([1,2,4]); w=min(w,4); a=rng.randint(0,NMEM-w)\n            if k=='load': th[t][i]=['load',a,w]\n            else: th[t][i]=[k,a,w,rng.randint(0,(1<<(8*w))-1",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 38198,
+      "time": "2026-10-08T20:47:48.193914+00:00",
+      "tool_call_id": "chatcmpl-tool-853bdb8bcabe1734",
+      "command": "cd /app && cat > /app/deliberate.py <<'EOF'\nimport json,sys,time\nsys.path.insert(0,'/app')\nfrom perfsearch import explore_count\nfrom main import compile_threads\ndef T(*p): return list(p)\ndef st(a,w,v): return ['store',a,w,v]\ndef ld(a,w): return ['load',a,w]\ndef xc(a,w,v): return ['xchg',a,w,v]\nC={}\nC['all4same']={\"memory\":[0]*8,\"threads\":[\n  [st(0,4,0x11111111),st(0,4,0x22222222),ld(0,4),ld(0,4)],\n  [st(0,4,0x33333333),ld(0,4),st(0,4,0x44444444),ld(0,4)],\n  [st(0,4,0x55555555),ld(0,4)]]}\nC['stores5loads5']={\"memory\":[0]*8,\"threads\":[\n  [st(0,4,0x11111111),st(2,4,0x22222222),ld(0,4),ld(2,4)],\n  [st(0,2,0x3333),ld(0,4),st(2,4,0x44444444),ld(2,4)],\n  [st(0,4,0x55555555),ld(0,4)]]}\nC['fenceload']={\"memory\":[0]*8,\"threads\":[\n  [st(0,4,0x11111111),st(2,4,0x22222222),ld(0,4),ld(2,4)],\n  [st(0,2,0x3333),ld(0,4),st(2,4,0x44444444),ld(2,4)],\n  [xc(0,4,0x66666666),ld(0,4)]]}\nC['allstores10']={\"memory\":[0]*8,\"threads\":[\n  [st(0,4,1),st(0,4,2),st(0,4,3),st(0,4,4)],\n  [st(0,4,5),st(0,4,6),st(0,4,7),st(0,4,8)],\n  [st(0,4,9),st(0,4,10)]]}\nC['allstores10_disjoint']={\"memory\":[0]*8,\"threads\":[\n  [st(0,2,1),st(2,2,2),st(4,2,3),st(6,2,4)],\n  [st(0,2,5),st(2,2,6),st(4,2,7),st(6,2,8)],\n  [st(0,2,9),st(2,2,10)]]}\nC['xchg5loads5']={\"memory\":[0]*8,\"threads\":[\n  [xc(0,4,0x11111111),xc(2,4,0x22222222),ld(0,4),ld(2,4)],\n  [xc(0,2,0x3333),ld(0,4),xc(2,4,0x44444444),ld(2,4)],\n  [xc(0,4,0x55555555),ld(0,4)]]}\nC['onebuf_heavy']={\"memory\":[0]*8,\"threads\":[\n  [st(0,4,0x01010101),st(0,4,0x02020202),ld(0,4),ld(0,4)],\n  [st(0,4,0x03030303),st(0,4,0x04040404),ld(0,4),ld(0,4)],\n  [st(0,4,0x05050505),ld(0,4)]]}\nf",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 40790,
+      "time": "2026-10-08T20:48:29.984296+00:00",
+      "tool_call_id": "chatcmpl-tool-80fa5a30f5b0e10e",
+      "command": "cat > /app/main.py <<'EOF'\n#!/usr/bin/env python3\n\"\"\"Mixed-width buffered machine: enumerate every terminal observable outcome.\n\nModel (see instruction.md):\n  * each thread has a program counter, a FIFO store buffer and an\n    observation list; shared memory is a byte array,\n  * `store`  : append the complete store to the thread's buffer (memory\n    unchanged),\n  * `load`   : every byte is resolved independently -- the youngest store\n    still sitting in *this* thread's buffer that covers the byte wins,\n    otherwise the byte comes from shared memory; the assembled unsigned\n    little-endian value is appended to the thread's observations,\n  * `fence`  : enabled only with an empty buffer,\n  * `xchg`   : enabled only with an empty buffer; atomically reads shared\n    memory, records the value and writes the supplied value,\n  * `drain`  : the oldest store of any non-empty buffer becomes globally\n    visible, all of its bytes at once.\n\nEvery transition either advances a program counter or removes a buffered\nstore, so all executions are finite and the transition graph is acyclic.\nWe therefore enumerate the reachable states exhaustively (deduplicating on\nthe whole state, which determines everything that can still happen and\neverything already observed) and report the states that have no enabled\ntransition left, i.e. all threads finished and all buffers empty.\n\"\"\"\n\nimport json\nimport sys\n\nSTORE, LOAD, FENCE, XCHG = 0, 1, 2, 3\n\n\ndef compile_threads(threads):\n    \"\"\"Compile instructions into compact (kind, addr, width, bytes) tuples.\"\"\"\n    progs = []\n    for thr in threads:\n        ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 41461,
+      "time": "2026-10-08T20:48:41.190384+00:00",
+      "tool_call_id": "chatcmpl-tool-b342dbed1e629076",
+      "command": "cd /app && python3 - <<'PY'\nimport json, subprocess, sys\nreqs = [\n {\"memory\":[1],\"threads\":[[]]},                                            # single empty thread\n {\"memory\":[1],\"threads\":[[],[],[]]},                                       # three empty threads\n {\"memory\":[5],\"threads\":[[\"fence\"]]},                                      # fence, nothing buffered\n {\"memory\":[0,0,0,0],\"threads\":[[\"store\",0,4,4294967295],[\"fence\"],[\"load\",0,4],[\"xchg\",0,4,0]]},\n {\"memory\":[7,7,7,7],\"threads\":[[\"xchg\",0,4,0],[\"load\",0,4],[\"xchg\",0,4,9]]},\n {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[[\"store\",0,4,1],[\"store\",4,4,2],[\"load\",0,4],[\"load\",4,4]],[\"store\",0,1,255],[\"load\",0,4]]},\n {\"memory\":[0],\"threads\":[[\"store\",0,1,1],[\"store\",0,1,2],[\"store\",0,1,3],[\"load\",0,1]]},\n {\"memory\":[1,2],\"threads\":[[\"load\",0,2]],[\"store\",0,1,255],[\"store\",1,1,254],[\"load\",0,2]]},\n]\ninp = ''.join(json.dumps(r)+'\\n' for r in reqs)\np = subprocess.run([sys.executable,'main.py'],input=inp,text=True,capture_output=True,cwd='/app')\nprint('rc',p.returncode,'stderr',p.stderr.strip()[:200])\nlines = p.stdout.splitlines()\nprint('lines',len(lines),'==',len(reqs))\nsys.path.insert(0,'/app')\nimport naive as N, main as M\nok=True\nfor r,l in zip(reqs,lines):\n    got=json.loads(l); exp=N.run(r)\n    k=lambda o: json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True,separators=(',',':'))\n    same = {k(o) for o in got['outcomes']} == {k(o) for o in exp['outcomes']}\n    ok &= same\n    print(('OK ' if same else 'BAD'), json.dumps(r)[:70], '->', len(got['outcomes']), 'outcomes', json.dumps(got['outcomes'])[:150])\nprint('AL",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 42162,
+      "time": "2026-10-08T20:48:52.036678+00:00",
+      "tool_call_id": "chatcmpl-tool-b2cbb1facd6d73c6",
+      "command": "cd /app && cat > /app/edge.py <<'EOF'\nimport json, subprocess, sys\nsys.path.insert(0,'/app')\nimport naive as N\n\nREQS = [\n {\"memory\":[1],\"threads\":[[]]},\n {\"memory\":[1],\"threads\":[[],[],[]]},\n {\"memory\":[5],\"threads\":[[\"fence\"]]},\n {\"memory\":[0,0,0,0],\"threads\":[[\"store\",0,4,4294967295],[\"fence\"],[\"load\",0,4],[\"xchg\",0,4,0]]},\n {\"memory\":[7,7,7,7],\"threads\":[[\"xchg\",0,4,0],[\"load\",0,4],[\"xchg\",0,4,9]]},\n {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n    [\"store\",0,4,1],[\"store\",4,4,2],[\"load\",0,4],[\"load\",4,4]],\n    [\"store\",0,1,255],[\"load\",0,4]]},\n {\"memory\":[0],\"threads\":[[\"store\",0,1,1],[\"store\",0,1,2],[\"store\",0,1,3],[\"load\",0,1]]},\n {\"memory\":[1,2],\"threads\":[[\"load\",0,2]],[\"store\",0,1,255],[\"store\",1,1,254],[\"load\",0,2]]},\n {\"memory\":[0,0],\"threads\":[[\"store\",0,2,0xBEEF],[\"fence\"],[\"load\",0,2],[\"xchg\",0,2,0]]},\n {\"memory\":[3],\"threads\":[[\"xchg\",0,1,7],[\"xchg\",0,1,8]]},\n]\ninp = ''.join(json.dumps(r)+'\\n' for r in REQS)\np = subprocess.run([sys.executable,'main.py'],input=inp,text=True,capture_output=True,cwd='/app')\nprint('rc', p.returncode, 'stderr:', p.stderr.strip()[:200])\nlines = p.stdout.splitlines()\nprint('output lines', len(lines), 'requests', len(REQS))\nok = len(lines) == len(REQS) and p.returncode == 0 and not p.stderr\nk = lambda o: json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True,separators=(',',':'))\nfor r, l in zip(REQS, lines):\n    got = json.loads(l)\n    exp = N.run(r)\n    same = {k(o) for o in got['outcomes']} == {k(o) for o in exp['outcomes']}\n    ok &= same\n    print(('OK ' if same else 'BAD'), json.dumps(r)[:78])\n    print('     got', len(",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 42927,
+      "time": "2026-10-08T20:49:02.549494+00:00",
+      "tool_call_id": "chatcmpl-tool-8cbbda21e7c8d28f",
+      "command": "cd /app && cat > /app/edge.py <<'EOF'\nimport json, subprocess, sys\nsys.path.insert(0,'/app')\nimport naive as N\n\ndef st(a,w,v): return ['store',a,w,v]\ndef ld(a,w):   return ['load',a,w]\ndef xc(a,w,v): return ['xchg',a,w,v]\nF = ['fence']\n\nREQS = [\n {\"memory\":[1],\"threads\":[[]]},\n {\"memory\":[1],\"threads\":[[],[],[]]},\n {\"memory\":[5],\"threads\":[[F]]},\n {\"memory\":[0,0,0,0],\"threads\":[[st(0,4,4294967295),F,ld(0,4),xc(0,4,0)]]},\n {\"memory\":[7,7,7,7],\"threads\":[[xc(0,4,0),ld(0,4),xc(0,4,9)]]},\n {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[[st(0,4,1),st(4,4,2),ld(0,4),ld(4,4)],[st(0,1,255),ld(0,4)]]},\n {\"memory\":[0],\"threads\":[[st(0,1,1),st(0,1,2),st(0,1,3),ld(0,1)]]},\n {\"memory\":[1,2],\"threads\":[[ld(0,2)],[st(0,1,255),st(1,1,254),ld(0,2)]]},\n {\"memory\":[0,0],\"threads\":[[st(0,2,0xBEEF),F,ld(0,2),xc(0,2,0)]]},\n {\"memory\":[3],\"threads\":[[xc(0,1,7),xc(0,1,8)]]},\n {\"memory\":[0,0,0,0],\"threads\":[[st(0,4,0xAABBCCDD),st(2,2,0xEEFF),ld(0,4),F]]},\n]\ninp = ''.join(json.dumps(r)+'\\n' for r in REQS)\np = subprocess.run([sys.executable,'main.py'],input=inp,text=True,capture_output=True,cwd='/app')\nprint('rc', p.returncode, 'stderr:', p.stderr.strip()[:200])\nlines = p.stdout.splitlines()\nprint('output lines', len(lines), 'requests', len(REQS))\nok = len(lines) == len(REQS) and p.returncode == 0 and not p.stderr\nk = lambda o: json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True,separators=(',',':'))\nfor r, l in zip(REQS, lines):\n    got = json.loads(l)\n    exp = N.run(r)\n    same = {k(o) for o in got['outcomes']} == {k(o) for o in exp['outcomes']}\n    ok &= same\n    print(('OK ' if same else",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43536,
+      "time": "2026-10-08T20:49:13.978622+00:00",
+      "tool_call_id": "chatcmpl-tool-92d8f550ee012547",
+      "command": "cd /app && for s in 31 32 33 34; do timeout 250 python3 crosscheck.py $s 200 6; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43538,
+      "time": "2026-10-08T20:49:15.320480+00:00",
+      "tool_call_id": "chatcmpl-tool-a33a61bf71b901e3",
+      "command": "cd /app && cat > /app/batch.py <<'EOF'\nimport json, sys, time, subprocess, random\nsys.path.insert(0,'/app')\nfrom search2 import rand_case\nrng = random.Random(99)\nreqs = [rand_case(rng) for _ in range(60)]\ninp = ''.join(json.dumps(r)+'\\n' for r in reqs)\nt = time.time()\np = subprocess.run([sys.executable,'main.py'],input=inp,text=True,capture_output=True,cwd='/app')\ndt = time.time()-t\nlines = p.stdout.splitlines()\nprint('rc',p.returncode,'stderr',p.stderr.strip()[:100])\nprint('requests',len(reqs),'lines',len(lines),'wall %.2fs'%dt)\ntot = sum(len(json.loads(l)['outcomes']) for l in lines)\nprint('total outcomes',tot)\nassert len(lines)==len(reqs) and p.returncode==0 and not p.stderr\nEOF\npython3 /app/batch.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43990,
+      "time": "2026-10-08T20:49:22.490560+00:00",
+      "tool_call_id": "chatcmpl-tool-b9edd08ce0469a84",
+      "command": "cd /app && cat > /app/batch.py <<'EOF'\nimport json, sys, time, subprocess, random\n\ndef rand_case(rng, nmem=8, nthreads=3, total=10):\n    counts=[0]*nthreads\n    for _ in range(total):\n        t=rng.randrange(nthreads)\n        if counts[t]<4: counts[t]+=1\n    kinds=['store','load','load','store','xchg','fence']\n    threads=[]\n    for c in counts:\n        prog=[]\n        for _ in range(c):\n            k=rng.choice(kinds)\n            if k=='fence': prog.append(['fence']); continue\n            w=rng.choice([x for x in (1,1,2,4) if x<=nmem])\n            a=rng.randint(0,nmem-w)\n            if k=='load': prog.append(['load',a,w])\n            else: prog.append([k,a,w,rng.randint(0,(1<<(8*w))-1)])\n        threads.append(prog)\n    return {'memory':[rng.randint(0,255) for _ in range(nmem)],'threads':threads}\n\nrng = random.Random(99)\nreqs = [rand_case(rng) for _ in range(60)]\ninp = ''.join(json.dumps(r)+'\\n' for r in reqs)\nt = time.time()\np = subprocess.run([sys.executable,'main.py'],input=inp,text=True,capture_output=True,cwd='/app')\ndt = time.time()-t\nlines = p.stdout.splitlines()\nprint('rc',p.returncode,'| stderr:',repr(p.stderr[:100]))\nprint('requests',len(reqs),'lines',len(lines),'wall %.2fs'%dt)\nprint('total outcomes',sum(len(json.loads(l)['outcomes']) for l in lines))\nassert len(lines)==len(reqs) and p.returncode==0 and not p.stderr and not p.stdout.endswith('  ')\nEOF\npython3 /app/batch.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 47223,
+      "time": "2026-10-08T20:50:04.173304+00:00",
+      "tool_call_id": "chatcmpl-tool-9570f5ea78e39f96",
+      "command": "cd /app && cat > /app/selftest.py <<'PYEOF'\n#!/usr/bin/env python3\n\"\"\"Self-tests for /app/main.py.\n\n1. public examples (examples.json)\n2. hand-checked edge cases (incl. classic TSO litmus shapes)\n3. randomized cross-check against an independent, dedup-free enumerator\n4. performance probe at the full stated input bounds\n\"\"\"\nimport json, pathlib, random, subprocess, sys, time\n\nHERE = pathlib.Path(__file__).resolve().parent\nsys.path.insert(0, str(HERE))\nimport main as M\n\n# ---------------------------------------------------------------- naive ref\nCAP = [3_000_000]\n\ndef naive_run(req):\n    \"\"\"Enumerate every execution (no state deduplication).\"\"\"\n    threads = req['threads']; n = len(threads)\n    start = {'mem': list(req['memory']), 'pc': [0]*n,\n             'buf': [[] for _ in range(n)], 'obs': [[] for _ in range(n)]}\n    def enabled(st):\n        acts = []\n        for t in range(n):\n            pc = st['pc'][t]\n            if pc < len(threads[t]):\n                k = threads[t][pc][0]\n                if k in ('fence', 'xchg') and st['buf'][t]:\n                    pass\n                else:\n                    acts.append(('exec', t))\n            if st['buf'][t]:\n                acts.append(('drain', t))\n        return acts\n    def step(st, act):\n        s = {'mem': list(st['mem']), 'pc': list(st['pc']),\n             'buf': [list(b) for b in st['buf']], 'obs': [list(o) for o in st['obs']]}\n        t = act[1]\n        if act[0] == 'drain':\n            a, w, v = s['buf'][t].pop(0)\n            nb = v.to_bytes(w, 'little')\n            for i in range(w): s['mem'][a+i] = nb[i]\n       ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 47252,
+      "time": "2026-10-08T20:50:09.669514+00:00",
+      "tool_call_id": "chatcmpl-tool-be899f51ce9db51a",
+      "command": "cd /app && timeout 400 python3 selftest.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 47499,
+      "time": "2026-10-08T20:50:16.226493+00:00",
+      "tool_call_id": "chatcmpl-tool-beb3edc8f01fd673",
+      "command": "cd /app && python3 - <<'EOF'\nimport pathlib\np=pathlib.Path('selftest.py'); s=p.read_text()\ns=s.replace(\"            obs = {tuple(tuple(x) for x in o['reads']) for o in got['outcomes']}\",\n            \"            obs = {tuple(v for th in o['reads'] for v in th)\\n                   for o in got['outcomes']}\")\np.write_text(s)\nEOF\ncd /app && timeout 400 python3 selftest.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 47883,
+      "time": "2026-10-08T20:50:25.332132+00:00",
+      "tool_call_id": "chatcmpl-tool-810d48c982011c19",
+      "command": "cd /app && python3 - <<'EOF'\nimport sys, time\nsys.path.insert(0,'/app')\nimport selftest as S\nfor seed in (7, 77, 777):\n    S.random_crosscheck(seed=seed, iters=400, small=6)\nS.random_crosscheck(seed=5, iters=150, small=7)\nt=time.time(); S.random_crosscheck(seed=9, iters=200, small=5); print('  (%.1fs)'%(time.time()-t))\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 47885,
+      "time": "2026-10-08T20:50:28.854272+00:00",
+      "tool_call_id": "chatcmpl-tool-9cdc79dc36ce9cec",
+      "command": "cd /app && python3 smoke.py && printf '%s\\n' '{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]}' '{\"memory\":[1],\"threads\":[[]]}' | python3 main.py | python3 -c \"import sys,json; [print(json.dumps(json.loads(l))) for l in sys.stdin]\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 48058,
+      "time": "2026-10-08T20:50:36.807183+00:00",
+      "tool_call_id": "chatcmpl-tool-8ee85c76c2620d9e",
+      "command": "cd /app && python3 -m py_compile main.py selftest.py && echo compiled && sed -n '1,40p' main.py && wc -l main.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 48402,
+      "time": "2026-10-08T20:50:45.617593+00:00",
+      "tool_call_id": "chatcmpl-tool-8d4460aa752f8022",
+      "command": "cd /app && rm -rf __pycache__ && python3 - <<'EOF'\nimport json, subprocess, sys, time, random\nsys.path.insert(0,'/app')\nfrom selftest import rand_case\nrng=random.Random(2024)\nreqs=[rand_case(rng, nmem=8, nthreads=3, total=10) for _ in range(300)]\ninp=''.join(json.dumps(r)+'\\n' for r in reqs)\nt=time.time(); p=subprocess.run([sys.executable,'main.py'],input=inp,text=True,capture_output=True,cwd='/app'); dt=time.time()-t\nlines=p.stdout.splitlines()\nprint('rc',p.returncode,'stderr',repr(p.stderr[:80]),'lines',len(lines),'wall %.2fs'%dt,\n      'outcomes',sum(len(json.loads(l)['outcomes']) for l in lines))\nassert p.returncode==0 and len(lines)==len(reqs) and not p.stderr\nEOF\nrm -rf /app/__pycache__; ls /app",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 70,
+      "time": "2026-10-08T20:32:44.297329+00:00",
+      "tool_call_id": "chatcmpl-tool-86619f4511d6c728",
+      "return_code": 0,
+      "stdout": "import json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n/app/examples.json\n",
+      "stderr": "",
+      "stdout_tail": "import json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n/app/examples.json\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 14806,
+      "time": "2026-10-08T20:36:59.225307+00:00",
+      "tool_call_id": "chatcmpl-tool-914848cee98e21d9",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 8, in <module>\nTypeError: list indices must be integers or slices, not str\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"<stdin>\", line 8, in <module>\nTypeError: list indices must be integers or slices, not str\n"
+    },
+    {
+      "step": 15933,
+      "time": "2026-10-08T20:37:17.476687+00:00",
+      "tool_call_id": "chatcmpl-tool-8a8b699cd9350cec",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/crosscheck.py\", line 51, in <module>\n    main()\n  File \"/app/crosscheck.py\", line 38, in main\n    req = rand_case(rng)\n          ^^^^^^^^^^^^^^\n  File \"/app/crosscheck.py\", line 25, in rand_case\n    a = rng.randint(0, nmem-w)\n        ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 336, in randint\n    return self.randrange(a, b+1)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 319, in randrange\n    raise ValueError(f\"empty range in randrange({start}, {stop})\")\nValueError: empty range in randrange(0, 0)\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/crosscheck.py\", line 51, in <module>\n    main()\n  File \"/app/crosscheck.py\", line 38, in main\n    req = rand_case(rng)\n          ^^^^^^^^^^^^^^\n  File \"/app/crosscheck.py\", line 25, in rand_case\n    a = rng.randint(0, nmem-w)\n        ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 336, in randint\n    return self.randrange(a, b+1)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 319, in randrange\n    raise ValueError(f\"empty range in randrange({start}, {stop})\")\nValueError: empty range in randrange(0, 0)\n"
+    },
+    {
+      "step": 16109,
+      "time": "2026-10-08T20:37:36.128606+00:00",
+      "tool_call_id": "chatcmpl-tool-8e593308cc56ff1c",
+      "return_code": 0,
+      "stdout": "done 200 mismatches 0\n",
+      "stderr": "",
+      "stdout_tail": "done 200 mismatches 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 16949,
+      "time": "2026-10-08T20:39:50.929824+00:00",
+      "tool_call_id": "chatcmpl-tool-ac0c17406ad3f060",
+      "return_code": 124,
+      "stdout": "done 250 mismatches 0\n",
+      "stderr": "",
+      "stdout_tail": "done 250 mismatches 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 17747,
+      "time": "2026-10-08T20:40:05.580435+00:00",
+      "tool_call_id": "chatcmpl-tool-8544f2cefdbefbf6",
+      "return_code": 0,
+      "stdout": "done 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\n",
+      "stderr": "",
+      "stdout_tail": "done 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 17900,
+      "time": "2026-10-08T20:40:09.601824+00:00",
+      "tool_call_id": "chatcmpl-tool-ae0f95cde4e075e1",
+      "return_code": 0,
+      "stdout": "done 150 mismatches 0\ndone 150 mismatches 0\ndone 150 mismatches 0\n",
+      "stderr": "",
+      "stdout_tail": "done 150 mismatches 0\ndone 150 mismatches 0\ndone 150 mismatches 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 20744,
+      "time": "2026-10-08T20:40:55.482888+00:00",
+      "tool_call_id": "chatcmpl-tool-8279159dc78d21b1",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/adversarial.py\", line 3, in <module>\n    from perfsearch import explore_count, rand_case\n  File \"/app/perfsearch.py\", line 80, in <module>\n    main()\n  File \"/app/perfsearch.py\", line 70, in main\n    seed=int(sys.argv[1]); iters=int(sys.argv[2])\n             ~~~~~~~~^^^\nIndexError: list index out of range\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/adversarial.py\", line 3, in <module>\n    from perfsearch import explore_count, rand_case\n  File \"/app/perfsearch.py\", line 80, in <module>\n    main()\n  File \"/app/perfsearch.py\", line 70, in main\n    seed=int(sys.argv[1]); iters=int(sys.argv[2])\n             ~~~~~~~~^^^\nIndexError: list index out of range\n"
+    },
+    {
+      "step": 40791,
+      "time": "2026-10-08T20:48:30.861325+00:00",
+      "tool_call_id": "chatcmpl-tool-80fa5a30f5b0e10e",
+      "return_code": 0,
+      "stdout": "Passed 3 public examples\n{\"outcomes\": [{\"reads\": [[]], \"memory\": [1]}]}\n{\"outcomes\": []}\n{\"outcomes\": []}\n",
+      "stderr": "request failed: ValueError(\"unknown instruction 's'\")\nrequest failed: JSONDecodeError('Expecting property name enclosed in double quotes: line 1 column 99 (char 98)')\n",
+      "stdout_tail": "Passed 3 public examples\n{\"outcomes\": [{\"reads\": [[]], \"memory\": [1]}]}\n{\"outcomes\": []}\n{\"outcomes\": []}\n",
+      "stderr_tail": "request failed: ValueError(\"unknown instruction 's'\")\nrequest failed: JSONDecodeError('Expecting property name enclosed in double quotes: line 1 column 99 (char 98)')\n"
+    },
+    {
+      "step": 41462,
+      "time": "2026-10-08T20:48:41.769313+00:00",
+      "tool_call_id": "chatcmpl-tool-b342dbed1e629076",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "  File \"<stdin>\", line 8\n    {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[[\"store\",0,4,1],[\"store\",4,4,2],[\"load\",0,4],[\"load\",4,4]],[\"store\",0,1,255],[\"load\",0,4]]},\n                                                                                                                                    ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{'\n",
+      "stdout_tail": "",
+      "stderr_tail": "  File \"<stdin>\", line 8\n    {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[[\"store\",0,4,1],[\"store\",4,4,2],[\"load\",0,4],[\"load\",4,4]],[\"store\",0,1,255],[\"load\",0,4]]},\n                                                                                                                                    ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{'\n"
+    },
+    {
+      "step": 42163,
+      "time": "2026-10-08T20:48:52.571314+00:00",
+      "tool_call_id": "chatcmpl-tool-b2cbb1facd6d73c6",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "  File \"/app/edge.py\", line 13\n    [\"store\",0,1,255],[\"load\",0,4]]},\n                                  ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{' on line 11\n",
+      "stdout_tail": "",
+      "stderr_tail": "  File \"/app/edge.py\", line 13\n    [\"store\",0,1,255],[\"load\",0,4]]},\n                                  ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{' on line 11\n"
+    },
+    {
+      "step": 43537,
+      "time": "2026-10-08T20:49:15.320232+00:00",
+      "tool_call_id": "chatcmpl-tool-92d8f550ee012547",
+      "return_code": 0,
+      "stdout": "done 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\n",
+      "stderr": "",
+      "stdout_tail": "done 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\ndone 200 mismatches 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 43539,
+      "time": "2026-10-08T20:49:15.907737+00:00",
+      "tool_call_id": "chatcmpl-tool-a33a61bf71b901e3",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/batch.py\", line 3, in <module>\n    from search2 import rand_case\n  File \"/app/search2.py\", line 22, in <module>\n    rng=random.Random(int(sys.argv[1]))\n                          ~~~~~~~~^^^\nIndexError: list index out of range\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/batch.py\", line 3, in <module>\n    from search2 import rand_case\n  File \"/app/search2.py\", line 22, in <module>\n    rng=random.Random(int(sys.argv[1]))\n                          ~~~~~~~~^^^\nIndexError: list index out of range\n"
+    },
+    {
+      "step": 47253,
+      "time": "2026-10-08T20:50:11.339839+00:00",
+      "tool_call_id": "chatcmpl-tool-be899f51ce9db51a",
+      "return_code": 1,
+      "stdout": "selftest:\n  public examples: 3 ok\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/selftest.py\", line 208, in <module>\n    public_examples(); litmus(); edges(); random_crosscheck(); performance()\n                       ^^^^^^^^\n  File \"/app/selftest.py\", line 159, in litmus\n    assert obs == want, (name, sorted(obs), sorted(want))\n           ^^^^^^^^^^^\nAssertionError: ('SB', [((0,), (0,)), ((0,), (1,)), ((1,), (0,)), ((1,), (1,))], [(0, 0), (0, 1), (1, 0), (1, 1)])\n",
+      "stdout_tail": "selftest:\n  public examples: 3 ok\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/selftest.py\", line 208, in <module>\n    public_examples(); litmus(); edges(); random_crosscheck(); performance()\n                       ^^^^^^^^\n  File \"/app/selftest.py\", line 159, in litmus\n    assert obs == want, (name, sorted(obs), sorted(want))\n           ^^^^^^^^^^^\nAssertionError: ('SB', [((0,), (0,)), ((0,), (1,)), ((1,), (0,)), ((1,), (1,))], [(0, 0), (0, 1), (1, 0), (1, 1)])\n"
+    },
+    {
+      "step": 47500,
+      "time": "2026-10-08T20:50:18.893095+00:00",
+      "tool_call_id": "chatcmpl-tool-beb3edc8f01fd673",
+      "return_code": 0,
+      "stdout": "selftest:\n  public examples: 3 ok\n  litmus / hand-checked shapes: 8 ok\n  edge cases: 7 ok\n  randomized cross-check: 600 cases (0 skipped as too big), 0 mismatches\n  performance: 400 full-bound requests, worst single request 131 outcomes in 16.6 ms\nall self-tests passed\n",
+      "stderr": "",
+      "stdout_tail": "selftest:\n  public examples: 3 ok\n  litmus / hand-checked shapes: 8 ok\n  edge cases: 7 ok\n  randomized cross-check: 600 cases (0 skipped as too big), 0 mismatches\n  performance: 400 full-bound requests, worst single request 131 outcomes in 16.6 ms\nall self-tests passed\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 47884,
+      "time": "2026-10-08T20:50:28.852493+00:00",
+      "tool_call_id": "chatcmpl-tool-810d48c982011c19",
+      "return_code": 0,
+      "stdout": "  randomized cross-check: 400 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 400 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 400 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 150 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 200 cases (0 skipped as too big), 0 mismatches\n  (0.0s)\n",
+      "stderr": "",
+      "stdout_tail": "  randomized cross-check: 400 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 400 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 400 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 150 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 200 cases (0 skipped as too big), 0 mismatches\n  (0.0s)\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 47252,
+      "kind": "terminal_call",
+      "summary": "cd /app && timeout 400 python3 selftest.py"
+    },
+    {
+      "step": 47253,
+      "kind": "terminal_result",
+      "return_code": 1,
+      "summary": "selftest:\n  public examples: 3 ok\nTraceback (most recent call last):\n  File \"/app/selftest.py\", line 208, in <module>\n    public_examples(); litmus(); edges(); random_crosscheck(); performance()\n                       ^^^^^^^^\n  File \"/app/selftest.py\", line 159, in litmus\n    assert obs == want, (name, sorted(obs), sorted(want))\n           ^^^^^^^^^^^\nAssertionError: ('SB', [((0,), (0,)), ((0,), (1,)), ((1,), (0,)), ((1,), (1,))], [(0, 0), (0, 1), (1, 0), (1, 1)])\n"
+    },
+    {
+      "step": 47499,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport pathlib\np=pathlib.Path('selftest.py'); s=p.read_text()\ns=s.replace(\"            obs = {tuple(tuple(x) for x in o['reads']) for o in got['outcomes']}\",\n            \"            obs = {tuple(v for th in o['reads'] for v in th)\\n                   for o in got['outcomes']}\")\np.write_text(s)\nEOF\ncd /app && timeout 400 python3 selftest.py"
+    },
+    {
+      "step": 47500,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "selftest:\n  public examples: 3 ok\n  litmus / hand-checked shapes: 8 ok\n  edge cases: 7 ok\n  randomized cross-check: 600 cases (0 skipped as too big), 0 mismatches\n  performance: 400 full-bound requests, worst single request 131 outcomes in 16.6 ms\nall self-tests passed\n"
+    },
+    {
+      "step": 47883,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport sys, time\nsys.path.insert(0,'/app')\nimport selftest as S\nfor seed in (7, 77, 777):\n    S.random_crosscheck(seed=seed, iters=400, small=6)\nS.random_crosscheck(seed=5, iters=150, small=7)\nt=time.time(); S.random_crosscheck(seed=9, iters=200, small=5); print('  (%.1fs)'%(time.time()-t))\nEOF"
+    },
+    {
+      "step": 47884,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "  randomized cross-check: 400 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 400 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 400 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 150 cases (0 skipped as too big), 0 mismatches\n  randomized cross-check: 200 cases (0 skipped as too big), 0 mismatches\n  (0.0s)\n"
+    },
+    {
+      "step": 47885,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 smoke.py && printf '%s\\n' '{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]}' '{\"memory\":[1],\"threads\":[[]]}' | python3 main.py | python3 -c \"import sys,json; [print(json.dumps(json.loads(l))) for l in sys.stdin]\""
+    },
+    {
+      "step": 47886,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\n{\"outcomes\": [{\"reads\": [[0], [0]], \"memory\": [1, 1]}, {\"reads\": [[0], [1]], \"memory\": [1, 1]}, {\"reads\": [[1], [0]], \"memory\": [1, 1]}, {\"reads\": [[1], [1]], \"memory\": [1, 1]}]}\n{\"outcomes\": [{\"reads\": [[]], \"memory\": [1]}]}\n"
+    },
+    {
+      "step": 48058,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 -m py_compile main.py selftest.py && echo compiled && sed -n '1,40p' main.py && wc -l main.py"
+    },
+    {
+      "step": 48059,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "compiled\n#!/usr/bin/env python3\n\"\"\"Mixed-width buffered machine: enumerate every terminal observable outcome.\n\nModel (see instruction.md):\n  * each thread has a program counter, a FIFO store buffer and an\n    observation list; shared memory is a byte array,\n  * `store`  : append the complete store to the thread's buffer (memory\n    unchanged),\n  * `load`   : every byte is resolved independently -- the youngest store\n    still sitting in *this* thread's buffer that covers the byte wins,\n    otherwise the byte comes from shared memory; the assembled unsigned\n    little-endian value is appended to the thread's observations,\n  * `fence`  : enabled only with an empty buffer,\n  * `xchg`   : enabled only with an empty buffer; atomically reads shared\n    memory, records the value and writes the supplied value,\n  * `drain`  : the oldest store of any non-empty buffer becomes globally\n    visible, all of its bytes at once.\n\nEvery transition either advances a program counter or removes a buffered\nstore, so all executions are finite and the transition graph is acyclic.\nWe therefore enumerate the reachable states exhaustively (deduplicating on\nthe whole state, which determines everything that ca"
+    },
+    {
+      "step": 48402,
+      "kind": "terminal_call",
+      "summary": "cd /app && rm -rf __pycache__ && python3 - <<'EOF'\nimport json, subprocess, sys, time, random\nsys.path.insert(0,'/app')\nfrom selftest import rand_case\nrng=random.Random(2024)\nreqs=[rand_case(rng, nmem=8, nthreads=3, total=10) for _ in range(300)]\ninp=''.join(json.dumps(r)+'\\n' for r in reqs)\nt=time.time(); p=subprocess.run([sys.executable,'main.py'],input=inp,text=True,capture_output=True,cwd='/app'); dt=time.time()-t\nlines=p.stdout.splitlines()\nprint('rc',p.returncode,'stderr',repr(p.stderr[:80]),'lines',len(lines),'wall %.2fs'%dt,\n      'outcomes',sum(len(json.loads(l)['outcomes']) for l in lines))\nassert p.returncode==0 and len(lines)==len(reqs) and not p.stderr\nEOF\nrm -rf /app/__pycache__; ls /app"
+    },
+    {
+      "step": 48403,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "rc 0 stderr '' lines 300 wall 0.46s outcomes 10531\nexamples.json\nmain.py\npublic_contract.py\nselftest.py\nsmoke.py\n"
+    }
+  ]
+}

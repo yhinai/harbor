@@ -1,0 +1,201 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-checkpointed-journal-1-a1-44268f56",
+    "task": "checkpointed-journal",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 1,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcome-corrections/v1.4.2/panel-kimi-checkpointed-journal-1-a1-44268f56.json",
+    "tool_calls": 9,
+    "agent_elapsed_seconds": 607.963172,
+    "input_tokens": 135586,
+    "output_tokens": 19403,
+    "uncached_cost_estimate": 0.697803,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "0b49da29516e34d1819f9a356504b006cbc57ed14ab593f0f46d8debb822a2b9",
+    "network_mode": "none",
+    "artifact_sha256": "92a90052d4f67c08c255b69e046a087d8a5aac006e1ba77fc8d983950492e3df",
+    "normalized_artifact_sha256": "4dc739d9921df29dceee62595817697ee26d98f575cac8db4646fc17dae3aa48",
+    "terminal_nonzero_or_error_text_events": 2,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 9942,
+        "time": "2026-10-08T18:35:29.326503+00:00",
+        "artifact_sha256": "92a90052d4f67c08c255b69e046a087d8a5aac006e1ba77fc8d983950492e3df",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 333.711827,
+    "event_counts": {
+      "initial": 1,
+      "request": 10,
+      "stream_chunk": 19018,
+      "response": 10,
+      "terminal_call": 9,
+      "terminal_result": 9,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 48,
+      "time": "2026-10-08T18:30:00.724250+00:00",
+      "tool_call_id": "call_0ff0cd02e2a94251b171284f",
+      "command": "ls -la /app/ && cat /app/smoke.py 2>/dev/null || echo \"no smoke.py\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 104,
+      "time": "2026-10-08T18:30:04.278270+00:00",
+      "tool_call_id": "call_ae10987c887c46c2aedcfcd7",
+      "command": "cat /app/main.py; echo ====; cat /app/public_contract.py; echo ====; cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 8802,
+      "time": "2026-10-08T18:34:57.120514+00:00",
+      "tool_call_id": "call_885e10a414424b248e02323b",
+      "command": "cd /app && python3 - <<'EOF'\nimport zlib\nlog = bytes.fromhex(\"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\")\npos=0\nwhile pos < len(log):\n    plen=int.from_bytes(log[pos:pos+4],'little')\n    seq=int.from_bytes(log[pos+4:pos+8],'little')\n    kind=log[pos+8]\n    tx=int.from_bytes(log[pos+9:pos+13],'little')\n    payload=log[pos+13:pos+13+plen]\n    crc=int.from_bytes(log[pos+13+plen:pos+17+plen],'little')\n    print(f\"plen={plen} seq={seq} kind={kind} tx={tx} payload={payload.hex()} crc={crc:08x} ok={zlib.crc32(log[pos:pos+13+plen])&0xffffffff==crc}\")\n    pos += 13+plen+4\nprint(\"total\", len(log), \"pos\", pos)\n# check commit digest = crc32 of patch payload\npatch_payload = bytes.fromhex(\"0000000002001122\")\nprint(\"digest\", hex(zlib.crc32(patch_payload)&0xffffffff))\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 9942,
+      "time": "2026-10-08T18:35:29.326503+00:00",
+      "tool_call_id": "call_15cf3cd802894f2385dc21c6",
+      "command": "cat > /app/main.py <<'EOF'\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nReads newline-delimited JSON requests on stdin and writes one JSON response\nper line.  See the task specification for the binary record format and the\ntransaction/checkpoint replay rules.\n\"\"\"\n\nimport json\nimport sys\nimport zlib\n\nKIND_BEGIN = 1\nKIND_PATCH = 2\nKIND_COMMIT = 3\nKIND_ABORT = 4\n\nHEADER_SIZE = 13          # payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32\nCRC_SIZE = 4              # trailing crc:u32\nMAX_PAYLOAD = 4096\n\n\ndef solve(request):\n    pages = [bytearray.fromhex(p) for p in request[\"pages\"]]\n    checkpoint = request[\"checkpoint\"]\n    log = bytes.fromhex(request[\"log\"])\n\n    n_pages = len(pages)\n    page_len = len(pages[0])\n    n = len(log)\n\n    # Active transaction incarnations: txid -> staged patches / running digest\n    # of the concatenated PATCH payloads (in log order).\n    staged = {}\n    digests = {}\n\n    pos = 0        # bytes consumed by the valid prefix\n    last_seq = 0   # sequence of the last valid record (0 for empty prefix)\n\n    while True:\n        # --- structural validation (any failure ends the valid prefix) ---\n        if n - pos < HEADER_SIZE:\n            break  # incomplete header\n        payload_length = int.from_bytes(log[pos:pos + 4], \"little\")\n        sequence = int.from_bytes(log[pos + 4:pos + 8], \"little\")\n        kind = log[pos + 8]\n        txid = int.from_bytes(log[pos + 9:pos + 13], \"little\")\n\n        if payload_length > MAX_PAYLOAD:\n            break\n        end = pos + HEADER_SIZE + payload_length\n        if n - ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 13349,
+      "time": "2026-10-08T18:37:23.740080+00:00",
+      "tool_call_id": "call_ee6284f3adc14b8eaad04d61",
+      "command": "cat > /app/test_journal.py <<'EOF'\n\"\"\"Edge-case tests with hand-computed expectations (independent builder).\"\"\"\nimport json, subprocess, sys, zlib\n\ndef rec(seq, kind, txid, payload, *, bad_crc=False, seq_override=None):\n    s = seq if seq_override is None else seq_override\n    header = len(payload).to_bytes(4,'little') + s.to_bytes(4,'little') + bytes([kind]) + txid.to_bytes(4,'little')\n    crc = zlib.crc32(header + payload) & 0xffffffff\n    if bad_crc: crc ^= 0xffffffff\n    return header + payload + crc.to_bytes(4,'little')\n\ndef patch_payload(page, off, data):\n    return page.to_bytes(2,'little') + off.to_bytes(2,'little') + len(data).to_bytes(2,'little') + data\n\ndef begin(seq, tx): return rec(seq,1,tx,b'')\ndef abort(seq, tx): return rec(seq,4,tx,b'')\ndef patch(seq, tx, page, off, data): return rec(seq,2,tx,patch_payload(page,off,data))\ndef commit(seq, tx, payloads, count=None, digest=None):\n    if count is None: count = len(payloads)\n    if digest is None: digest = zlib.crc32(b''.join(payloads)) & 0xffffffff\n    return rec(seq,3,tx,count.to_bytes(4,'little') + digest.to_bytes(4,'little'))\n\ndef run(cases):\n    inp = ''.join(json.dumps(c['req']) + '\\n' for c in cases)\n    p = subprocess.run([sys.executable, '/app/main.py'], input=inp, text=True,\n                       capture_output=True, cwd='/app')\n    assert p.returncode == 0, p.stderr\n    lines = p.stdout.splitlines()\n    assert len(lines) == len(cases), (len(lines), len(cases))\n    fails = 0\n    for c, line in zip(cases, lines):\n        got = json.loads(line)\n        exp = c['exp']\n        ok = (got['valid_bytes'] == e",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 15945,
+      "time": "2026-10-08T18:38:22.661434+00:00",
+      "tool_call_id": "call_38f8a1aebf574afaaca72a6e",
+      "command": "cat > /app/fuzz_journal.py <<'EOF'\n\"\"\"Randomized differential test: main.solve vs an independently-styled oracle.\"\"\"\nimport random, zlib, sys\nsys.path.insert(0, '/app')\nfrom main import solve\n\ndef oracle(req):\n    pages = [bytearray(bytes.fromhex(p)) for p in req['pages']]\n    ckpt = req['checkpoint']\n    log = bytes.fromhex(req['log'])\n    npages, plen = len(pages), len(pages[0])\n    # Phase 1: parse the structurally valid prefix\n    records = []\n    pos = 0\n    last = 0\n    while pos + 13 <= len(log):\n        pl = int.from_bytes(log[pos:pos+4], 'little')\n        sq = int.from_bytes(log[pos+4:pos+8], 'little')\n        kd = log[pos+8]\n        tx = int.from_bytes(log[pos+9:pos+13], 'little')\n        if pl > 4096 or pos + 17 + pl > len(log):\n            break\n        pay = log[pos+13:pos+13+pl]\n        crc = int.from_bytes(log[pos+13+pl:pos+17+pl], 'little')\n        if (zlib.crc32(log[pos:pos+13+pl]) & 0xffffffff) != crc:\n            break\n        if sq <= last or tx == 0:\n            break\n        info = None\n        if kd in (1, 4):\n            if pl != 0: break\n        elif kd == 3:\n            if pl != 8: break\n            info = (int.from_bytes(pay[:4], 'little'), int.from_bytes(pay[4:], 'little'))\n        elif kd == 2:\n            if pl < 6: break\n            pi = int.from_bytes(pay[0:2], 'little')\n            bo = int.from_bytes(pay[2:4], 'little')\n            bc = int.from_bytes(pay[4:6], 'little')\n            if bc == 0 or pl != 6 + bc or pi >= npages or bo + bc > plen:\n                break\n            info = (pi, bo, pay[6:])\n        else:\n            break\n       ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 16080,
+      "time": "2026-10-08T18:38:30.526759+00:00",
+      "tool_call_id": "call_a37b480ca9c24303873daa0c",
+      "command": "cd /app && sed -i 's/cnt = len(lst) if rng.random() < 0.8 else len(lst)+rng.choice(\\[-1,1\\])/cnt = len(lst) if rng.random() < 0.8 else max(0, len(lst)+rng.choice([-1,1]))/' fuzz_journal.py && python3 fuzz_journal.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 17825,
+      "time": "2026-10-08T18:39:14.158687+00:00",
+      "tool_call_id": "call_61103ebbe9ca40d4b12365f8",
+      "command": "cat > /app/fuzz2_journal.py <<'EOF'\n\"\"\"Adversarial fuzz: invalid records mid-stream, garbage, max-size logs.\"\"\"\nimport random, zlib, sys, time\nsys.path.insert(0, '/app')\nfrom main import solve\nfrom fuzz_journal import oracle, make_rec\n\ndef gen_bad_rec(rng, seq):\n    kind = rng.choice([0, 5, 255, 1, 2, 3, 4])\n    tx = rng.choice([0, 1, 2])\n    which = rng.randint(0, 6)\n    if which == 0:\n        return make_rec(seq, kind, tx, rng.randbytes(rng.randint(0, 3)))\n    if which == 1:  # begin/abort with payload\n        return make_rec(seq, rng.choice([1, 4]), tx, b'\\x00')\n    if which == 2:  # patch count zero\n        return make_rec(seq, 2, tx, b'\\x00\\x00\\x00\\x00\\x00\\x00')\n    if which == 3:  # patch plen mismatch\n        return make_rec(seq, 2, tx, b'\\x00\\x00\\x00\\x00\\x01\\x00\\xaa\\xbb')\n    if which == 4:  # patch out of bounds\n        return make_rec(seq, 2, tx, (7).to_bytes(2,'little') + (63).to_bytes(2,'little') + (5).to_bytes(2,'little') + b'\\x01'*5)\n    if which == 5:  # commit bad length\n        return make_rec(seq, 3, tx, rng.randbytes(rng.choice([0, 4, 9])))\n    # oversized payload_length field with garbage\n    h = (4097).to_bytes(4,'little') + seq.to_bytes(4,'little') + bytes([2]) + (1).to_bytes(4,'little')\n    return h + rng.randbytes(rng.randint(0, 20))\n\ndef gen(rng):\n    npages = rng.randint(1, 8)\n    plen = rng.randint(1, 64)\n    pages = [rng.randbytes(plen).hex() for _ in range(npages)]\n    recs = []\n    seq = 0\n    patch_pay = {}\n    nrec = rng.randint(1, 10)\n    insert_bad = rng.random() < 0.5\n    bad_at = rng.randint(0, nrec) if insert_bad else -1\n    for i in ran",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 18545,
+      "time": "2026-10-08T18:39:46.630697+00:00",
+      "tool_call_id": "call_5e23537019504794821d70f7",
+      "command": "cd /app && python3 smoke.py && printf '%s\\n' '{\"pages\":[\"00\"],\"checkpoint\":0,\"log\":\"\"}' '{\"pages\":[\"DEADBEEF\"],\"checkpoint\":999999999999,\"log\":\"\"}' | python3 main.py && echo \"--- stderr check ---\" && python3 main.py < /dev/null | wc -c && ls /app",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 49,
+      "time": "2026-10-08T18:30:00.985190+00:00",
+      "tool_call_id": "call_0ff0cd02e2a94251b171284f",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:29 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:29 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 15946,
+      "time": "2026-10-08T18:38:24.591537+00:00",
+      "tool_call_id": "call_38f8a1aebf574afaaca72a6e",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/fuzz_journal.py\", line 127, in <module>\n    req = gen(rng)\n          ^^^^^^^^\n  File \"/app/fuzz_journal.py\", line 104, in gen\n    recs.append(make_rec(seq,3,tx,cnt.to_bytes(4,'little')+dig.to_bytes(4,'little')))\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^\nOverflowError: can't convert negative int to unsigned\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/fuzz_journal.py\", line 127, in <module>\n    req = gen(rng)\n          ^^^^^^^^\n  File \"/app/fuzz_journal.py\", line 104, in gen\n    recs.append(make_rec(seq,3,tx,cnt.to_bytes(4,'little')+dig.to_bytes(4,'little')))\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^\nOverflowError: can't convert negative int to unsigned\n"
+    }
+  ],
+  "last_events": [
+    {
+      "step": 9942,
+      "kind": "terminal_call",
+      "summary": "cat > /app/main.py <<'EOF'\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nReads newline-delimited JSON requests on stdin and writes one JSON response\nper line.  See the task specification for the binary record format and the\ntransaction/checkpoint replay rules.\n\"\"\"\n\nimport json\nimport sys\nimport zlib\n\nKIND_BEGIN = 1\nKIND_PATCH = 2\nKIND_COMMIT = 3\nKIND_ABORT = 4\n\nHEADER_SIZE = 13          # payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32\nCRC_SIZE = 4              # trailing crc:u32\nMAX_PAYLOAD = 4096\n\n\ndef solve(request):\n    pages = [bytearray.fromhex(p) for p in request[\"pages\"]]\n    checkpoint = request[\"checkpoint\"]\n    log = bytes.fromhex(request[\"log\"])\n\n    n_pages = len(pages)\n    page_len = len(pages[0])\n    n = len(log)\n\n    # Active transaction incarnations: txid -> staged patches / running digest\n    # of the concatenated PATCH payloads (in log order).\n    staged = {}\n    digests = {}\n\n    pos = 0        # bytes consumed by the vali"
+    },
+    {
+      "step": 9943,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\n"
+    },
+    {
+      "step": 13349,
+      "kind": "terminal_call",
+      "summary": "cat > /app/test_journal.py <<'EOF'\n\"\"\"Edge-case tests with hand-computed expectations (independent builder).\"\"\"\nimport json, subprocess, sys, zlib\n\ndef rec(seq, kind, txid, payload, *, bad_crc=False, seq_override=None):\n    s = seq if seq_override is None else seq_override\n    header = len(payload).to_bytes(4,'little') + s.to_bytes(4,'little') + bytes([kind]) + txid.to_bytes(4,'little')\n    crc = zlib.crc32(header + payload) & 0xffffffff\n    if bad_crc: crc ^= 0xffffffff\n    return header + payload + crc.to_bytes(4,'little')\n\ndef patch_payload(page, off, data):\n    return page.to_bytes(2,'little') + off.to_bytes(2,'little') + len(data).to_bytes(2,'little') + data\n\ndef begin(seq, tx): return rec(seq,1,tx,b'')\ndef abort(seq, tx): return rec(seq,4,tx,b'')\ndef patch(seq, tx, page, off, data): return rec(seq,2,tx,patch_payload(page,off,data))\ndef commit(seq, tx, payloads, count=None, digest=None):\n    if count is None: count = len(payloads)\n    if digest is None: digest = zlib.crc32(b''.joi"
+    },
+    {
+      "step": 13350,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "35/35 passed\n"
+    },
+    {
+      "step": 15945,
+      "kind": "terminal_call",
+      "summary": "cat > /app/fuzz_journal.py <<'EOF'\n\"\"\"Randomized differential test: main.solve vs an independently-styled oracle.\"\"\"\nimport random, zlib, sys\nsys.path.insert(0, '/app')\nfrom main import solve\n\ndef oracle(req):\n    pages = [bytearray(bytes.fromhex(p)) for p in req['pages']]\n    ckpt = req['checkpoint']\n    log = bytes.fromhex(req['log'])\n    npages, plen = len(pages), len(pages[0])\n    # Phase 1: parse the structurally valid prefix\n    records = []\n    pos = 0\n    last = 0\n    while pos + 13 <= len(log):\n        pl = int.from_bytes(log[pos:pos+4], 'little')\n        sq = int.from_bytes(log[pos+4:pos+8], 'little')\n        kd = log[pos+8]\n        tx = int.from_bytes(log[pos+9:pos+13], 'little')\n        if pl > 4096 or pos + 17 + pl > len(log):\n            break\n        pay = log[pos+13:pos+13+pl]\n        crc = int.from_bytes(log[pos+13+pl:pos+17+pl], 'little')\n        if (zlib.crc32(log[pos:pos+13+pl]) & 0xffffffff) != crc:\n            break\n        if sq <= last or tx == 0:\n            br"
+    },
+    {
+      "step": 15946,
+      "kind": "terminal_result",
+      "return_code": 1,
+      "summary": "Traceback (most recent call last):\n  File \"/app/fuzz_journal.py\", line 127, in <module>\n    req = gen(rng)\n          ^^^^^^^^\n  File \"/app/fuzz_journal.py\", line 104, in gen\n    recs.append(make_rec(seq,3,tx,cnt.to_bytes(4,'little')+dig.to_bytes(4,'little')))\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^\nOverflowError: can't convert negative int to unsigned\n"
+    },
+    {
+      "step": 16080,
+      "kind": "terminal_call",
+      "summary": "cd /app && sed -i 's/cnt = len(lst) if rng.random() < 0.8 else len(lst)+rng.choice(\\[-1,1\\])/cnt = len(lst) if rng.random() < 0.8 else max(0, len(lst)+rng.choice([-1,1]))/' fuzz_journal.py && python3 fuzz_journal.py"
+    },
+    {
+      "step": 16081,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "20000 randomized cases agree\n"
+    },
+    {
+      "step": 17825,
+      "kind": "terminal_call",
+      "summary": "cat > /app/fuzz2_journal.py <<'EOF'\n\"\"\"Adversarial fuzz: invalid records mid-stream, garbage, max-size logs.\"\"\"\nimport random, zlib, sys, time\nsys.path.insert(0, '/app')\nfrom main import solve\nfrom fuzz_journal import oracle, make_rec\n\ndef gen_bad_rec(rng, seq):\n    kind = rng.choice([0, 5, 255, 1, 2, 3, 4])\n    tx = rng.choice([0, 1, 2])\n    which = rng.randint(0, 6)\n    if which == 0:\n        return make_rec(seq, kind, tx, rng.randbytes(rng.randint(0, 3)))\n    if which == 1:  # begin/abort with payload\n        return make_rec(seq, rng.choice([1, 4]), tx, b'\\x00')\n    if which == 2:  # patch count zero\n        return make_rec(seq, 2, tx, b'\\x00\\x00\\x00\\x00\\x00\\x00')\n    if which == 3:  # patch plen mismatch\n        return make_rec(seq, 2, tx, b'\\x00\\x00\\x00\\x00\\x01\\x00\\xaa\\xbb')\n    if which == 4:  # patch out of bounds\n        return make_rec(seq, 2, tx, (7).to_bytes(2,'little') + (63).to_bytes(2,'little') + (5).to_bytes(2,'little') + b'\\x01'*5)\n    if which == 5:  # commit bad lengt"
+    },
+    {
+      "step": 17826,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "20000 randomized cases agree\n20000 adversarial cases agree\nmax-size log: 3855 records, 300 solves in 0.67s\npatch-heavy 64KiB log: 300 solves in 0.38s\n"
+    },
+    {
+      "step": 18545,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 smoke.py && printf '%s\\n' '{\"pages\":[\"00\"],\"checkpoint\":0,\"log\":\"\"}' '{\"pages\":[\"DEADBEEF\"],\"checkpoint\":999999999999,\"log\":\"\"}' | python3 main.py && echo \"--- stderr check ---\" && python3 main.py < /dev/null | wc -c && ls /app"
+    },
+    {
+      "step": 18546,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\n{\"pages\": [\"00\"], \"valid_bytes\": 0, \"last_seq\": 0}\n{\"pages\": [\"deadbeef\"], \"valid_bytes\": 0, \"last_seq\": 0}\n--- stderr check ---\n0\nexamples.json\nfuzz2_journal.py\nfuzz_journal.py\nmain.py\npublic_contract.py\nsmoke.py\ntest_journal.py\n"
+    }
+  ]
+}

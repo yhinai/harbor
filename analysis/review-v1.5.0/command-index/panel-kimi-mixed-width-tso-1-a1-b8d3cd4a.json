@@ -1,0 +1,280 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-mixed-width-tso-1-a1-b8d3cd4a",
+    "task": "mixed-width-tso",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 1,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcome-corrections/v1.4.2/panel-kimi-mixed-width-tso-1-a1-b8d3cd4a.json",
+    "tool_calls": 16,
+    "agent_elapsed_seconds": 615.29999,
+    "input_tokens": 243429,
+    "output_tokens": 18131,
+    "uncached_cost_estimate": 1.002252,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "700c6c2ddd33aecd0f4d84aceb2b09471886879fac1ffad084ee1fec37ac442d",
+    "network_mode": "none",
+    "artifact_sha256": "2c039ffa4328528e809f7330a743fc7422214dfa83dd80564c779c411794f402",
+    "normalized_artifact_sha256": "6ece9ad63584fb2ca9fd235a10ca0b4fa8629ed83a54fc3010ae6976ed86480d",
+    "terminal_nonzero_or_error_text_events": 5,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 6361,
+        "time": "2026-10-08T18:34:03.348403+00:00",
+        "artifact_sha256": "2c039ffa4328528e809f7330a743fc7422214dfa83dd80564c779c411794f402",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 247.693746,
+    "event_counts": {
+      "initial": 1,
+      "request": 17,
+      "stream_chunk": 17487,
+      "response": 17,
+      "terminal_call": 16,
+      "terminal_result": 16,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 65,
+      "time": "2026-10-08T18:30:01.569339+00:00",
+      "tool_call_id": "call_14ee6e9635b64d9594e8a4ec",
+      "command": "cat /app/main.py 2>/dev/null; echo \"-----\"; cat /app/smoke.py 2>/dev/null; echo \"-----\"; ls -la /app",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 103,
+      "time": "2026-10-08T18:30:06.026091+00:00",
+      "tool_call_id": "call_bdd76041bf4a4f71b3f37617",
+      "command": "cat /app/examples.json; echo \"-----\"; cat /app/public_contract.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6361,
+      "time": "2026-10-08T18:34:03.348403+00:00",
+      "tool_call_id": "call_9e0c11aab0284bce9e9ccb93",
+      "command": "cat > /app/main.py <<'EOF'\nimport json\nimport sys\nfrom functools import lru_cache\n\n\ndef solve(request):\n    mem0 = tuple(request[\"memory\"])\n    threads = request[\"threads\"]\n    n = len(threads)\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n    lens = tuple(len(t) for t in instrs)\n    empty_obs = tuple(() for _ in range(n))\n    pcs0 = tuple(0 for _ in range(n))\n    bufs0 = tuple(() for _ in range(n))\n\n    @lru_cache(maxsize=None)\n    def rec(mem, pcs, bufs):\n        \"\"\"Return frozenset of (obs_suffix, final_mem) reachable from this state.\n\n        obs_suffix is a tuple with one tuple of observed values per thread,\n        covering only instructions executed from this state onward.\n        \"\"\"\n        done = True\n        for t in range(n):\n            if pcs[t] < lens[t] or bufs[t]:\n                done = False\n                break\n        if done:\n            return frozenset({(empty_obs, mem)})\n\n        results = set()\n        for t in range(n):\n            pc = pcs[t]\n            buf = bufs[t]\n            if pc < lens[t]:\n                ins = instrs[t][pc]\n                op = ins[0]\n                npc = pcs[:t] + (pc + 1,) + pcs[t + 1:]\n                if op == \"store\":\n                    nb = bufs[:t] + (buf + ((ins[1], ins[2], ins[3]),),) + bufs[t + 1:]\n                    results.update(rec(mem, npc, nb))\n                elif op == \"load\":\n                    addr, width = ins[1], ins[2]\n                    val = 0\n                    for j in range(width):\n                        a = addr + j\n                        b = mem[a]\n                    ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 7938,
+      "time": "2026-10-08T18:34:50.759756+00:00",
+      "tool_call_id": "call_14b52943db2c4122b820978c",
+      "command": "cat > /app/brute.py <<'EOF'\nimport json, sys\n\ndef brute_solve(request):\n    mem0 = tuple(request[\"memory\"])\n    threads = request[\"threads\"]\n    n = len(threads)\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n    lens = tuple(len(t) for t in instrs)\n    # state: (mem, pcs, bufs, obs)\n    init = (mem0, tuple(0 for _ in range(n)), tuple(() for _ in range(n)), tuple(() for _ in range(n)))\n    seen = {init}\n    work = [init]\n    outcomes = set()\n    while work:\n        mem, pcs, bufs, obs = work.pop()\n        if all(pcs[t] == lens[t] for t in range(n)) and not any(bufs):\n            outcomes.add((obs, mem))\n            continue\n        for t in range(n):\n            pc = pcs[t]; buf = bufs[t]\n            if pc < lens[t]:\n                ins = instrs[t][pc]; op = ins[0]\n                npc = pcs[:t] + (pc+1,) + pcs[t+1:]\n                if op == \"store\":\n                    nb = bufs[:t] + (buf + ((ins[1],ins[2],ins[3]),),) + bufs[t+1:]\n                    ns = (mem, npc, nb, obs)\n                elif op == \"load\":\n                    addr, width = ins[1], ins[2]\n                    val = 0\n                    for j in range(width):\n                        a = addr + j; b = mem[a]\n                        for sa, sw, sv in reversed(buf):\n                            if sa <= a < sa + sw:\n                                b = (sv >> (8*(a-sa))) & 0xFF; break\n                        val |= b << (8*j)\n                    ns = (mem, npc, bufs, obs[:t] + (obs[t]+(val,),) + obs[t+1:])\n                elif op == \"fence\":\n                    if buf: continue\n                ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 8466,
+      "time": "2026-10-08T18:35:13.098158+00:00",
+      "tool_call_id": "call_01de2f7da1474a5897d2fe9d",
+      "command": "cd /app && python3 -c \"\nfrom brute import brute_solve\nimport json\nreq={'memory':[76],'threads':[[['store',0,1,197],['fence']]]}\nprint(json.dumps(brute_solve(req), indent=1))\n\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 9303,
+      "time": "2026-10-08T18:35:42.007525+00:00",
+      "tool_call_id": "call_197d978da41249c0a52a8458",
+      "command": "cd /app && python3 - <<'EOF'\nimport re\nsrc = open('brute.py').read()\nsrc = src.replace('''                elif op == \"fence\":\n                    if buf: continue\n                    ns = (mem, npc, bufs, obs)\n                elif op == \"xchg\":\n                    if buf: continue''', '''                elif op == \"fence\":\n                    ns = None if buf else (mem, npc, bufs, obs)\n                elif op == \"xchg\":\n                    ns = None\n                    if not buf:''')\nsrc = src.replace('''                    ns = (tuple(nm), npc, bufs, obs[:t] + (obs[t]+(old,),) + obs[t+1:])\n                else:\n                    continue\n                if ns not in seen:''', '''                        ns = (tuple(nm), npc, bufs, obs[:t] + (obs[t]+(old,),) + obs[t+1:])\n                else:\n                    ns = None\n                if ns is not None and ns not in seen:''')\n# fix indentation of xchg body\nsrc = src.replace('''                    if not buf:\n                    addr, width, value = ins[1], ins[2], ins[3]\n                    old = 0; nm = list(mem)\n                    for j in range(width):\n                        old |= mem[addr+j] << (8*j)\n                        nm[addr+j] = (value >> (8*j)) & 0xFF''', '''                    if not buf:\n                        addr, width, value = ins[1], ins[2], ins[3]\n                        old = 0; nm = list(mem)\n                        for j in range(width):\n                            old |= mem[addr+j] << (8*j)\n                            nm[addr+j] = (value >> (8*j)) & 0xFF''')\nopen('brute.py','w').write(src)",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 9324,
+      "time": "2026-10-08T18:35:44.948939+00:00",
+      "tool_call_id": "call_e98e46210f644fe7be9fec59",
+      "command": "cd /app && python3 difftest.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 10356,
+      "time": "2026-10-08T18:36:16.756579+00:00",
+      "tool_call_id": "call_ef033749803e4718923dfdf3",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom brute import brute_solve\n\ndef key(o): return json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True)\ndef chk(name, req):\n    a=solve(json.loads(json.dumps(req))); b=brute_solve(req)\n    sa={key(o) for o in a['outcomes']}; sb={key(o) for o in b['outcomes']}\n    ok = sa==sb and len(a['outcomes'])==len(sa)\n    print((\"OK  \" if ok else \"FAIL\"), name, \"outcomes:\", len(sa))\n    if not ok:\n        print(json.dumps(req)); print(\"main:\",sorted(sa)); print(\"brute:\",sorted(sb)); sys.exit(1)\n\n# task's headline request\nchk(\"headline\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]})\n# xchg basics: reads memory, writes value, enabled only with empty buffer\nchk(\"xchg1\", {\"memory\":[5,0],\"threads\":[[[\"xchg\",0,1,7]],[]]})\n# xchg vs other thread's pending buffer (must not see it / not drain it)\nchk(\"xchg2\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,3],[\"xchg\",0,1,9]],[]]})\nchk(\"xchg3\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,3]],[\"xchg\",0,1,9]]})\n# multi-byte xchg little-endian\nchk(\"xchg4\", {\"memory\":[1,2,3,4],\"threads\":[[[\"xchg\",0,4,0xAABBCCDD],[\"load\",0,4]]]})\n# forwarding: youngest covering store wins per byte, partial overlaps\nchk(\"fwd1\", {\"memory\":[0,0,0,0],\"threads\":[[[\"store\",0,4,0x11223344],[\"store\",1,2,0xAABB],[\"store\",0,1,0xEE],[\"load\",0,4]]]})\n# load forwarding from buffer even with drain pending; fence drain semantics\nchk(\"fence1\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,5],[\"fence\"],[\"load\",0,1]]]})\n# drain after thread finis",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 11316,
+      "time": "2026-10-08T18:36:41.055818+00:00",
+      "tool_call_id": "call_c30e2c21283244e09057fd49",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom brute import brute_solve\n\ndef key(o): return json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True)\ndef chk(name, req):\n    a=solve(json.loads(json.dumps(req))); b=brute_solve(req)\n    sa={key(o) for o in a['outcomes']}; sb={key(o) for o in b['outcomes']}\n    ok = sa==sb and len(a['outcomes'])==len(sa)\n    print((\"OK  \" if ok else \"FAIL\"), name, \"outcomes:\", len(sa))\n    if not ok:\n        print(json.dumps(req)); print(\"main:\",sorted(sa)); print(\"brute:\",sorted(sb)); sys.exit(1)\n\nchk(\"headline\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]})\nchk(\"xchg1\", {\"memory\":[5,0],\"threads\":[[[\"xchg\",0,1,7]],[]]})\nchk(\"xchg2\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,3],[\"xchg\",0,1,9]],[]]})\nchk(\"xchg3\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,3]],[[\"xchg\",0,1,9]]]})\nchk(\"xchg4\", {\"memory\":[1,2,3,4],\"threads\":[[[\"xchg\",0,4,0xAABBCCDD],[\"load\",0,4]]]})\nchk(\"fwd1\", {\"memory\":[0,0,0,0],\"threads\":[[[\"store\",0,4,0x11223344],[\"store\",1,2,0xAABB],[\"store\",0,1,0xEE],[\"load\",0,4]]]})\nchk(\"fence1\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,5],[\"fence\"],[\"load\",0,1]]]})\nchk(\"drain-end\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,5]],[\"load\",0,1]]]})\nchk(\"straddle\", {\"memory\":[9,9],\"threads\":[[[\"store\",0,1,1],[\"load\",0,2]]]})\nchk(\"empties\", {\"memory\":[3],\"threads\":[[],[],[]]})\nchk(\"mixed3\", {\"memory\":[0,0,0],\"threads\":[\n  [[\"store\",0,1,1],[\"load\",1,1]],\n  [[\"store\",1,1,2],[\"load\",2,1]],\n  [[\"store\",2,1,3],[\"load\",0,1]]]})\n# fence blocked unti",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 12192,
+      "time": "2026-10-08T18:37:05.545768+00:00",
+      "tool_call_id": "call_d7c98367797a43008b7289be",
+      "command": "cd /app && cat > targeted.py <<'EOF'\nimport json, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom brute import brute_solve\n\ndef key(o): return json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True)\ndef chk(name, req):\n    a=solve(json.loads(json.dumps(req))); b=brute_solve(req)\n    sa={key(o) for o in a['outcomes']}; sb={key(o) for o in b['outcomes']}\n    ok = sa==sb and len(a['outcomes'])==len(sa)\n    print((\"OK  \" if ok else \"FAIL\"), name, \"outcomes:\", len(sa))\n    if not ok:\n        print(json.dumps(req)); print(\"main:\",sorted(sa)); print(\"brute:\",sorted(sb)); sys.exit(1)\n\nchk(\"headline\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]})\nchk(\"xchg1\", {\"memory\":[5,0],\"threads\":[[[\"xchg\",0,1,7]],[]]})\nchk(\"xchg2\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,3],[\"xchg\",0,1,9]],[]]})\nchk(\"xchg3\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,3]],[[\"xchg\",0,1,9]]]})\nchk(\"xchg4\", {\"memory\":[1,2,3,4],\"threads\":[[[\"xchg\",0,4,0xAABBCCDD],[\"load\",0,4]]]})\nchk(\"fwd1\", {\"memory\":[0,0,0,0],\"threads\":[[[\"store\",0,4,0x11223344],[\"store\",1,2,0xAABB],[\"store\",0,1,0xEE],[\"load\",0,4]]]})\nchk(\"fence1\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,5],[\"fence\"],[\"load\",0,1]]]})\nchk(\"drain-end\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,5]],[\"load\",0,1]]})\nchk(\"straddle\", {\"memory\":[9,9],\"threads\":[[[\"store\",0,1,1],[\"load\",0,2]]]})\nchk(\"empties\", {\"memory\":[3],\"threads\":[[],[],[]]})\nchk(\"mixed3\", {\"memory\":[0,0,0],\"threads\":[\n  [[\"store\",0,1,1],[\"load\",1,1]],\n  [[\"store\",1,1,2],[\"load\",2,1]],\n  [[\"store\",2,1,3],[\"load\",0,1]]]})\nchk(\"fence2\",",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 12384,
+      "time": "2026-10-08T18:37:14.403143+00:00",
+      "tool_call_id": "call_f48f71a363ec4e34bbb75bf5",
+      "command": "cd /app && sed -i 's|\\[\\[\"store\",0,1,5\\]\\],\\\\?\\[\"load\",0,1\\]\\]|XX|' targeted.py && python3 - <<'EOF'\nsrc = open('targeted.py').read()\nsrc = src.replace('[[[\"store\",0,1,5]],[\"load\",0,1]]', '[[[\"store\",0,1,5]],[[\"load\",0,1]]]')\nopen('targeted.py','w').write(src)\nEOF\npython3 targeted.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 13142,
+      "time": "2026-10-08T18:37:39.336527+00:00",
+      "tool_call_id": "call_79a5102e665b428883e8224b",
+      "command": "cd /app && cat > fuzz2.py <<'EOF'\nimport json, random, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom brute import brute_solve\n\ndef key(o): return json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True)\n\ndef gen(rng, maxtotal):\n    nmem = rng.randint(1, 8)\n    mem = [rng.randint(0, 255) for _ in range(nmem)]\n    nt = rng.randint(1, 3)\n    threads = []\n    total = 0\n    for _ in range(nt):\n        k = rng.randint(0, 4)\n        if total + k > maxtotal: k = maxtotal - total\n        total += k\n        t = []\n        for _ in range(k):\n            op = rng.choice([\"store\",\"load\",\"fence\",\"xchg\",\"store\",\"load\",\"xchg\"])\n            if op == \"fence\":\n                t.append([\"fence\"])\n            else:\n                w = rng.choice([1,2,4])\n                if w > nmem: w = 1\n                addr = rng.randint(0, nmem - w)\n                if op == \"load\":\n                    t.append([\"load\", addr, w])\n                else:\n                    val = rng.randint(0, (1 << (8*w)) - 1)\n                    t.append([op, addr, w, val])\n        threads.append(t)\n    return {\"memory\": mem, \"threads\": threads}\n\nrng = random.Random(999)\nt0=time.time()\nN=250\nworst=0.0; worst_n=0\nfor i in range(N):\n    req = gen(rng, 8)\n    s=time.time()\n    a = solve(json.loads(json.dumps(req)))\n    d=time.time()-s\n    b = brute_solve(req)\n    sa={key(o) for o in a['outcomes']}; sb={key(o) for o in b['outcomes']}\n    if sa!=sb or len(a['outcomes'])!=len(sa):\n        print(\"MISMATCH\", i); print(json.dumps(req))\n        print(\"main:\",sorted(sa)); print(\"brute:\",sorted(sb)); sys.exi",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 14134,
+      "time": "2026-10-08T18:38:07.559231+00:00",
+      "tool_call_id": "call_904227ffb2b34325951a879d",
+      "command": "cd /app && cat > stress.py <<'EOF'\nimport json, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom brute import brute_solve\n\ndef key(o): return json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True)\n\ncases = {\n \"SBx3\": {\"memory\":[0,0,0],\"threads\":[\n    [[\"store\",0,1,1],[\"load\",1,1],[\"store\",1,1,7],[\"load\",2,1]],\n    [[\"store\",1,1,2],[\"load\",2,1],[\"store\",2,1,8],[\"load\",0,1]],\n    [[\"store\",2,1,3],[\"load\",0,1]]]},\n \"4stores-4loads\": {\"memory\":[0],\"threads\":[\n    [[\"store\",0,1,1],[\"store\",0,1,2],[\"store\",0,1,3],[\"store\",0,1,4]],\n    [[\"load\",0,1],[\"load\",0,1],[\"load\",0,1],[\"load\",0,1]],\n    [[\"load\",0,1],[\"load\",0,1]]]},\n \"wide8\": {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n    [[\"store\",0,4,0x11223344],[\"store\",4,4,0x55667788],[\"load\",2,2],[\"load\",0,4]],\n    [[\"store\",2,4,0xAABBCCDD],[\"load\",0,2],[\"load\",4,4],[\"fence\"]],\n    [[\"xchg\",0,2,0x9999],[\"load\",0,4]]]},\n \"xchg-fest\": {\"memory\":[0,0],\"threads\":[\n    [[\"xchg\",0,1,1],[\"xchg\",1,1,2],[\"xchg\",0,1,3],[\"load\",0,2]],\n    [[\"xchg\",1,1,4],[\"xchg\",0,1,5],[\"load\",0,1],[\"load\",1,1]],\n    [[\"xchg\",0,1,6],[\"load\",1,1]]]},\n \"fwd-heavy\": {\"memory\":[1,2,3,4,5,6,7,8],\"threads\":[\n    [[\"store\",0,4,0xDEADBEEF],[\"store\",2,4,0x12345678],[\"load\",1,4],[\"store\",1,1,0x77]],\n    [[\"store\",3,2,0xAAAA],[\"load\",0,4],[\"load\",4,4],[\"fence\"]],\n    [[\"load\",0,4],[\"xchg\",6,2,0xBBBB]]]},\n}\nfor name, req in cases.items():\n    t0=time.time()\n    a = solve(json.loads(json.dumps(req)))\n    d = time.time()-t0\n    sa = {key(o) for o in a['outcomes']}\n    print(\"%-16s outcomes=%-5d dupes=%s time=%.2fs\" % (name, len(sa), len(a['outcomes']",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 15287,
+      "time": "2026-10-08T18:38:48.615067+00:00",
+      "tool_call_id": "call_f1e7c6adeec94231bb556677",
+      "command": "cd /app && cat > stress2.py <<'EOF'\nimport json, random, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\n\nrng = random.Random(7)\ndef gen_max():\n    mem = [rng.randint(0,255) for _ in range(8)]\n    t1 = []\n    for i in range(4):\n        t1.append([\"store\", rng.choice([0,2,4]), 4, rng.randint(0,2**32-1)])\n    t2 = []\n    for i in range(4):\n        w = rng.choice([1,2,4]); t2.append([\"load\", rng.randint(0,8-w), w])\n    t3 = []\n    for i in range(2):\n        w = rng.choice([1,2]); \n        if rng.random()<0.5: t3.append([\"xchg\", rng.randint(0,8-w), w, rng.randint(0,2**(8*w)-1)])\n        else: t3.append([\"load\", rng.randint(0,8-w), w])\n    return {\"memory\":mem,\"threads\":[t1,t2,t3]}\n\nworst=0; worst_out=0\nfor i in range(60):\n    req = gen_max()\n    t0=time.time(); a=solve(req); d=time.time()-t0\n    if d>worst: worst=d; worst_out=len(a['outcomes'])\nprint(\"max-diversity: slowest %.3fs with %d outcomes\" % (worst, worst_out))\n\n# all-loads-all-threads wide, many shared addresses\nreq={\"memory\":list(range(8)),\"threads\":[\n  [[\"store\",0,4,111],[\"load\",0,4],[\"store\",4,4,222],[\"load\",4,4]],\n  [[\"store\",0,4,333],[\"load\",4,4],[\"store\",4,4,444],[\"load\",0,4]],\n  [[\"load\",0,4],[\"load\",4,4]]]}\nt0=time.time(); a=solve(req); print(\"SB-wide: %.3fs %d outcomes\" % (time.time()-t0, len(a['outcomes'])))\n\n# pure store storm: 10 stores total across 3 threads, 8 bytes -> max drains\nreq={\"memory\":[0]*8,\"threads\":[\n  [[\"store\",0,1,1],[\"store\",1,1,2],[\"store\",2,1,3],[\"store\",3,1,4]],\n  [[\"store\",4,1,5],[\"store\",5,1,6],[\"store\",6,1,7],[\"store\",7,1,8]],\n  [[\"store\",0,1,9],[\"store\",4,1,10]]]}\nt0=time.t",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 16267,
+      "time": "2026-10-08T18:39:21.816554+00:00",
+      "tool_call_id": "call_1052f166668f47039c8d5ecc",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, random, subprocess, sys, time\nrng = random.Random(31337)\ndef gen(maxtotal):\n    nmem = rng.randint(1,8)\n    mem=[rng.randint(0,255) for _ in range(nmem)]\n    nt=rng.randint(1,3); threads=[]; total=0\n    for _ in range(nt):\n        k=rng.randint(0,4)\n        if total+k>maxtotal: k=maxtotal-total\n        total+=k; t=[]\n        for _ in range(k):\n            op=rng.choice([\"store\",\"load\",\"fence\",\"xchg\",\"store\",\"load\"])\n            if op==\"fence\": t.append([\"fence\"])\n            else:\n                w=rng.choice([1,2,4])\n                if w>nmem: w=1\n                a=rng.randint(0,nmem-w)\n                t.append([\"load\",a,w] if op==\"load\" else [op,a,w,rng.randint(0,(1<<(8*w))-1)])\n        threads.append(t)\n    return {\"memory\":mem,\"threads\":threads}\n\nreqs=[gen(10) for _ in range(300)]\ninp=''.join(json.dumps(r)+'\\n' for r in reqs)\nt0=time.time()\np=subprocess.run([sys.executable,'main.py'],input=inp,text=True,capture_output=True,cwd='/app')\nel=time.time()-t0\nassert p.returncode==0, p.stderr\nlines=p.stdout.splitlines()\nassert len(lines)==len(reqs), (len(lines),len(reqs))\ntot=0\nfor line in lines:\n    o=json.loads(line)\n    ks={json.dumps({'reads':x['reads'],'memory':x['memory']},sort_keys=True) for x in o['outcomes']}\n    assert len(ks)==len(o['outcomes'])\n    tot+=len(ks)\nprint(\"batch of %d max-size requests: %.2fs total, %d outcomes, no dupes, stderr=%r\" % (len(reqs), el, tot, p.stderr[:200]))\nEOF\npython3 /app/smoke.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 16973,
+      "time": "2026-10-08T18:39:46.973035+00:00",
+      "tool_call_id": "call_f18a406b8925482b9f211200",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, random, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom brute import brute_solve\ndef key(o): return json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True)\nrng = random.Random(424242)\ndef gen(maxtotal):\n    nmem = rng.randint(1,8)\n    mem=[rng.randint(0,255) for _ in range(nmem)]\n    nt=rng.randint(1,3); threads=[]; total=0\n    for _ in range(nt):\n        k=rng.randint(0,4)\n        if total+k>maxtotal: k=maxtotal-total\n        total+=k; t=[]\n        for _ in range(k):\n            op=rng.choice([\"store\",\"load\",\"fence\",\"xchg\",\"fence\",\"xchg\"])\n            if op==\"fence\": t.append([\"fence\"])\n            else:\n                w=rng.choice([1,2,4,4])\n                if w>nmem: w=1\n                a=rng.randint(0,nmem-w)\n                t.append([\"load\",a,w] if op==\"load\" else [op,a,w,rng.randint(0,(1<<(8*w))-1)])\n        threads.append(t)\n    return {\"memory\":mem,\"threads\":threads}\nfor i in range(300):\n    req=gen(7)\n    a=solve(json.loads(json.dumps(req))); b=brute_solve(req)\n    sa={key(o) for o in a['outcomes']}; sb={key(o) for o in b['outcomes']}\n    if sa!=sb or len(a['outcomes'])!=len(sa):\n        print(\"MISMATCH\",i); print(json.dumps(req)); sys.exit(1)\nprint(\"final fuzz: 300 more cases match\")\nEOF\npython3 /app/smoke.py && rm -f /app/brute.py /app/difftest.py /app/fuzz2.py /app/stress.py /app/stress2.py /app/targeted.py && ls /app",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 66,
+      "time": "2026-10-08T18:30:01.814539+00:00",
+      "tool_call_id": "call_14ee6e9635b64d9594e8a4ec",
+      "return_code": 0,
+      "stdout": "import json, sys\ndef solve(request):\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nif __name__ == '__main__':\n    for line in sys.stdin:\n        print(json.dumps(solve(json.loads(line))))\n-----\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n-----\ntotal 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:29 ..\n-rw-r--r-- 1 agent agent 2506 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\n",
+      "stderr": "",
+      "stdout_tail": "import json, sys\ndef solve(request):\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nif __name__ == '__main__':\n    for line in sys.stdin:\n        print(json.dumps(solve(json.loads(line))))\n-----\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n-----\ntotal 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:29 ..\n-rw-r--r-- 1 agent agent 2506 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 7939,
+      "time": "2026-10-08T18:34:51.035070+00:00",
+      "tool_call_id": "call_14b52943db2c4122b820978c",
+      "return_code": 1,
+      "stdout": "MISMATCH 4\n{\"memory\": [76], \"threads\": [[[\"store\", 0, 1, 197], [\"fence\"]]]}\nmain : ['{\"memory\": [197], \"reads\": [[]]}']\nbrute: []\n",
+      "stderr": "",
+      "stdout_tail": "MISMATCH 4\n{\"memory\": [76], \"threads\": [[[\"store\", 0, 1, 197], [\"fence\"]]]}\nmain : ['{\"memory\": [197], \"reads\": [[]]}']\nbrute: []\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 10357,
+      "time": "2026-10-08T18:36:17.001526+00:00",
+      "tool_call_id": "call_ef033749803e4718923dfdf3",
+      "return_code": 1,
+      "stdout": "OK   headline outcomes: 4\nOK   xchg1 outcomes: 1\nOK   xchg2 outcomes: 1\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 21, in <module>\n  File \"<stdin>\", line 8, in chk\n  File \"/app/main.py\", line 10, in solve\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 10, in <genexpr>\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n                    ^^^^^^^^^^\nTypeError: 'int' object is not iterable\n",
+      "stdout_tail": "OK   headline outcomes: 4\nOK   xchg1 outcomes: 1\nOK   xchg2 outcomes: 1\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"<stdin>\", line 21, in <module>\n  File \"<stdin>\", line 8, in chk\n  File \"/app/main.py\", line 10, in solve\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 10, in <genexpr>\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n                    ^^^^^^^^^^\nTypeError: 'int' object is not iterable\n"
+    },
+    {
+      "step": 11317,
+      "time": "2026-10-08T18:36:41.342758+00:00",
+      "tool_call_id": "call_c30e2c21283244e09057fd49",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "  File \"<stdin>\", line 22\n    chk(\"drain-end\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,5]],[\"load\",0,1]]]})\n                                                                               ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{'\n",
+      "stdout_tail": "",
+      "stderr_tail": "  File \"<stdin>\", line 22\n    chk(\"drain-end\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,5]],[\"load\",0,1]]]})\n                                                                               ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{'\n"
+    },
+    {
+      "step": 12193,
+      "time": "2026-10-08T18:37:05.792783+00:00",
+      "tool_call_id": "call_d7c98367797a43008b7289be",
+      "return_code": 1,
+      "stdout": "OK   headline outcomes: 4\nOK   xchg1 outcomes: 1\nOK   xchg2 outcomes: 1\nOK   xchg3 outcomes: 2\nOK   xchg4 outcomes: 1\nOK   fwd1 outcomes: 1\nOK   fence1 outcomes: 1\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/targeted.py\", line 22, in <module>\n    chk(\"drain-end\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,5]],[\"load\",0,1]]})\n  File \"/app/targeted.py\", line 8, in chk\n    a=solve(json.loads(json.dumps(req))); b=brute_solve(req)\n      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 10, in solve\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 10, in <genexpr>\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n                    ^^^^^^^^^^\nTypeError: 'int' object is not iterable\n",
+      "stdout_tail": "OK   headline outcomes: 4\nOK   xchg1 outcomes: 1\nOK   xchg2 outcomes: 1\nOK   xchg3 outcomes: 2\nOK   xchg4 outcomes: 1\nOK   fwd1 outcomes: 1\nOK   fence1 outcomes: 1\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/targeted.py\", line 22, in <module>\n    chk(\"drain-end\", {\"memory\":[0,0],\"threads\":[[[\"store\",0,1,5]],[\"load\",0,1]]})\n  File \"/app/targeted.py\", line 8, in chk\n    a=solve(json.loads(json.dumps(req))); b=brute_solve(req)\n      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 10, in solve\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 10, in <genexpr>\n    instrs = [tuple(tuple(ins) for ins in t) for t in threads]\n                    ^^^^^^^^^^\nTypeError: 'int' object is not iterable\n"
+    }
+  ],
+  "last_events": [
+    {
+      "step": 12384,
+      "kind": "terminal_call",
+      "summary": "cd /app && sed -i 's|\\[\\[\"store\",0,1,5\\]\\],\\\\?\\[\"load\",0,1\\]\\]|XX|' targeted.py && python3 - <<'EOF'\nsrc = open('targeted.py').read()\nsrc = src.replace('[[[\"store\",0,1,5]],[\"load\",0,1]]', '[[[\"store\",0,1,5]],[[\"load\",0,1]]]')\nopen('targeted.py','w').write(src)\nEOF\npython3 targeted.py"
+    },
+    {
+      "step": 12385,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "OK   headline outcomes: 4\nOK   xchg1 outcomes: 1\nOK   xchg2 outcomes: 1\nOK   xchg3 outcomes: 2\nOK   xchg4 outcomes: 1\nOK   fwd1 outcomes: 1\nOK   fence1 outcomes: 1\nOK   drain-end outcomes: 2\nOK   straddle outcomes: 1\nOK   empties outcomes: 1\nOK   mixed3 outcomes: 8\nOK   fence2 outcomes: 5\nOK   xchg5 outcomes: 3\nOK   overlap outcomes: 8\nall targeted checks passed\n"
+    },
+    {
+      "step": 13142,
+      "kind": "terminal_call",
+      "summary": "cd /app && cat > fuzz2.py <<'EOF'\nimport json, random, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom brute import brute_solve\n\ndef key(o): return json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True)\n\ndef gen(rng, maxtotal):\n    nmem = rng.randint(1, 8)\n    mem = [rng.randint(0, 255) for _ in range(nmem)]\n    nt = rng.randint(1, 3)\n    threads = []\n    total = 0\n    for _ in range(nt):\n        k = rng.randint(0, 4)\n        if total + k > maxtotal: k = maxtotal - total\n        total += k\n        t = []\n        for _ in range(k):\n            op = rng.choice([\"store\",\"load\",\"fence\",\"xchg\",\"store\",\"load\",\"xchg\"])\n            if op == \"fence\":\n                t.append([\"fence\"])\n            else:\n                w = rng.choice([1,2,4])\n                if w > nmem: w = 1\n                addr = rng.randint(0, nmem - w)\n                if op == \"load\":\n                    t.append([\"load\", addr, w])\n                else:\n                    val = rng.randint(0,"
+    },
+    {
+      "step": 13143,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "fuzz2: 250 cases match; slowest solve 0.001s (132 outcomes); total 0.0s\n"
+    },
+    {
+      "step": 14134,
+      "kind": "terminal_call",
+      "summary": "cd /app && cat > stress.py <<'EOF'\nimport json, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom brute import brute_solve\n\ndef key(o): return json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True)\n\ncases = {\n \"SBx3\": {\"memory\":[0,0,0],\"threads\":[\n    [[\"store\",0,1,1],[\"load\",1,1],[\"store\",1,1,7],[\"load\",2,1]],\n    [[\"store\",1,1,2],[\"load\",2,1],[\"store\",2,1,8],[\"load\",0,1]],\n    [[\"store\",2,1,3],[\"load\",0,1]]]},\n \"4stores-4loads\": {\"memory\":[0],\"threads\":[\n    [[\"store\",0,1,1],[\"store\",0,1,2],[\"store\",0,1,3],[\"store\",0,1,4]],\n    [[\"load\",0,1],[\"load\",0,1],[\"load\",0,1],[\"load\",0,1]],\n    [[\"load\",0,1],[\"load\",0,1]]]},\n \"wide8\": {\"memory\":[0,0,0,0,0,0,0,0],\"threads\":[\n    [[\"store\",0,4,0x11223344],[\"store\",4,4,0x55667788],[\"load\",2,2],[\"load\",0,4]],\n    [[\"store\",2,4,0xAABBCCDD],[\"load\",0,2],[\"load\",4,4],[\"fence\"]],\n    [[\"xchg\",0,2,0x9999],[\"load\",0,4]]]},\n \"xchg-fest\": {\"memory\":[0,0],\"threads\":[\n    [[\"xchg\",0,1,1],[\"xchg\",1,1,2],[\"xchg\",0,1,3],[\"load\",0,2"
+    },
+    {
+      "step": 14135,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "SBx3             outcomes=108   dupes=False time=0.00s\n   brute time=0.00s match=True\n4stores-4loads   outcomes=1050  dupes=False time=0.00s\n   brute time=0.01s match=True\nwide8            outcomes=256   dupes=False time=0.00s\n   brute time=0.01s match=True\nxchg-fest        outcomes=168   dupes=False time=0.00s\n   brute time=0.00s match=True\nfwd-heavy        outcomes=200   dupes=False time=0.00s\n   brute time=0.01s match=True\n"
+    },
+    {
+      "step": 15287,
+      "kind": "terminal_call",
+      "summary": "cd /app && cat > stress2.py <<'EOF'\nimport json, random, sys, time\nsys.path.insert(0,'/app')\nfrom main import solve\n\nrng = random.Random(7)\ndef gen_max():\n    mem = [rng.randint(0,255) for _ in range(8)]\n    t1 = []\n    for i in range(4):\n        t1.append([\"store\", rng.choice([0,2,4]), 4, rng.randint(0,2**32-1)])\n    t2 = []\n    for i in range(4):\n        w = rng.choice([1,2,4]); t2.append([\"load\", rng.randint(0,8-w), w])\n    t3 = []\n    for i in range(2):\n        w = rng.choice([1,2]); \n        if rng.random()<0.5: t3.append([\"xchg\", rng.randint(0,8-w), w, rng.randint(0,2**(8*w)-1)])\n        else: t3.append([\"load\", rng.randint(0,8-w), w])\n    return {\"memory\":mem,\"threads\":[t1,t2,t3]}\n\nworst=0; worst_out=0\nfor i in range(60):\n    req = gen_max()\n    t0=time.time(); a=solve(req); d=time.time()-t0\n    if d>worst: worst=d; worst_out=len(a['outcomes'])\nprint(\"max-diversity: slowest %.3fs with %d outcomes\" % (worst, worst_out))\n\n# all-loads-all-threads wide, many shared addresses\nreq={\"m"
+    },
+    {
+      "step": 15288,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "max-diversity: slowest 0.010s with 2081 outcomes\nSB-wide: 0.003s 162 outcomes\nstore-storm: 0.003s 4 outcomes\nload-storm: 0.005s 600 outcomes\n"
+    },
+    {
+      "step": 16267,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport json, random, subprocess, sys, time\nrng = random.Random(31337)\ndef gen(maxtotal):\n    nmem = rng.randint(1,8)\n    mem=[rng.randint(0,255) for _ in range(nmem)]\n    nt=rng.randint(1,3); threads=[]; total=0\n    for _ in range(nt):\n        k=rng.randint(0,4)\n        if total+k>maxtotal: k=maxtotal-total\n        total+=k; t=[]\n        for _ in range(k):\n            op=rng.choice([\"store\",\"load\",\"fence\",\"xchg\",\"store\",\"load\"])\n            if op==\"fence\": t.append([\"fence\"])\n            else:\n                w=rng.choice([1,2,4])\n                if w>nmem: w=1\n                a=rng.randint(0,nmem-w)\n                t.append([\"load\",a,w] if op==\"load\" else [op,a,w,rng.randint(0,(1<<(8*w))-1)])\n        threads.append(t)\n    return {\"memory\":mem,\"threads\":threads}\n\nreqs=[gen(10) for _ in range(300)]\ninp=''.join(json.dumps(r)+'\\n' for r in reqs)\nt0=time.time()\np=subprocess.run([sys.executable,'main.py'],input=inp,text=True,capture_output=True,cwd='/app')\nel=ti"
+    },
+    {
+      "step": 16268,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "batch of 300 max-size requests: 0.10s total, 5403 outcomes, no dupes, stderr=''\nPassed 3 public examples\n"
+    },
+    {
+      "step": 16973,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport json, random, sys\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom brute import brute_solve\ndef key(o): return json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True)\nrng = random.Random(424242)\ndef gen(maxtotal):\n    nmem = rng.randint(1,8)\n    mem=[rng.randint(0,255) for _ in range(nmem)]\n    nt=rng.randint(1,3); threads=[]; total=0\n    for _ in range(nt):\n        k=rng.randint(0,4)\n        if total+k>maxtotal: k=maxtotal-total\n        total+=k; t=[]\n        for _ in range(k):\n            op=rng.choice([\"store\",\"load\",\"fence\",\"xchg\",\"fence\",\"xchg\"])\n            if op==\"fence\": t.append([\"fence\"])\n            else:\n                w=rng.choice([1,2,4,4])\n                if w>nmem: w=1\n                a=rng.randint(0,nmem-w)\n                t.append([\"load\",a,w] if op==\"load\" else [op,a,w,rng.randint(0,(1<<(8*w))-1)])\n        threads.append(t)\n    return {\"memory\":mem,\"threads\":threads}\nfor i in range(300):\n    req=gen(7)\n    a=solv"
+    },
+    {
+      "step": 16974,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "final fuzz: 300 more cases match\nPassed 3 public examples\nexamples.json\nmain.py\npublic_contract.py\nsmoke.py\n"
+    }
+  ]
+}

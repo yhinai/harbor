@@ -1,0 +1,308 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-deepseek-exact-fused-dot-8-a1-af2c2e96",
+    "task": "exact-fused-dot",
+    "model": "accounts/fireworks/models/deepseek-v4p1-flash",
+    "replicate": 8,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-deepseek-exact-fused-dot-8-a1-af2c2e96.json",
+    "tool_calls": 21,
+    "agent_elapsed_seconds": 555.152495,
+    "input_tokens": 1062377,
+    "output_tokens": 67163,
+    "uncached_cost_estimate": 0.39930870000000007,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "d7b31d54e4b68cf9567c84619ffad3dbf366ad9bbcb13221b1858fa85f20947f",
+    "network_mode": "none",
+    "artifact_sha256": "7ce976638983bfc8be877948d34fa0bd849ecb5595b549d48c46c86315172b59",
+    "normalized_artifact_sha256": "b233d63dfa626598e156ee5f837b3cb8b19496c0144ee1e079b40313d81bfdb7",
+    "terminal_nonzero_or_error_text_events": 5,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [],
+    "final_artifact_literal_written_by_30_min": false,
+    "first_literal_final_artifact_seconds": null,
+    "event_counts": {
+      "initial": 1,
+      "request": 21,
+      "stream_chunk": 66544,
+      "response": 21,
+      "terminal_call": 21,
+      "terminal_result": 21,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 22740,
+      "time": "2026-10-08T20:50:48.085569+00:00",
+      "tool_call_id": "call_0156c7a530154050a7170cc0",
+      "command": "ls -la /app && echo \"---\" && cat /app/smoke.py 2>/dev/null; echo \"---\"; python3 --version",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 22742,
+      "time": "2026-10-08T20:50:48.926724+00:00",
+      "tool_call_id": "call_f08f97a987d8427991b00ff8",
+      "command": "ls -la / && ls -la /app/* 2>/dev/null",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 22830,
+      "time": "2026-10-08T20:50:50.908536+00:00",
+      "tool_call_id": "call_2813401b108240d7a7129a43",
+      "command": "cat /app/examples.json; echo \"---\"; cat /app/main.py; echo \"---\"; cat /app/public_contract.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 25223,
+      "time": "2026-10-08T20:51:04.654728+00:00",
+      "tool_call_id": "call_30706fb45fdf4003a682fb2e",
+      "command": "cat > /app/main.py <<'EOF'\n#!/usr/bin/env python3\n\"\"\"Bit-exact fused dot product for a parameterized binary floating-point format.\n\nReads newline-delimited JSON requests from stdin and writes one JSON response\nper line to stdout.  All products are formed and summed exactly (as integers\nscaled by a power of two); only the final sum is rounded to the target format.\n\"\"\"\nimport json\nimport sys\n\n\ndef decode(v, ebits, fbits, Eall, F, mask_f):\n    \"\"\"Return (sign, kind, snan, A).\n\n    kind: 0 finite, 1 NaN, 2 infinity.  For finite values, A is an integer such\n    that value = (-1)**sign * A * 2**(emin-fbits); A == 0 denotes a signed zero.\n    snan is 1 for a signaling NaN, else 0.\n    \"\"\"\n    s = (v >> (ebits + fbits)) & 1\n    e = (v >> fbits) & Eall\n    f = v & mask_f\n    if e == Eall:\n        if f == 0:\n            return (s, 2, 0, 0)\n        # top fraction bit set => quiet, clear => signaling\n        return (s, 1, 0 if ((f >> (fbits - 1)) & 1) else 1, 0)\n    if e == 0:\n        A = f\n    else:\n        A = (F + f) << (e - 1)\n    return (s, 0, 0, A)\n\n\ndef solve(req):\n    ebits = req[\"ebits\"]\n    fbits = req[\"fbits\"]\n    mode = req[\"mode\"]\n    pairs = req[\"pairs\"]\n\n    Eall = (1 << ebits) - 1\n    bias = (1 << (ebits - 1)) - 1\n    F = 1 << fbits\n    mask_f = F - 1\n    emin = 1 - bias\n    emax = Eall - 1 - bias\n    unit = emin - fbits          # exponent of one unit of the scaled integers\n    unit2 = unit + unit          # every finite product is a multiple of 2**unit2\n\n    any_nan = False\n    any_snan = False\n    any_inf = False\n    pos_inf = False\n    neg_inf = False\n    invalid = ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 30316,
+      "time": "2026-10-08T20:51:45.675107+00:00",
+      "tool_call_id": "call_e2df9015871243fc96d47284",
+      "command": "cat > /app/ref_check.py <<'EOF'\n\"\"\"Independent Fraction-based reference for cross-checking main.solve.\"\"\"\nfrom fractions import Fraction\n\ndef floor_log2(x):\n    # x positive Fraction\n    L = x.numerator.bit_length() - x.denominator.bit_length()\n    if Fraction(2) ** L > x:\n        L -= 1\n    return L\n\ndef ref(req):\n    ebits = req[\"ebits\"]; fbits = req[\"fbits\"]; mode = req[\"mode\"]; pairs = req[\"pairs\"]\n    Eall = (1 << ebits) - 1\n    bias = (1 << (ebits - 1)) - 1\n    F = 1 << fbits\n    emin = 1 - bias\n    emax = Eall - 1 - bias\n\n    def dec(h):\n        v = int(h, 16)\n        s = (v >> (ebits + fbits)) & 1\n        e = (v >> fbits) & Eall\n        f = v & (F - 1)\n        if e == Eall:\n            if f == 0:\n                return (\"inf\", s)\n            return (\"qnan\" if ((f >> (fbits - 1)) & 1) else \"snan\", s)\n        if e == 0:\n            val = Fraction(f) * Fraction(2) ** (1 - bias - fbits)\n        else:\n            val = Fraction(F + f) * Fraction(2) ** (e - bias - fbits)\n        return (\"fin\", s, val)\n\n    ops = [(dec(a), dec(b)) for a, b in pairs]\n\n    any_nan = any(o[0][0] in (\"qnan\", \"snan\") for o in ops for o in o)\n    any_snan = any(o[0] == \"snan\" for o in ops for o in o)\n    invalid = any_snan\n    inf_signs = set()\n    for (ta, sa, *va), (tb, sb, *vb) in [(o[0], o[1]) for o in ops]:\n        if ta in (\"qnan\", \"snan\") or tb in (\"qnan\", \"snan\"):\n            continue\n        if ta == \"inf\" or tb == \"inf\":\n            other_zero = (ta == \"fin\" and va[0] == 0) or (tb == \"fin\" and vb[0] == 0)\n            if other_zero:\n                invalid = True\n            else:\n     ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 31365,
+      "time": "2026-10-08T20:51:55.079125+00:00",
+      "tool_call_id": "call_896c174b1ae44d7e975c0269",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, sys\nsys.path.insert(0, '/app')\nfrom main import solve\nfrom ref_check import ref\n\ntests = [\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[]}, \"0\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RDN\",\"pairs\":[]}, \"20\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"20\",\"20\"]]}, \"0\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"20\",\"0\"]]}, \"20\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"0\",\"0\"]]}, \"0\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RDN\",\"pairs\":[[\"0\",\"0\"]]}, \"20\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"20\",\"20\"],[\"20\",\"0\"]]}, \"0\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1c\",\"c\"]]}, \"1c\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"3c\",\"c\"]]}, \"3c\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1c\",\"c\"],[\"3c\",\"c\"]]}, \"1e\", [\"invalid\"]),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1c\",\"0\"]]}, \"1e\", [\"invalid\"]),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"0\",\"1c\"]]}, \"1e\", [\"invalid\"]),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1e\",\"0\"]]}, \"1e\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1d\",\"0\"]]}, \"1e\", [\"invalid\"]),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1e\",\"1c\"]]}, \"1e\", []),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1d\",\"1c\"]]}, \"1e\", [\"invalid\"]),\n  ({\"ebits\":3,\"fbits\":2,\"mode\":\"RNE\",\"pairs\":[[\"1e\",\"1c\"],[\"1c\",\"c\"],[\"3c\",\"c\"]]}, \"1e\", [\"invalid\"]),\n]\nfor req, b, fl in tests:\n    got = solve(req)\n    assert int(got['bits'],16)==int(b,16) and set(got['flags'])==set(fl), (req, got, b, fl)\nprint(\"hand ok\")\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 32635,
+      "time": "2026-10-08T20:52:05.498891+00:00",
+      "tool_call_id": "call_1d6e965277a241e9b2443459",
+      "command": "cd /app && python3 - <<'EOF'\nimport sys, random, itertools, time\nsys.path.insert(0, '/app')\nfrom main import solve\nfrom ref_check import ref\n\ndef cmp(req):\n    a = solve(req); b = ref(req)\n    if int(a['bits'],16) != int(b['bits'],16) or set(a['flags']) != set(b['flags']):\n        return (a, b)\n    return None\n\n# exhaustive single pair for small formats, all modes\nfor (eb, fb) in [(3,2),(3,3),(4,2)]:\n    w = 1+eb+fb\n    pats = [format(v,'x') for v in range(1<<w)]\n    modes = [\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]\n    n=0\n    t=time.time()\n    for m in modes:\n        for a in pats:\n            for b in pats:\n                req={\"ebits\":eb,\"fbits\":fb,\"mode\":m,\"pairs\":[[a,b]]}\n                r=cmp(req)\n                if r:\n                    print(\"MISMATCH\", req, r); sys.exit(1)\n                n+=1\n    print(f\"exhaustive single-pair ebits={eb} fbits={fb}: {n} cases ok in {time.time()-t:.1f}s\")\n\n# randomized multi-pair tests\nrng = random.Random(12345)\nspecials_cache={}\ndef patterns(eb,fb,k):\n    key=(eb,fb)\n    if key not in specials_cache:\n        w=1+eb+fb; Eall=(1<<eb)-1; F=1<<fb\n        sp=[0, 1<<(w-1), (Eall<<fb), (1<<(w-1))|(Eall<<fb),\n            ((Eall-1)<<fb)|(F-1), ((1<<(w-1))|((Eall-1)<<fb)|(F-1)),\n            (Eall<<fb)|(1<<(fb-1)), (Eall<<fb)|((1<<fb)-1),\n            (Eall<<fb)|(1<<(fb-1))|1, 1, F-1, F, (F<<1)-1, (Eall-1)<<fb]\n        specials_cache[key]=sp\n    sp=specials_cache[key]\n    out=[]\n    for _ in range(k):\n        if rng.random()<0.6:\n            out.append(rng.randrange(1<<(1+eb+fb)))\n        else:\n            out.append(rng.choice(sp))\n    return out\n\nf",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 33459,
+      "time": "2026-10-08T20:52:13.401246+00:00",
+      "tool_call_id": "call_50d736df005b4ed4a4e46e36",
+      "command": "cd /app && nl -ba ref_check.py | sed -n '25,75p'",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 35073,
+      "time": "2026-10-08T20:52:24.602543+00:00",
+      "tool_call_id": "call_d16fe463784d430d88f5e73a",
+      "command": "cd /app && python3 - <<'EOF'\nimport re\np='/app/ref_check.py'\ns=open(p).read()\ns=s.replace('any_nan = any(o[0][0] in (\"qnan\", \"snan\") for o in ops for o in o)',\n            'any_nan = any(o[0] in (\"qnan\", \"snan\") for o in ops for o in o)')\nopen(p,'w').write(s)\nEOF\npython3 - <<'EOF'\nimport sys, random, time\nsys.path.insert(0, '/app')\nfrom main import solve\nfrom ref_check import ref\n\ndef cmp(req):\n    a = solve(req); b = ref(req)\n    if int(a['bits'],16) != int(b['bits'],16) or set(a['flags']) != set(b['flags']):\n        return (a, b)\n    return None\n\nfor (eb, fb) in [(3,2),(3,3),(4,2)]:\n    w = 1+eb+fb\n    pats = [format(v,'x') for v in range(1<<w)]\n    modes = [\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]\n    n=0\n    t=time.time()\n    for m in modes:\n        for a in pats:\n            for b in pats:\n                req={\"ebits\":eb,\"fbits\":fb,\"mode\":m,\"pairs\":[[a,b]]}\n                r=cmp(req)\n                if r:\n                    print(\"MISMATCH\", req, r); sys.exit(1)\n                n+=1\n    print(f\"exhaustive single-pair ebits={eb} fbits={fb}: {n} cases ok in {time.time()-t:.1f}s\")\n\nrng = random.Random(12345)\nspecials_cache={}\ndef patterns(eb,fb,k):\n    key=(eb,fb)\n    if key not in specials_cache:\n        w=1+eb+fb; Eall=(1<<eb)-1; F=1<<fb\n        sp=[0, 1<<(w-1), (Eall<<fb), (1<<(w-1))|(Eall<<fb),\n            ((Eall-1)<<fb)|(F-1), ((1<<(w-1))|((Eall-1)<<fb)|(F-1)),\n            (Eall<<fb)|(1<<(fb-1)), (Eall<<fb)|((1<<fb)-1),\n            (Eall<<fb)|(1<<(fb-1))|1, 1, F-1, F, (F<<1)-1, (Eall-1)<<fb]\n        specials_cache[key]=sp\n    sp=specials_cache[key]\n    out=[]\n    for _ in ran",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 36416,
+      "time": "2026-10-08T20:52:43.401908+00:00",
+      "tool_call_id": "call_4be90b4e9b204f2c9273f5b0",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, random, time, subprocess, sys\nrng=random.Random(7)\neb,fb=11,52; w=1+eb+fb; Eall=(1<<eb)-1; F=1<<fb\ndef rnd():\n    r=rng.random()\n    if r<0.75:\n        return rng.randrange(1<<w)\n    if r<0.8: return 0\n    if r<0.85: return rng.randrange(1, F)          # subnormal\n    if r<0.9: return ((Eall-1)<<fb)|rng.randrange(F)  # large finite\n    if r<0.95: return Eall<<fb                     # inf\n    return (Eall<<fb)|rng.randrange(1,F)           # nan\nlines=[]\nN=20000\nfor _ in range(N):\n    pairs=[[format(rnd(),'x'),format(rnd(),'x')] for _ in range(64)]\n    lines.append(json.dumps({\"ebits\":eb,\"fbits\":fb,\"mode\":rng.choice([\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]),\"pairs\":pairs}))\ndata='\\n'.join(lines)+'\\n'\nopen('/tmp/bench_in.jsonl','w').write(data)\nt=time.time()\np=subprocess.run([sys.executable,'/app/main.py'],input=data,text=True,capture_output=True)\nel=time.time()-t\nassert p.returncode==0, p.stderr\nassert len(p.stdout.splitlines())==N\nprint(f\"{N} requests x 64 pairs: {el:.2f}s  (input {len(data)/1e6:.1f} MB)\")\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 42869,
+      "time": "2026-10-08T20:53:30.438245+00:00",
+      "tool_call_id": "call_a880705455684b778aa653b8",
+      "command": "cd /app && python3 - <<'EOF'\nimport sys\nsys.path.insert(0,'/app')\nfrom main import solve\n\ndef chk(req, bits, flags, note=\"\"):\n    got=solve(req)\n    ok = int(got['bits'],16)==int(bits,16) and set(got['flags'])==set(flags)\n    print((\"ok  \" if ok else \"FAIL\"), note, req['mode'], req['pairs'], \"->\", got, \"expected\", bits, flags)\n    return ok\n\nallok=True\nE=lambda m,p: {\"ebits\":3,\"fbits\":2,\"mode\":m,\"pairs\":p}\n\n# tie in normal range: +0.28125 = 4.5*2^-4 (0.1875 * 1.5), between 0.25 and 0.3125\nallok &= chk(E(\"RNE\",[[\"03\",\"0e\"]]),\"04\",[\"inexact\"],\"tie-even\")\nallok &= chk(E(\"RNA\",[[\"03\",\"0e\"]]),\"05\",[\"inexact\"],\"tie-away\")\nallok &= chk(E(\"RTZ\",[[\"03\",\"0e\"]]),\"04\",[\"inexact\"],\"tie-tz\")\nallok &= chk(E(\"RUP\",[[\"03\",\"0e\"]]),\"05\",[\"inexact\"],\"tie-up\")\nallok &= chk(E(\"RDN\",[[\"03\",\"0e\"]]),\"04\",[\"inexact\"],\"tie-dn\")\n# negative version\nallok &= chk(E(\"RNE\",[[\"23\",\"0e\"]]),\"24\",[\"inexact\"],\"neg tie-even\")\nallok &= chk(E(\"RNA\",[[\"23\",\"0e\"]]),\"25\",[\"inexact\"],\"neg tie-away\")\nallok &= chk(E(\"RTZ\",[[\"23\",\"0e\"]]),\"24\",[\"inexact\"],\"neg tie-tz\")\nallok &= chk(E(\"RUP\",[[\"23\",\"0e\"]]),\"24\",[\"inexact\"],\"neg tie-up (toward zero)\")\nallok &= chk(E(\"RDN\",[[\"23\",\"0e\"]]),\"25\",[\"inexact\"],\"neg tie-dn (away)\")\n\n# tie in subnormal range: 1.5*2^-4 = 0.09375 (0.1875*0.5)\nallok &= chk(E(\"RNE\",[[\"03\",\"08\"]]),\"02\",[\"inexact\",\"underflow\"],\"sub tie-even\")\nallok &= chk(E(\"RNA\",[[\"03\",\"08\"]]),\"02\",[\"inexact\",\"underflow\"],\"sub tie-away\")\nallok &= chk(E(\"RTZ\",[[\"03\",\"08\"]]),\"01\",[\"inexact\",\"underflow\"],\"sub tie-tz\")\nallok &= chk(E(\"RUP\",[[\"03\",\"08\"]]),\"02\",[\"inexact\",\"underflow\"],\"sub tie-up\")\nallok &= chk(E(\"RDN\",[[\"03\",\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 44187,
+      "time": "2026-10-08T20:53:41.329282+00:00",
+      "tool_call_id": "call_a4b34cb74b2e4851b755279a",
+      "command": "cd /app && python3 - <<'EOF'\nimport sys\nsys.path.insert(0,'/app')\nfrom main import solve\nE=lambda m,p: {\"ebits\":3,\"fbits\":2,\"mode\":m,\"pairs\":p}\ndef chk(req, bits, flags, note=\"\"):\n    got=solve(req)\n    ok = int(got['bits'],16)==int(bits,16) and set(got['flags'])==set(flags)\n    print((\"ok  \" if ok else \"FAIL\"), note, req['mode'], req['pairs'], \"->\", got, \"expected\", bits, flags)\n    return ok\nallok=True\n# 14 + 1 = 15, tie between 14 and 16 with q=2\np=[[\"1b\",\"0c\"],[\"0c\",\"0c\"]]\nallok &= chk(E(\"RNE\",p),\"1c\",[\"overflow\",\"inexact\"],\"15 RNE -> inf\")\nallok &= chk(E(\"RNA\",p),\"1c\",[\"overflow\",\"inexact\"],\"15 RNA -> inf\")\nallok &= chk(E(\"RTZ\",p),\"1b\",[\"inexact\"],\"15 RTZ -> max finite no ovf\")\nallok &= chk(E(\"RUP\",p),\"1c\",[\"overflow\",\"inexact\"],\"15 RUP -> inf\")\nallok &= chk(E(\"RDN\",p),\"1b\",[\"inexact\"],\"15 RDN -> max finite no ovf\")\n# negative: -14 - 1 = -15\np=[[\"3b\",\"0c\"],[\"2c\",\"0c\"]]\nallok &= chk(E(\"RNE\",p),\"3c\",[\"overflow\",\"inexact\"],\"-15 RNE -> -inf\")\nallok &= chk(E(\"RNA\",p),\"3c\",[\"overflow\",\"inexact\"],\"-15 RNA -> -inf\")\nallok &= chk(E(\"RTZ\",p),\"3b\",[\"inexact\"],\"-15 RTZ -> -max finite\")\nallok &= chk(E(\"RUP\",p),\"3b\",[\"inexact\"],\"-15 RUP -> -max finite no ovf\")\nallok &= chk(E(\"RDN\",p),\"3c\",[\"overflow\",\"inexact\"],\"-15 RDN -> -inf\")\n# 14*1 = 14 exact\nallok &= chk(E(\"RNE\",[[\"1b\",\"0c\"]]),\"1b\",[],\"14*1 exact\")\n# fused exactness: products each inexact individually but cancel exactly\n# (1+2^-2)*(1+2^-2) - (1+2^-2)*(1+2^-2) = 0, products identical => +0\nallok &= chk(E(\"RNE\",[[\"0e\",\"0e\"],[\"0e\",\"2e\"]]),\"00\",[],\"cancel to +0\")\nallok &= chk(E(\"RDN\",[[\"0e\",\"0e\"],[\"0e\",\"2e\"]]),\"20\",[],\"cancel to -",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 50083,
+      "time": "2026-10-08T20:54:23.770533+00:00",
+      "tool_call_id": "call_f60775fb40bb4682be65da8e",
+      "command": "cd /app && python3 - <<'EOF'\nimport sys, random, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom ref_check import ref\nE=lambda m,p: {\"ebits\":3,\"fbits\":2,\"mode\":m,\"pairs\":p}\ndef chk(req, bits, flags, note=\"\"):\n    got=solve(req)\n    ok = int(got['bits'],16)==int(bits,16) and set(got['flags'])==set(flags)\n    if not ok: print(\"FAIL\", note, req, got, bits, flags)\n    return ok\nallok=True\n# 12+1 = 13, tie between 12 (even significand f=2) and 14 (f=3)\np=[[\"1a\",\"0c\"],[\"0c\",\"0c\"]]\nallok &= chk(E(\"RNE\",p),\"1a\",[\"inexact\"],\"13 RNE tie-even picks 12\")\nallok &= chk(E(\"RNA\",p),\"1b\",[\"inexact\"],\"13 RNA picks 14\")\nallok &= chk(E(\"RTZ\",p),\"1a\",[\"inexact\"],\"13 RTZ\")\nallok &= chk(E(\"RUP\",p),\"1b\",[\"inexact\"],\"13 RUP\")\nallok &= chk(E(\"RDN\",p),\"1a\",[\"inexact\"],\"13 RDN\")\nprint(\"tie-even 12/14 ok\" if allok else \"FAILURES\")\n\n# Large randomized differential, incl. adversarial repetition\nrng=random.Random(999)\ndef randop(eb,fb):\n    w=1+eb+fb; Eall=(1<<eb)-1; F=1<<fb\n    r=rng.random()\n    if r<0.5: return rng.randrange(1<<w)\n    if r<0.6: return 0\n    if r<0.7: return rng.randrange(F)                    # subnormal\n    if r<0.8: return ((Eall-1)<<fb)|rng.randrange(F)     # max-ish finite\n    if r<0.9: return (Eall<<fb)|rng.randrange(F)         # nan (incl sNaN)\n    return Eall<<fb                                      # inf\nformats=[(3,2),(3,3),(4,3),(5,4),(7,10),(11,52),(3,52),(11,2),(6,40),(4,20)]\nN=30000\nt=time.time()\nfor i in range(N):\n    eb,fb=rng.choice(formats)\n    m=rng.choice([\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"])\n    k=rng.choice([0,1,2,3,4,8,32,64])\n    pairs=[[format(randop(eb,fb",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 53105,
+      "time": "2026-10-08T20:54:51.775193+00:00",
+      "tool_call_id": "call_e656b308cd5841268942ba3d",
+      "command": "cd /app && python3 - <<'EOF'\nimport sys\nsys.path.insert(0,'/app')\nfrom main import solve\nE=lambda m,p: {\"ebits\":3,\"fbits\":2,\"mode\":m,\"pairs\":p}\ndef chk(req, bits, flags, note=\"\"):\n    got=solve(req)\n    ok = int(got['bits'],16)==int(bits,16) and set(got['flags'])==set(flags)\n    print((\"ok  \" if ok else \"FAIL\"), note, \"->\", got)\n    return ok\na=True\na&=chk(E(\"RNE\",[[\"1f\",\"0c\"]]),\"1e\",[],\"quiet nan f=3\")\na&=chk(E(\"RNE\",[[\"1e\",\"0c\"]]),\"1e\",[],\"quiet nan f=2\")\na&=chk(E(\"RNE\",[[\"1d\",\"0c\"]]),\"1e\",[\"invalid\"],\"signaling nan f=1\")\na&=chk(E(\"RNE\",[[\"3d\",\"0c\"]]),\"1e\",[\"invalid\"],\"negative signaling nan\")\na&=chk(E(\"RNE\",[[\"1c\",\"1d\"]]),\"1e\",[\"invalid\"],\"snan with inf, no product\")\na&=chk(E(\"RNE\",[[\"1e\",\"0c\"],[\"1c\",\"0c\"]]),\"1e\",[],\"qnan dominates, only +inf\")\na&=chk(E(\"RNE\",[[\"1e\",\"0c\"],[\"1c\",\"0c\"],[\"3c\",\"0c\"]]),\"1e\",[\"invalid\"],\"qnan + both inf signs\")\na&=chk(E(\"RNE\",[[\"1e\",\"0c\"],[\"1c\",\"0\"]]),\"1e\",[\"invalid\"],\"qnan + zero*inf\")\na&=chk(E(\"RNE\",[[\"1c\",\"1c\"]]),\"1c\",[],\"+inf*+inf\")\na&=chk(E(\"RNE\",[[\"1c\",\"3c\"]]),\"3c\",[],\"+inf*-inf\")\na&=chk(E(\"RNE\",[[\"3c\",\"3c\"]]),\"1c\",[],\"-inf*-inf\")\na&=chk(E(\"RNE\",[[\"1c\",\"0c\"],[\"0c\",\"0c\"]]),\"1c\",[],\"inf + finite\")\na&=chk(E(\"RNE\",[[\"1c\",\"0c\"],[\"0c\",\"2c\"]]),\"1c\",[],\"inf + finite negative\")\na&=chk(E(\"RNE\",[[\"3c\",\"0c\"],[\"0c\",\"2c\"]]),\"3c\",[],\"-inf + finite\")\na&=chk(E(\"RNE\",[[\"20\",\"1c\"]]),\"1e\",[\"invalid\"],\"-0 * +inf\")\na&=chk(E(\"RNE\",[[\"1c\",\"20\"]]),\"1e\",[\"invalid\"],\"+inf * -0\")\na&=chk(E(\"RNE\",[[\"0\",\"3c\"]]),\"1e\",[\"invalid\"],\"+0 * -inf\")\n# empty all modes\nfor m,exp in [(\"RNE\",\"0\"),(\"RNA\",\"0\"),(\"RTZ\",\"0\"),(\"RUP\",\"0\"),(\"RDN\",\"20\")]:\n    a&=chk(E(m,[]),exp,[],f\"empty ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 56534,
+      "time": "2026-10-08T20:55:20.296970+00:00",
+      "tool_call_id": "call_84b18819a6b34fc0b8433d9f",
+      "command": "cd /app && python3 - <<'EOF'\nimport sys\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom ref_check import ref\nM=\"7fefffffffffffff\"; Mneg=\"ffefffffffffffff\"\nfor mode,expbits in [(\"RNE\",\"0\"),(\"RNA\",\"0\"),(\"RTZ\",\"0\"),(\"RUP\",\"1\"),(\"RDN\",\"0\")]:\n    req={\"ebits\":11,\"fbits\":52,\"mode\":mode,\"pairs\":[[M,M],[Mneg,M],[\"1\",\"1\"]]}\n    got=solve(req); r=ref(req)\n    print(mode, got, r)\n    assert int(got['bits'],16)==int(r['bits'],16) and set(got['flags'])==set(r['flags'])\n    assert int(got['bits'],16)==int(expbits,16) and set(got['flags'])=={\"underflow\",\"inexact\"}, (mode,got)\nprint(\"extreme cancellation ok\")\nEOF\necho \"--- end-to-end mixed batch ---\"\npython3 - <<'EOF'\nimport json, subprocess, sys, random\nsys.path.insert(0,'/app')\nfrom ref_check import ref\nrng=random.Random(42)\nreqs=[]\nfor i in range(500):\n    eb=rng.randint(3,11); fb=rng.randint(2,52)\n    if 1+eb+fb>64: fb=64-1-eb\n    reqs.append({\"ebits\":eb,\"fbits\":fb,\"mode\":rng.choice([\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]),\n                 \"pairs\":[[format(rng.randrange(1<<(1+eb+fb)),'x').upper(),format(rng.randrange(1<<(1+eb+fb)),'x')] for _ in range(rng.randint(0,6))]})\ninp='\\n'.join(json.dumps(r) for r in reqs)+'\\n'\np=subprocess.run([sys.executable,'/app/main.py'],input=inp,text=True,capture_output=True,cwd='/app')\nassert p.returncode==0, p.stderr\nassert p.stderr=='', p.stderr\nlines=p.stdout.splitlines()\nassert len(lines)==len(reqs), (len(lines),len(reqs))\nfor r,l in zip(reqs,lines):\n    got=json.loads(l); exp=ref(r)\n    assert int(got['bits'],16)==int(exp['bits'],16) and set(got['flags'])==set(exp['flags']), (r,got,exp)\nprint(\"end-t",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 59102,
+      "time": "2026-10-08T20:55:43.966712+00:00",
+      "tool_call_id": "call_7de398685144461ca83f0abb",
+      "command": "cd /app && python3 -m py_compile main.py ref_check.py && echo \"compile ok\" && sed -n '1,60p' main.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 59677,
+      "time": "2026-10-08T20:55:49.986751+00:00",
+      "tool_call_id": "call_e5576a3f564b42fcbb3f2476",
+      "command": "cd /app && python3 smoke.py && python3 - <<'EOF'\nimport sys, random\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom ref_check import ref\n\n# Exhaustive single-pair regression on toy formats, all modes\nn=0\nfor (eb,fb) in [(3,2),(3,3)]:\n    pats=[format(v,'x') for v in range(1<<(1+eb+fb))]\n    for m in [\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]:\n        for a in pats:\n            for b in pats:\n                req={\"ebits\":eb,\"fbits\":fb,\"mode\":m,\"pairs\":[[a,b]]}\n                x=solve(req); y=ref(req)\n                assert int(x['bits'],16)==int(y['bits'],16) and set(x['flags'])==set(y['flags']), (req,x,y)\n                n+=1\nprint(\"exhaustive regression:\",n,\"cases ok\")\n\n# random regression\nrng=random.Random(2024)\nfor i in range(20000):\n    eb=rng.randint(3,11); fb=rng.randint(2,52)\n    if 1+eb+fb>64: fb=64-1-eb\n    w=1+eb+fb\n    k=rng.choice([0,1,2,4,16,64])\n    pairs=[[format(rng.randrange(1<<w),'x'),format(rng.randrange(1<<w),'x')] for _ in range(k)]\n    req={\"ebits\":eb,\"fbits\":fb,\"mode\":rng.choice([\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]),\"pairs\":pairs}\n    x=solve(req); y=ref(req)\n    assert int(x['bits'],16)==int(y['bits'],16) and set(x['flags'])==set(y['flags']), (req,x,y)\nprint(\"random regression: 20000 cases ok\")\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 59914,
+      "time": "2026-10-08T20:55:58.225792+00:00",
+      "tool_call_id": "call_3658c5c10fbe4b038b207b1f",
+      "command": "cd /app && rm -rf __pycache__ && sed -n '60,200p' main.py && ls -la /app",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 61240,
+      "time": "2026-10-08T20:56:12.260080+00:00",
+      "tool_call_id": "call_1d694b89ffd64a1493667fa5",
+      "command": "cd /app && python3 - <<'EOF'\np='/app/main.py'\ns=open(p).read()\ns=s.replace(\"\"\"        req = json.loads(line)\n        out.write(json.dumps(solve(req), separators=(\",\", \":\")))\n        out.write(\"\\\\n\")\n    out.flush()\"\"\",\n\"\"\"        req = json.loads(line)\n        out.write(json.dumps(solve(req), separators=(\",\", \":\")))\n        out.write(\"\\\\n\")\n        out.flush()\"\"\")\nopen(p,'w').write(s)\nEOF\npython3 - <<'EOF'\nimport subprocess, sys, time\ndata=open('/tmp/bench_in.jsonl').read()\nt=time.time()\np=subprocess.run([sys.executable,'/app/main.py'],input=data,text=True,capture_output=True)\nel=time.time()-t\nassert p.returncode==0 and len(p.stdout.splitlines())==20000\nprint(f\"20000x64 requests with per-line flush: {el:.2f}s\")\nEOF\npython3 /app/smoke.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 65226,
+      "time": "2026-10-08T20:56:52.921078+00:00",
+      "tool_call_id": "call_c324ad45d3a34cf1854defce",
+      "command": "cd /app && python3 - <<'EOF'\np='/app/main.py'\ns=open(p).read()\nold = '''def main():\n    out = sys.stdout\n    for line in sys.stdin:\n        line = line.strip()\n        if not line:\n            continue\n        req = json.loads(line)\n        out.write(json.dumps(solve(req), separators=(\",\", \":\")))\n        out.write(\"\\\\n\")\n        out.flush()'''\nnew = '''def main():\n    # A dedicated writer thread keeps the main thread from ever blocking on a\n    # full stdout pipe (so batch harnesses cannot deadlock), while still\n    # flushing every response promptly for interactive harnesses.\n    import queue\n    import threading\n\n    out = sys.stdout\n    q = queue.Queue()\n    sentinel = object()\n\n    def writer():\n        while True:\n            item = q.get()\n            if item is sentinel:\n                break\n            out.write(item)\n            out.flush()\n\n    t = threading.Thread(target=writer, daemon=True)\n    t.start()\n    for line in sys.stdin:\n        line = line.strip()\n        if not line:\n            continue\n        req = json.loads(line)\n        q.put(json.dumps(solve(req), separators=(\",\", \":\")) + \"\\\\n\")\n    q.put(sentinel)\n    t.join()'''\nassert old in s\ns=s.replace(old,new)\nopen(p,'w').write(s)\nEOF\npython3 -m py_compile /app/main.py && python3 /app/smoke.py\npython3 - <<'EOF'\nimport subprocess, sys, time, json\ndata=open('/tmp/bench_in.jsonl').read()\nt=time.time()\np=subprocess.run([sys.executable,'/app/main.py'],input=data,text=True,capture_output=True)\nel=time.time()-t\nassert p.returncode==0 and p.stderr=='' and len(p.stdout.splitlines())==20000\nprint(f\"batch 20000x6",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 66080,
+      "time": "2026-10-08T20:57:04.473927+00:00",
+      "tool_call_id": "call_57d047c9758143d394d44450",
+      "command": "cd /app && python3 - <<'EOF'\nimport sys, random, subprocess, json, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom ref_check import ref\n\ndef cmp(req):\n    a=solve(req); b=ref(req)\n    assert int(a['bits'],16)==int(b['bits'],16) and set(a['flags'])==set(b['flags']), (req,a,b)\n\n# exhaustive single-pair toy formats\nn=0\nfor (eb,fb) in [(3,2),(3,3),(4,2)]:\n    pats=[format(v,'x') for v in range(1<<(1+eb+fb))]\n    for m in [\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]:\n        for a in pats:\n            for b in pats:\n                cmp({\"ebits\":eb,\"fbits\":fb,\"mode\":m,\"pairs\":[[a,b]]}); n+=1\nprint(\"exhaustive:\",n)\n# random differential across parameter range\nrng=random.Random(31337)\nfor i in range(20000):\n    eb=rng.randint(3,11); fb=rng.randint(2,52)\n    if 1+eb+fb>64: fb=64-1-eb\n    w=1+eb+fb\n    pairs=[[format(rng.randrange(1<<w),'x'),format(rng.randrange(1<<w),'x')] for _ in range(rng.choice([0,1,2,3,8,64]))]\n    cmp({\"ebits\":eb,\"fbits\":fb,\"mode\":rng.choice([\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]),\"pairs\":pairs})\nprint(\"random differential: 20000\")\n# end-to-end subprocess on mixed batch\nreqs=[]\nfor i in range(1000):\n    eb=rng.randint(3,11); fb=rng.randint(2,52)\n    if 1+eb+fb>64: fb=64-1-eb\n    w=1+eb+fb\n    reqs.append({\"ebits\":eb,\"fbits\":fb,\"mode\":rng.choice([\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]),\n                 \"pairs\":[[format(rng.randrange(1<<w),'x'),format(rng.randrange(1<<w),'x')] for _ in range(rng.randint(0,64))]})\ninp='\\n'.join(json.dumps(r) for r in reqs)+'\\n'\np=subprocess.run([sys.executable,'/app/main.py'],input=inp,text=True,capture_output=True,cwd='/app')\nassert p.returncod",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 22741,
+      "time": "2026-10-08T20:50:48.926512+00:00",
+      "tool_call_id": "call_0156c7a530154050a7170cc0",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:48 ..\n-rw-r--r-- 1 agent agent  896 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('exact-fused-dot',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n---\nPython 3.12.12\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:48 ..\n-rw-r--r-- 1 agent agent  896 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('exact-fused-dot',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n---\nPython 3.12.12\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 30317,
+      "time": "2026-10-08T20:51:46.678905+00:00",
+      "tool_call_id": "call_e2df9015871243fc96d47284",
+      "return_code": 1,
+      "stdout": "public ok\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 38, in <module>\nAssertionError: ({'ebits': 3, 'fbits': 2, 'mode': 'RNE', 'pairs': [['20', '20']]}, {'bits': '0', 'flags': []}, '20', [])\n",
+      "stdout_tail": "public ok\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"<stdin>\", line 38, in <module>\nAssertionError: ({'ebits': 3, 'fbits': 2, 'mode': 'RNE', 'pairs': [['20', '20']]}, {'bits': '0', 'flags': []}, '20', [])\n"
+    },
+    {
+      "step": 32636,
+      "time": "2026-10-08T20:52:06.231589+00:00",
+      "tool_call_id": "call_1d6e965277a241e9b2443459",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 23, in <module>\n  File \"<stdin>\", line 7, in cmp\n  File \"/app/ref_check.py\", line 65, in ref\n    prod = va[0] * vb[0]\n                   ~~^^^\nIndexError: list index out of range\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"<stdin>\", line 23, in <module>\n  File \"<stdin>\", line 7, in cmp\n  File \"/app/ref_check.py\", line 65, in ref\n    prod = va[0] * vb[0]\n                   ~~^^^\nIndexError: list index out of range\n"
+    },
+    {
+      "step": 42870,
+      "time": "2026-10-08T20:53:30.950487+00:00",
+      "tool_call_id": "call_a880705455684b778aa653b8",
+      "return_code": 0,
+      "stdout": "ok   tie-even RNE [['03', '0e']] -> {'bits': '4', 'flags': ['inexact']} expected 04 ['inexact']\nok   tie-away RNA [['03', '0e']] -> {'bits': '5', 'flags': ['inexact']} expected 05 ['inexact']\nok   tie-tz RTZ [['03', '0e']] -> {'bits': '4', 'flags': ['inexact']} expected 04 ['inexact']\nok   tie-up RUP [['03', '0e']] -> {'bits': '5', 'flags': ['inexact']} expected 05 ['inexact']\nok   tie-dn RDN [['03', '0e']] -> {'bits': '4', 'flags': ['inexact']} expected 04 ['inexact']\nok   neg tie-even RNE [['23', '0e']] -> {'bits': '24', 'flags': ['inexact']} expected 24 ['inexact']\nok   neg tie-away RNA [['23', '0e']] -> {'bits': '25', 'flags': ['inexact']} expected 25 ['inexact']\nok   neg tie-tz RTZ [['23', '0e']] -> {'bits': '24', 'flags': ['inexact']} expected 24 ['inexact']\nok   neg tie-up (toward zero) RUP [['23', '0e']] -> {'bits': '24', 'flags': ['inexact']} expected 24 ['inexact']\nok   neg tie-dn (away) RDN [['23', '0e']] -> {'bits': '25', 'flags': ['inexact']} expected 25 ['inexact']\nok   sub tie-even RNE [['03', '08']] -> {'bits': '2', 'flags': ['inexact', 'underflow']} expected 02 ['inexact', 'underflow']\nok   sub tie-away RNA [['03', '08']] -> {'bits': '2', 'flags': ['inexact', 'underflow']} expected 02 ['inexact', 'underflow']\nok   sub tie-tz RTZ [['03', '08']] -> {'bits': '1', 'flags': ['inexact', 'underflow']} expected 01 ['inexact', 'underflow']\nok   sub tie-up RUP [['03', '08']] -> {'bits': '2', 'flags': ['inexact', 'underflow']} expected 02 ['inexact', 'underflow']\nok   sub tie-dn RDN [['03', '08']] -> {'bits': '1', 'flags': ['inexact', 'underflow']} expected 01 ['inexact', 'underflow']\nok   norm boundary tie-even RNE [['07', '08']] -> {'bits': '4', 'flags': ['inexact']} expected 04 ['inexact']\nok   norm boundary tie-away RNA [['07', '08']] -> {'bits': '4', 'flags': ['inexact']} expected 04 ['inexact']\nok   norm boundary tz RTZ [['07', '08']] -> {'bits': '3', 'flags': ['inexact', 'underflow']} expected 03 ['inexact', 'underflow']\nok   norm boundary up RUP [['07', '08']] -> {'bits': '4', 'flags': ['inexact']} expected 04 ['inexact']\nok   norm boundary dn RDN [['07', '08']] -> {'bits': '3', 'flags': ['inexact', 'underflow']} expected 03 ['inexact', 'underflow']\nok   carry RNE RNE [['0a', '09']] -> {'bits': '8', 'flags': ['inexact']} expected 08 ['inexact']\nok   carry RNA RNA [['0a', '09']] -> {'bits': '8', 'flags': ['inexact']} expected 08 ['inexact']\nok   carry RTZ RTZ [['0a', '09']] -> {'bits': '7', 'flags': ['inexact']} expected 07 ['inexact']\nok   carry RUP RUP [['0a', '09']] -> {'bits': '8', 'flags': ['inexact']} expected 08 ['inexact']\nok   carry RDN RDN [['0a', '09']] -> {'bits': '7', 'flags': ['inexact']} expected 07 ['inexact']\nok   exact subnormal RNE [['04', '04']] -> {'bits': '1', 'flags': []} expected 01 []\nok   exact subnormal RDN RDN [['04', '04']] -> {'bits': '1', 'flags': []} expected 01 []\nok   tiny RNE -> +0 RNE [['01', '01']] -> {'bits': '0', 'flags': ['underflow', 'inexact']} expected 00 ['inexact', 'underflow']\nok   tiny RNA -> +0 RNA [['01', '01']] -> {'bits': '0', 'flags': ['underflow', 'inexact']} expected 00 ['inexact', 'underflow']\nok   tiny RTZ -> +0 RTZ [['01', '01']] -> {'bits': '0', 'flags': ['underflow', 'inexact']} expected 00 ['inexact', 'underflow']\nok   tiny RUP -> min sub RUP [['01', '01']] -> {'bits': '1', 'flags': ['inexact', 'underflow']} expected 01 ['inexact', 'underflow']\nok   tiny RDN -> +0 RDN [['01', '01']] -> {'bits': '0', 'flags': ['underflow', 'inexact']} expected 00 ['inexact', 'underflow']\nok   neg tiny RUP -> -0 RUP [['21', '01']] -> {'bits': '20', 'flags': ['underflow', 'inexact']} expected 20 ['inexact', 'underflow']\nok   neg tiny RDN -> min sub RDN [['21', '01']] -> {'bits': '21', 'flags': ['inexact', 'underflow']} expected 21 ['inexact', 'underflow']\nok   neg tiny RNE -> -0 RNE [['21', '01']] -> {'bits': '20', 'flags': ['underflow', 'inexact']} expected 20 ['inexact', 'underflow']\nok   neg tiny RTZ -> -0 RTZ [['21', '01']] -> {'bits': '20', 'flags': ['underflow', 'inexact']} expected 20 ['inexact', 'underflow']\nok   ovf RNE RNE [['1b', '1b']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   ovf RNA RNA [['1b', '1b']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   ovf RTZ RTZ [['1b', '1b']] -> {'bits': '1b', 'flags': ['overflow', 'inexact']} expected 1b ['overflow', 'inexact']\nok   ovf RUP+ RUP [['1b', '1b']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   ovf RDN+ RDN [['1b', '1b']] -> {'bits': '1b', 'flags': ['overflow', 'inexact']} expected 1b ['overflow', 'inexact']\nok   ovf RNE- RNE [['3b', '1b']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   ovf RTZ- RTZ [['3b', '1b']] -> {'bits': '3b', 'flags': ['overflow', 'inexact']} expected 3b ['overflow', 'inexact']\nok   ovf RUP- (toward zero) RUP [['3b', '1b']] -> {'bits': '3b', 'flags': ['overflow', 'inexact']} expected 3b ['overflow', 'inexact']\nok   ovf RDN- (away) RDN [['3b', '1b']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   exact 2^(emax+1) RNE RNE [['14', '14']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   exact 2^(emax+1) RNA RNA [['14', '14']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   exact 2^(emax+1) RTZ RTZ [['14', '14']] -> {'bits': '1b', 'flags': ['overflow', 'inexact']} expected 1b ['overflow', 'inexact']\nok   exact 2^(emax+1) RUP RUP [['14', '14']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   exact 2^(emax+1) RDN RDN [['14', '14']] -> {'bits': '1b', 'flags': ['overflow', 'inexact']} expected 1b ['overflow', 'inexact']\nFAIL 15 RNE -> inf RNE [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1c ['overflow', 'inexact']\nFAIL 15 RNA -> inf RNA [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1c",
+      "stderr": "",
+      "stdout_tail": "w', 'inexact']} expected 00 ['inexact', 'underflow']\nok   neg tiny RUP -> -0 RUP [['21', '01']] -> {'bits': '20', 'flags': ['underflow', 'inexact']} expected 20 ['inexact', 'underflow']\nok   neg tiny RDN -> min sub RDN [['21', '01']] -> {'bits': '21', 'flags': ['inexact', 'underflow']} expected 21 ['inexact', 'underflow']\nok   neg tiny RNE -> -0 RNE [['21', '01']] -> {'bits': '20', 'flags': ['underflow', 'inexact']} expected 20 ['inexact', 'underflow']\nok   neg tiny RTZ -> -0 RTZ [['21', '01']] -> {'bits': '20', 'flags': ['underflow', 'inexact']} expected 20 ['inexact', 'underflow']\nok   ovf RNE RNE [['1b', '1b']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   ovf RNA RNA [['1b', '1b']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   ovf RTZ RTZ [['1b', '1b']] -> {'bits': '1b', 'flags': ['overflow', 'inexact']} expected 1b ['overflow', 'inexact']\nok   ovf RUP+ RUP [['1b', '1b']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   ovf RDN+ RDN [['1b', '1b']] -> {'bits': '1b', 'flags': ['overflow', 'inexact']} expected 1b ['overflow', 'inexact']\nok   ovf RNE- RNE [['3b', '1b']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   ovf RTZ- RTZ [['3b', '1b']] -> {'bits': '3b', 'flags': ['overflow', 'inexact']} expected 3b ['overflow', 'inexact']\nok   ovf RUP- (toward zero) RUP [['3b', '1b']] -> {'bits': '3b', 'flags': ['overflow', 'inexact']} expected 3b ['overflow', 'inexact']\nok   ovf RDN- (away) RDN [['3b', '1b']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   exact 2^(emax+1) RNE RNE [['14', '14']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   exact 2^(emax+1) RNA RNA [['14', '14']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   exact 2^(emax+1) RTZ RTZ [['14', '14']] -> {'bits': '1b', 'flags': ['overflow', 'inexact']} expected 1b ['overflow', 'inexact']\nok   exact 2^(emax+1) RUP RUP [['14', '14']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   exact 2^(emax+1) RDN RDN [['14', '14']] -> {'bits': '1b', 'flags': ['overflow', 'inexact']} expected 1b ['overflow', 'inexact']\nFAIL 15 RNE -> inf RNE [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1c ['overflow', 'inexact']\nFAIL 15 RNA -> inf RNA [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1c ['overflow', 'inexact']\nFAIL 15 RTZ -> max finite no ovf RTZ [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1b ['inexact']\nFAIL 15 RUP -> inf RUP [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1c ['overflow', 'inexact']\nFAIL 15 RDN -> max finite no ovf RDN [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1b ['inexact']\nFAIL check placeholder RNE [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1b ['inexact']\nSOME FAILED\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 44188,
+      "time": "2026-10-08T20:53:41.696686+00:00",
+      "tool_call_id": "call_a4b34cb74b2e4851b755279a",
+      "return_code": 0,
+      "stdout": "ok   15 RNE -> inf RNE [['1b', '0c'], ['0c', '0c']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   15 RNA -> inf RNA [['1b', '0c'], ['0c', '0c']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   15 RTZ -> max finite no ovf RTZ [['1b', '0c'], ['0c', '0c']] -> {'bits': '1b', 'flags': ['inexact']} expected 1b ['inexact']\nok   15 RUP -> inf RUP [['1b', '0c'], ['0c', '0c']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   15 RDN -> max finite no ovf RDN [['1b', '0c'], ['0c', '0c']] -> {'bits': '1b', 'flags': ['inexact']} expected 1b ['inexact']\nok   -15 RNE -> -inf RNE [['3b', '0c'], ['2c', '0c']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   -15 RNA -> -inf RNA [['3b', '0c'], ['2c', '0c']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   -15 RTZ -> -max finite RTZ [['3b', '0c'], ['2c', '0c']] -> {'bits': '3b', 'flags': ['inexact']} expected 3b ['inexact']\nok   -15 RUP -> -max finite no ovf RUP [['3b', '0c'], ['2c', '0c']] -> {'bits': '3b', 'flags': ['inexact']} expected 3b ['inexact']\nok   -15 RDN -> -inf RDN [['3b', '0c'], ['2c', '0c']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   14*1 exact RNE [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1b []\nok   cancel to +0 RNE [['0e', '0e'], ['0e', '2e']] -> {'bits': '0', 'flags': []} expected 00 []\nok   cancel to -0 RDN RDN [['0e', '0e'], ['0e', '2e']] -> {'bits': '20', 'flags': []} expected 20 []\nok   cancel nonzero RNE [['0c', '0c'], ['2c', '0c']] -> {'bits': '0', 'flags': []} expected 00 []\nok   cancel nonzero RDN RDN [['0c', '0c'], ['2c', '0c']] -> {'bits': '20', 'flags': []} expected 20 []\nFAIL sum subnormals exact RNE [['03', '0c'], ['01', '0c'], ['01', '0c'], ['01', '0c']] -> {'bits': '6', 'flags': []} expected 04 []\nSOME FAILED\n",
+      "stderr": "",
+      "stdout_tail": "ok   15 RNE -> inf RNE [['1b', '0c'], ['0c', '0c']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   15 RNA -> inf RNA [['1b', '0c'], ['0c', '0c']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   15 RTZ -> max finite no ovf RTZ [['1b', '0c'], ['0c', '0c']] -> {'bits': '1b', 'flags': ['inexact']} expected 1b ['inexact']\nok   15 RUP -> inf RUP [['1b', '0c'], ['0c', '0c']] -> {'bits': '1c', 'flags': ['overflow', 'inexact']} expected 1c ['overflow', 'inexact']\nok   15 RDN -> max finite no ovf RDN [['1b', '0c'], ['0c', '0c']] -> {'bits': '1b', 'flags': ['inexact']} expected 1b ['inexact']\nok   -15 RNE -> -inf RNE [['3b', '0c'], ['2c', '0c']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   -15 RNA -> -inf RNA [['3b', '0c'], ['2c', '0c']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   -15 RTZ -> -max finite RTZ [['3b', '0c'], ['2c', '0c']] -> {'bits': '3b', 'flags': ['inexact']} expected 3b ['inexact']\nok   -15 RUP -> -max finite no ovf RUP [['3b', '0c'], ['2c', '0c']] -> {'bits': '3b', 'flags': ['inexact']} expected 3b ['inexact']\nok   -15 RDN -> -inf RDN [['3b', '0c'], ['2c', '0c']] -> {'bits': '3c', 'flags': ['overflow', 'inexact']} expected 3c ['overflow', 'inexact']\nok   14*1 exact RNE [['1b', '0c']] -> {'bits': '1b', 'flags': []} expected 1b []\nok   cancel to +0 RNE [['0e', '0e'], ['0e', '2e']] -> {'bits': '0', 'flags': []} expected 00 []\nok   cancel to -0 RDN RDN [['0e', '0e'], ['0e', '2e']] -> {'bits': '20', 'flags': []} expected 20 []\nok   cancel nonzero RNE [['0c', '0c'], ['2c', '0c']] -> {'bits': '0', 'flags': []} expected 00 []\nok   cancel nonzero RDN RDN [['0c', '0c'], ['2c', '0c']] -> {'bits': '20', 'flags': []} expected 20 []\nFAIL sum subnormals exact RNE [['03', '0c'], ['01', '0c'], ['01', '0c'], ['01', '0c']] -> {'bits': '6', 'flags': []} expected 04 []\nSOME FAILED\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 59102,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 -m py_compile main.py ref_check.py && echo \"compile ok\" && sed -n '1,60p' main.py"
+    },
+    {
+      "step": 59103,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "compile ok\n#!/usr/bin/env python3\n\"\"\"Bit-exact fused dot product for a parameterized binary floating-point format.\n\nReads newline-delimited JSON requests from stdin and writes one JSON response\nper line to stdout.  All products are formed and summed exactly (as integers\nscaled by a power of two); only the final sum is rounded to the target format.\n\"\"\"\nimport json\nimport sys\n\n\ndef decode(v, ebits, fbits, Eall, F, mask_f):\n    \"\"\"Return (sign, kind, snan, A).\n\n    kind: 0 finite, 1 NaN, 2 infinity.  For finite values, A is an integer such\n    that value = (-1)**sign * A * 2**(emin-fbits); A == 0 denotes a signed zero.\n    snan is 1 for a signaling NaN, else 0.\n    \"\"\"\n    s = (v >> (ebits + fbits)) & 1\n    e = (v >> fbits) & Eall\n    f = v & mask_f\n    if e == Eall:\n        if f == 0:\n            return (s, 2, 0, 0)\n        # top fraction bit set => quiet, clear => signaling\n        return (s, 1, 0 if ((f >> (fbits - 1)) & 1) else 1, 0)\n    if e == 0:\n        A = f\n    else:\n        A = (F + f) << (e - 1)\n    return (s, 0, 0, A)\n\n\ndef solve(req):\n    ebits = req[\"ebits\"]\n    fbits = req[\"fbits\"]\n    mode = req[\"mode\"]\n    pairs = req[\"pairs\"]\n\n    Eall = (1 << ebits) - 1\n    bias = ("
+    },
+    {
+      "step": 59677,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 smoke.py && python3 - <<'EOF'\nimport sys, random\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom ref_check import ref\n\n# Exhaustive single-pair regression on toy formats, all modes\nn=0\nfor (eb,fb) in [(3,2),(3,3)]:\n    pats=[format(v,'x') for v in range(1<<(1+eb+fb))]\n    for m in [\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]:\n        for a in pats:\n            for b in pats:\n                req={\"ebits\":eb,\"fbits\":fb,\"mode\":m,\"pairs\":[[a,b]]}\n                x=solve(req); y=ref(req)\n                assert int(x['bits'],16)==int(y['bits'],16) and set(x['flags'])==set(y['flags']), (req,x,y)\n                n+=1\nprint(\"exhaustive regression:\",n,\"cases ok\")\n\n# random regression\nrng=random.Random(2024)\nfor i in range(20000):\n    eb=rng.randint(3,11); fb=rng.randint(2,52)\n    if 1+eb+fb>64: fb=64-1-eb\n    w=1+eb+fb\n    k=rng.choice([0,1,2,4,16,64])\n    pairs=[[format(rng.randrange(1<<w),'x'),format(rng.randrange(1<<w),'x')] for _ in range(k)]\n    req={\"ebits\":eb,\"fbits\":fb,\"mode\""
+    },
+    {
+      "step": 59678,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\nexhaustive regression: 102400 cases ok\nrandom regression: 20000 cases ok\n"
+    },
+    {
+      "step": 59914,
+      "kind": "terminal_call",
+      "summary": "cd /app && rm -rf __pycache__ && sed -n '60,200p' main.py && ls -la /app"
+    },
+    {
+      "step": 59915,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "    for pa, pb in pairs:\n        sa, ka, na, A = decode(int(pa, 16), ebits, fbits, Eall, F, mask_f)\n        sb, kb, nb, B = decode(int(pb, 16), ebits, fbits, Eall, F, mask_f)\n\n        if ka == 1 or kb == 1:\n            # A pair with a NaN operand contributes no product at all.\n            any_nan = True\n            if na or nb:\n                any_snan = True\n            all_neg_zero = False\n            continue\n\n        if ka == 2 or kb == 2:\n            if (ka == 2 and kb == 0 and B == 0) or (kb == 2 and ka == 0 and A == 0):\n                # zero times infinity (either order)\n                invalid = True\n                all_neg_zero = False\n                continue\n            any_inf = True\n            if sa ^ sb:\n                neg_inf = True\n            else:\n                pos_inf = True\n            all_neg_zero = False\n            continue\n\n        # Both operands finite.\n        prod = A * B\n        sp = sa ^ sb\n        if prod == 0:\n            if sp == 0:\n                all_neg_zero = False\n        else:\n            all_neg_zero = False\n            total += -prod if sp else prod\n\n    if any_snan:\n        invalid = True\n    if pos_inf and neg_inf:\n        invalid = T"
+    },
+    {
+      "step": 61240,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\np='/app/main.py'\ns=open(p).read()\ns=s.replace(\"\"\"        req = json.loads(line)\n        out.write(json.dumps(solve(req), separators=(\",\", \":\")))\n        out.write(\"\\\\n\")\n    out.flush()\"\"\",\n\"\"\"        req = json.loads(line)\n        out.write(json.dumps(solve(req), separators=(\",\", \":\")))\n        out.write(\"\\\\n\")\n        out.flush()\"\"\")\nopen(p,'w').write(s)\nEOF\npython3 - <<'EOF'\nimport subprocess, sys, time\ndata=open('/tmp/bench_in.jsonl').read()\nt=time.time()\np=subprocess.run([sys.executable,'/app/main.py'],input=data,text=True,capture_output=True)\nel=time.time()-t\nassert p.returncode==0 and len(p.stdout.splitlines())==20000\nprint(f\"20000x64 requests with per-line flush: {el:.2f}s\")\nEOF\npython3 /app/smoke.py"
+    },
+    {
+      "step": 61241,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "20000x64 requests with per-line flush: 4.79s\nPassed 3 public examples\n"
+    },
+    {
+      "step": 65226,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\np='/app/main.py'\ns=open(p).read()\nold = '''def main():\n    out = sys.stdout\n    for line in sys.stdin:\n        line = line.strip()\n        if not line:\n            continue\n        req = json.loads(line)\n        out.write(json.dumps(solve(req), separators=(\",\", \":\")))\n        out.write(\"\\\\n\")\n        out.flush()'''\nnew = '''def main():\n    # A dedicated writer thread keeps the main thread from ever blocking on a\n    # full stdout pipe (so batch harnesses cannot deadlock), while still\n    # flushing every response promptly for interactive harnesses.\n    import queue\n    import threading\n\n    out = sys.stdout\n    q = queue.Queue()\n    sentinel = object()\n\n    def writer():\n        while True:\n            item = q.get()\n            if item is sentinel:\n                break\n            out.write(item)\n            out.flush()\n\n    t = threading.Thread(target=writer, daemon=True)\n    t.start()\n    for line in sys.stdin:\n        line = line.strip()\n        if not"
+    },
+    {
+      "step": 65227,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\nbatch 20000x64 with writer thread: 3.70s\ninteractive response: {\"bits\":\"c\",\"flags\":[]}\ninteractive response: {\"bits\":\"20\",\"flags\":[]}\ninteractive ok\n"
+    },
+    {
+      "step": 66080,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport sys, random, subprocess, json, time\nsys.path.insert(0,'/app')\nfrom main import solve\nfrom ref_check import ref\n\ndef cmp(req):\n    a=solve(req); b=ref(req)\n    assert int(a['bits'],16)==int(b['bits'],16) and set(a['flags'])==set(b['flags']), (req,a,b)\n\n# exhaustive single-pair toy formats\nn=0\nfor (eb,fb) in [(3,2),(3,3),(4,2)]:\n    pats=[format(v,'x') for v in range(1<<(1+eb+fb))]\n    for m in [\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"]:\n        for a in pats:\n            for b in pats:\n                cmp({\"ebits\":eb,\"fbits\":fb,\"mode\":m,\"pairs\":[[a,b]]}); n+=1\nprint(\"exhaustive:\",n)\n# random differential across parameter range\nrng=random.Random(31337)\nfor i in range(20000):\n    eb=rng.randint(3,11); fb=rng.randint(2,52)\n    if 1+eb+fb>64: fb=64-1-eb\n    w=1+eb+fb\n    pairs=[[format(rng.randrange(1<<w),'x'),format(rng.randrange(1<<w),'x')] for _ in range(rng.choice([0,1,2,3,8,64]))]\n    cmp({\"ebits\":eb,\"fbits\":fb,\"mode\":rng.choice([\"RNE\",\"RNA\",\"RTZ\",\"RUP\",\"RDN\"])"
+    },
+    {
+      "step": 66081,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "exhaustive: 184320\nrandom differential: 20000\nend-to-end: 1000\nPassed 3 public examples\ntotal 40\ndrwxr-xr-x 1 agent agent 4096 Oct  8 20:57 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:48 ..\n-rw-r--r-- 1 agent agent  896 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent 6661 Oct  8 20:56 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent 4293 Oct  8 20:52 ref_check.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\n"
+    }
+  ]
+}

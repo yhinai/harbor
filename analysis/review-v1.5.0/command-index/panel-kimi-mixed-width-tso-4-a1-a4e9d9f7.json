@@ -1,0 +1,201 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-mixed-width-tso-4-a1-a4e9d9f7",
+    "task": "mixed-width-tso",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 4,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcome-corrections/v1.4.3/panel-kimi-mixed-width-tso-4-a1-a4e9d9f7.json",
+    "tool_calls": 9,
+    "agent_elapsed_seconds": 277.908741,
+    "input_tokens": 71665,
+    "output_tokens": 7473,
+    "uncached_cost_estimate": 0.32709000000000005,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "03a8222534003981cc5fa7f81bb8dfd2e800f4e3daa6b4e3cf419e35d2e91062",
+    "network_mode": "none",
+    "artifact_sha256": "ec154dfcaa10306486e3b3234f9bcbb33c15df0cde0a9f17b097b69145c8a21f",
+    "normalized_artifact_sha256": "9ec9ee2230ef1ae0786ad60965af2253e68fc24e2bc51b3c2cd4f6fe7a92a03f",
+    "terminal_nonzero_or_error_text_events": 2,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 3392,
+        "time": "2026-10-08T18:46:03.647467+00:00",
+        "artifact_sha256": "ec154dfcaa10306486e3b3234f9bcbb33c15df0cde0a9f17b097b69145c8a21f",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 113.153198,
+    "event_counts": {
+      "initial": 1,
+      "request": 10,
+      "stream_chunk": 7061,
+      "response": 10,
+      "terminal_call": 9,
+      "terminal_result": 9,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 52,
+      "time": "2026-10-08T18:44:14.936842+00:00",
+      "tool_call_id": "call_4cf055bb1aad436c8254a391",
+      "command": "cat /app/main.py; echo ---; cat /app/smoke.py 2>/dev/null; ls /app",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 90,
+      "time": "2026-10-08T18:44:18.772003+00:00",
+      "tool_call_id": "call_7c7bd636a0f14406a4633a88",
+      "command": "cat /app/examples.json; echo ---; cat /app/public_contract.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 3392,
+      "time": "2026-10-08T18:46:03.647467+00:00",
+      "tool_call_id": "call_0a93a1db72944e6fb22d277b",
+      "command": "cat > /app/main.py << 'EOF'\nimport json, sys\n\ndef solve(request):\n    mem0 = tuple(request['memory'])\n    progs = request['threads']\n    n = len(progs)\n    # State: (memory tuple, tuple of (pc, buffer tuple, observations tuple))\n    start = (mem0, tuple((0, (), ()) for _ in range(n)))\n    visited = {start}\n    stack = [start]\n    outcomes = set()\n    while stack:\n        mem, ts = stack.pop()\n        terminal = True\n        for i in range(n):\n            pc, buf, obs = ts[i]\n            if pc < len(progs[i]):\n                terminal = False\n                ins = progs[i][pc]\n                op = ins[0]\n                if op == 'store':\n                    nts = list(ts)\n                    nts[i] = (pc + 1, buf + ((ins[1], ins[2], ins[3]),), obs)\n                    s = (mem, tuple(nts))\n                    if s not in visited:\n                        visited.add(s); stack.append(s)\n                elif op == 'load':\n                    addr, width = ins[1], ins[2]\n                    v = 0\n                    for j in range(width):\n                        b = addr + j\n                        val = None\n                        for k in range(len(buf) - 1, -1, -1):\n                            sa, sw, sv = buf[k]\n                            if sa <= b < sa + sw:\n                                val = (sv >> (8 * (b - sa))) & 0xFF\n                                break\n                        if val is None:\n                            val = mem[b]\n                        v |= val << (8 * j)\n                    nts = list(ts)\n                    nts[i] = (pc + 1, buf, obs + (v,",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 4548,
+      "time": "2026-10-08T18:46:32.874830+00:00",
+      "tool_call_id": "call_e1d0e07eae5b482d9bfa2998",
+      "command": "cd /app && cat > /tmp/brute.py << 'EOF'\nimport json, sys, itertools, random\nsys.setrecursionlimit(100000)\n\ndef brute(request):\n    mem0 = tuple(request['memory'])\n    progs = request['threads']\n    n = len(progs)\n    outcomes = set()\n    def rec(mem, ts):\n        enabled = []\n        for i in range(n):\n            pc, buf, obs = ts[i]\n            if pc < len(progs[i]):\n                ins = progs[i][pc]; op = ins[0]\n                if op in ('fence','xchg') and buf:\n                    continue\n                enabled.append(('exec', i))\n        for i in range(n):\n            if ts[i][1]:\n                enabled.append(('drain', i))\n        if not enabled:\n            outcomes.add((tuple(t[2] for t in ts), mem))\n            return\n        for kind, i in enabled:\n            pc, buf, obs = ts[i]\n            if kind == 'drain':\n                sa, sw, sv = buf[0]\n                m = list(mem)\n                for j in range(sw): m[sa+j] = (sv >> (8*j)) & 0xFF\n                nts = list(ts); nts[i] = (pc, buf[1:], obs)\n                rec(tuple(m), tuple(nts))\n            else:\n                ins = progs[i][pc]; op = ins[0]\n                if op == 'store':\n                    nts = list(ts); nts[i] = (pc+1, buf+((ins[1],ins[2],ins[3]),), obs)\n                    rec(mem, tuple(nts))\n                elif op == 'load':\n                    addr, width = ins[1], ins[2]; v = 0\n                    for j in range(width):\n                        b = addr+j; val = None\n                        for k in range(len(buf)-1, -1, -1):\n                            sa, sw, sv = buf[k]\n         ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 4602,
+      "time": "2026-10-08T18:46:38.041281+00:00",
+      "tool_call_id": "call_dd8067200fea40b8b2ace4b9",
+      "command": "cd /app && sed -i 's/^import main/import sys; sys.path.insert(0, \"\\/app\")\\nimport main/' /tmp/brute.py && python3 /tmp/brute.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 5332,
+      "time": "2026-10-08T18:47:01.100159+00:00",
+      "tool_call_id": "call_8f82ffc5ee93456a8590f249",
+      "command": "cd /app && cat > /tmp/perf.py << 'EOF'\nimport sys, time, json\nsys.path.insert(0, '/app')\nimport main\n\ncases = [\n    # classic store buffering with wide accesses, 3 threads, 10 instrs\n    {'memory':[0]*8, 'threads':[\n        [['store',0,4,0x01020304],['load',4,4],['load',0,2],['fence']],\n        [['store',4,4,0x05060708],['load',0,4],['load',4,2]],\n        [['store',2,2,0x090A],['load',0,4]]]},\n    # all-store threads + drains galore\n    {'memory':[0]*8, 'threads':[\n        [['store',0,1,1],['store',1,1,2],['store',2,1,3],['store',3,1,4]],\n        [['store',4,1,5],['store',5,1,6],['store',6,1,7],['store',7,1,8]],\n        [['load',0,4],['load',4,4]]]},\n    # xchg heavy\n    {'memory':[0]*4, 'threads':[\n        [['xchg',0,1,1],['xchg',0,1,2],['load',0,1],['load',1,1]],\n        [['xchg',0,1,3],['xchg',1,1,4],['load',0,1],['load',1,1]],\n        [['xchg',1,1,5],['load',0,2]]]},\n    # fences everywhere\n    {'memory':[0]*8, 'threads':[\n        [['store',0,4,1],['fence'],['load',4,4],['store',4,4,2]],\n        [['store',4,4,3],['fence'],['load',0,4]],\n        [['load',0,4],['load',4,4]]]},\n    # overlapping widths partial forwarding, 3 threads\n    {'memory':[1,2,3,4,5,6,7,8], 'threads':[\n        [['store',0,4,0xAABBCCDD],['store',1,2,0xEEFF],['load',0,4],['load',2,2]],\n        [['store',3,2,0x1234],['load',0,4],['fence'],['store',0,2,0x5678]],\n        [['load',0,4],['load',4,4]]]},\n]\nt0 = time.time()\nfor c in cases:\n    s = time.time()\n    r = main.solve(c)\n    print(len(r['outcomes']), 'outcomes in %.3fs' % (time.time()-s))\nprint('total %.3fs' % (time.time()-t0))\nEOF\npython3 /tmp/per",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 5917,
+      "time": "2026-10-08T18:47:29.542928+00:00",
+      "tool_call_id": "call_107586aa8ee941249682ca9c",
+      "command": "cd /app && cat > /tmp/stress.py << 'EOF'\nimport sys, time, random, json\nsys.path.insert(0, '/app')\nimport main\nrandom.seed(7)\nworst = 0; wn = 0; wo = 0\nfor trial in range(300):\n    mem = [random.randint(0,255) for _ in range(8)]\n    sizes = random.choice([(4,4,2),(4,3,3),(4,4,1),(3,3,3),(4,2,2),(4,4,0)])\n    threads = []\n    for k in sizes:\n        prog = []\n        for _ in range(k):\n            w = random.choice([1,2,4])\n            a = random.randint(0, 8-w)\n            op = random.choice(['store','load','load','fence','xchg'])\n            if op=='store': prog.append(['store',a,w,random.randint(0,(1<<(8*w))-1)])\n            elif op=='load': prog.append(['load',a,w])\n            elif op=='fence': prog.append(['fence'])\n            else: prog.append(['xchg',a,w,random.randint(0,255)])\n        threads.append(prog)\n    t0=time.time(); r = main.solve({'memory':mem,'threads':threads}); dt=time.time()-t0\n    if dt > worst: worst=dt; wn=len(r['outcomes'])\n    wo = max(wo, len(r['outcomes']))\nprint('worst time %.3fs (%d outcomes); max outcomes %d' % (worst, wn, wo))\nEOF\npython3 /tmp/stress.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6703,
+      "time": "2026-10-08T18:48:19.810691+00:00",
+      "tool_call_id": "call_8465fe9129814b3aa0b3f197",
+      "command": "cd /app && cat > /tmp/edge.py << 'EOF'\nimport sys, time, json\nsys.path.insert(0, '/app')\nimport main\n\n# adversarial: 3 threads, 10 instrs, same addresses, wide xchg+store mix\nadv = {'memory':[0]*8,'threads':[\n  [['store',0,4,0x11111111],['load',0,4],['store',0,4,0x22222222],['load',0,4]],\n  [['xchg',0,4,0x33333333],['store',4,4,0x44444444],['load',0,4],['load',4,4]],\n  [['store',4,4,0x55555555],['xchg',0,4,0x66666666]]]}\nt0=time.time(); r=main.solve(adv); print('adversarial:', len(r['outcomes']), 'outcomes %.3fs'%(time.time()-t0))\n\n# xchg blocked by nonempty buffer: store;xchg must see drained store? No: xchg reads MEMORY only.\n# thread0: store 0<-9 (stays buffered until drained); xchg reads memory, not buffer.\nr = main.solve({'memory':[0],'threads':[[['store',0,1,9],['xchg',0,1,5]]]})\nprint('xchg-after-store:', sorted((tuple(o['reads'][0]), tuple(o['memory'])) for o in r['outcomes']))\n# xchg must wait for drain => always reads 9? No: drain must happen before xchg (buffer nonempty),\n# so xchg always observes 9. Expect reads=[9], memory=[5].\n\n# fence blocked: store;fence;load \u2014 load can only run after drain\nr = main.solve({'memory':[7,0],'threads':[[['store',0,1,1],['fence'],['load',0,1]]]})\nprint('fence:', sorted(o['reads'][0] for o in r['outcomes']))\n\n# empty threads / multiple lines\nr = main.solve({'memory':[3],'threads':[[],[]]})\nprint('empty:', r)\nEOF\npython3 /tmp/edge.py\nprintf '%s\\n%s\\n%s\\n' '{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]}' '{\"memory\":[5],\"threads\":[[]]}' '{\"memory\":[1,2,3,4],\"threads\":[[[\"store\",0,4,28745402",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6839,
+      "time": "2026-10-08T18:48:32.805126+00:00",
+      "tool_call_id": "call_402fb7aec8e34ba0bbe8f4ef",
+      "command": "python3 /app/smoke.py && python3 /tmp/brute.py",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 53,
+      "time": "2026-10-08T18:44:15.584999+00:00",
+      "tool_call_id": "call_4cf055bb1aad436c8254a391",
+      "return_code": 0,
+      "stdout": "import json, sys\ndef solve(request):\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nif __name__ == '__main__':\n    for line in sys.stdin:\n        print(json.dumps(solve(json.loads(line))))\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\nexamples.json\nmain.py\npublic_contract.py\nsmoke.py\n",
+      "stderr": "",
+      "stdout_tail": "import json, sys\ndef solve(request):\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nif __name__ == '__main__':\n    for line in sys.stdin:\n        print(json.dumps(solve(json.loads(line))))\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\nexamples.json\nmain.py\npublic_contract.py\nsmoke.py\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 4549,
+      "time": "2026-10-08T18:46:33.147051+00:00",
+      "tool_call_id": "call_e1d0e07eae5b482d9bfa2998",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/brute.py\", line 63, in <module>\n    import main\nModuleNotFoundError: No module named 'main'\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/tmp/brute.py\", line 63, in <module>\n    import main\nModuleNotFoundError: No module named 'main'\n"
+    }
+  ],
+  "last_events": [
+    {
+      "step": 4548,
+      "kind": "terminal_call",
+      "summary": "cd /app && cat > /tmp/brute.py << 'EOF'\nimport json, sys, itertools, random\nsys.setrecursionlimit(100000)\n\ndef brute(request):\n    mem0 = tuple(request['memory'])\n    progs = request['threads']\n    n = len(progs)\n    outcomes = set()\n    def rec(mem, ts):\n        enabled = []\n        for i in range(n):\n            pc, buf, obs = ts[i]\n            if pc < len(progs[i]):\n                ins = progs[i][pc]; op = ins[0]\n                if op in ('fence','xchg') and buf:\n                    continue\n                enabled.append(('exec', i))\n        for i in range(n):\n            if ts[i][1]:\n                enabled.append(('drain', i))\n        if not enabled:\n            outcomes.add((tuple(t[2] for t in ts), mem))\n            return\n        for kind, i in enabled:\n            pc, buf, obs = ts[i]\n            if kind == 'drain':\n                sa, sw, sv = buf[0]\n                m = list(mem)\n                for j in range(sw): m[sa+j] = (sv >> (8*j)) & 0xFF\n                nts = list(ts"
+    },
+    {
+      "step": 4549,
+      "kind": "terminal_result",
+      "return_code": 1,
+      "summary": "Traceback (most recent call last):\n  File \"/tmp/brute.py\", line 63, in <module>\n    import main\nModuleNotFoundError: No module named 'main'\n"
+    },
+    {
+      "step": 4602,
+      "kind": "terminal_call",
+      "summary": "cd /app && sed -i 's/^import main/import sys; sys.path.insert(0, \"\\/app\")\\nimport main/' /tmp/brute.py && python3 /tmp/brute.py"
+    },
+    {
+      "step": 4603,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "all randomized cross-checks passed\n"
+    },
+    {
+      "step": 5332,
+      "kind": "terminal_call",
+      "summary": "cd /app && cat > /tmp/perf.py << 'EOF'\nimport sys, time, json\nsys.path.insert(0, '/app')\nimport main\n\ncases = [\n    # classic store buffering with wide accesses, 3 threads, 10 instrs\n    {'memory':[0]*8, 'threads':[\n        [['store',0,4,0x01020304],['load',4,4],['load',0,2],['fence']],\n        [['store',4,4,0x05060708],['load',0,4],['load',4,2]],\n        [['store',2,2,0x090A],['load',0,4]]]},\n    # all-store threads + drains galore\n    {'memory':[0]*8, 'threads':[\n        [['store',0,1,1],['store',1,1,2],['store',2,1,3],['store',3,1,4]],\n        [['store',4,1,5],['store',5,1,6],['store',6,1,7],['store',7,1,8]],\n        [['load',0,4],['load',4,4]]]},\n    # xchg heavy\n    {'memory':[0]*4, 'threads':[\n        [['xchg',0,1,1],['xchg',0,1,2],['load',0,1],['load',1,1]],\n        [['xchg',0,1,3],['xchg',1,1,4],['load',0,1],['load',1,1]],\n        [['xchg',1,1,5],['load',0,2]]]},\n    # fences everywhere\n    {'memory':[0]*8, 'threads':[\n        [['store',0,4,1],['fence'],['load',4,4],['store',4,"
+    },
+    {
+      "step": 5333,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "24 outcomes in 0.002s\n25 outcomes in 0.002s\n116 outcomes in 0.001s\n23 outcomes in 0.000s\n230 outcomes in 0.004s\ntotal 0.010s\n"
+    },
+    {
+      "step": 5917,
+      "kind": "terminal_call",
+      "summary": "cd /app && cat > /tmp/stress.py << 'EOF'\nimport sys, time, random, json\nsys.path.insert(0, '/app')\nimport main\nrandom.seed(7)\nworst = 0; wn = 0; wo = 0\nfor trial in range(300):\n    mem = [random.randint(0,255) for _ in range(8)]\n    sizes = random.choice([(4,4,2),(4,3,3),(4,4,1),(3,3,3),(4,2,2),(4,4,0)])\n    threads = []\n    for k in sizes:\n        prog = []\n        for _ in range(k):\n            w = random.choice([1,2,4])\n            a = random.randint(0, 8-w)\n            op = random.choice(['store','load','load','fence','xchg'])\n            if op=='store': prog.append(['store',a,w,random.randint(0,(1<<(8*w))-1)])\n            elif op=='load': prog.append(['load',a,w])\n            elif op=='fence': prog.append(['fence'])\n            else: prog.append(['xchg',a,w,random.randint(0,255)])\n        threads.append(prog)\n    t0=time.time(); r = main.solve({'memory':mem,'threads':threads}); dt=time.time()-t0\n    if dt > worst: worst=dt; wn=len(r['outcomes'])\n    wo = max(wo, len(r['outcomes'])"
+    },
+    {
+      "step": 5918,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "worst time 0.009s (410 outcomes); max outcomes 737\n"
+    },
+    {
+      "step": 6703,
+      "kind": "terminal_call",
+      "summary": "cd /app && cat > /tmp/edge.py << 'EOF'\nimport sys, time, json\nsys.path.insert(0, '/app')\nimport main\n\n# adversarial: 3 threads, 10 instrs, same addresses, wide xchg+store mix\nadv = {'memory':[0]*8,'threads':[\n  [['store',0,4,0x11111111],['load',0,4],['store',0,4,0x22222222],['load',0,4]],\n  [['xchg',0,4,0x33333333],['store',4,4,0x44444444],['load',0,4],['load',4,4]],\n  [['store',4,4,0x55555555],['xchg',0,4,0x66666666]]]}\nt0=time.time(); r=main.solve(adv); print('adversarial:', len(r['outcomes']), 'outcomes %.3fs'%(time.time()-t0))\n\n# xchg blocked by nonempty buffer: store;xchg must see drained store? No: xchg reads MEMORY only.\n# thread0: store 0<-9 (stays buffered until drained); xchg reads memory, not buffer.\nr = main.solve({'memory':[0],'threads':[[['store',0,1,9],['xchg',0,1,5]]]})\nprint('xchg-after-store:', sorted((tuple(o['reads'][0]), tuple(o['memory'])) for o in r['outcomes']))\n# xchg must wait for drain => always reads 9? No: drain must happen before xchg (buffer nonempty),\n# "
+    },
+    {
+      "step": 6704,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "adversarial: 141 outcomes 0.004s\nxchg-after-store: [((9,), (5,))]\nfence: [[1]]\nempty: {'outcomes': [{'reads': [[], []], 'memory': [3]}]}\n{\"outcomes\": [{\"reads\": [[0], [1]], \"memory\": [1, 1]}, {\"reads\": [[1], [1]], \"memory\": [1, 1]}, {\"reads\": [[0], [0]], \"memory\": [1, 1]}, {\"reads\": [[1], [0]], \"memory\": [1, 1]}]}\n{\"outcomes\": [{\"reads\": [[]], \"memory\": [5]}]}\n{\"outcomes\": [{\"reads\": [[296401732]], \"memory\": [68, 187, 170, 17]}]}\n"
+    },
+    {
+      "step": 6839,
+      "kind": "terminal_call",
+      "summary": "python3 /app/smoke.py && python3 /tmp/brute.py"
+    },
+    {
+      "step": 6840,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\nall randomized cross-checks passed\n"
+    }
+  ]
+}

@@ -1,0 +1,327 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-deepseek-checkpointed-journal-7-a1-156c24e5",
+    "task": "checkpointed-journal",
+    "model": "accounts/fireworks/models/deepseek-v4p1-flash",
+    "replicate": 7,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-deepseek-checkpointed-journal-7-a1-156c24e5.json",
+    "tool_calls": 18,
+    "agent_elapsed_seconds": 513.213824,
+    "input_tokens": 369873,
+    "output_tokens": 27629,
+    "uncached_cost_estimate": 0.1441167,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "252f533b679d039a5969a76577fb3cb2e9f991bdec511465324acdd1badd28fe",
+    "network_mode": "none",
+    "artifact_sha256": "8f7bcc89e4bc08d576caae394c212bf43ce08177ff2fafc1562703fe4e1e5a0d",
+    "normalized_artifact_sha256": "9a44fae93f38e4980589e42f3145e93a37dab3c284a4c178ceb5ddbfd560ab45",
+    "terminal_nonzero_or_error_text_events": 9,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [],
+    "final_artifact_literal_written_by_30_min": false,
+    "first_literal_final_artifact_seconds": null,
+    "event_counts": {
+      "initial": 1,
+      "request": 19,
+      "stream_chunk": 27091,
+      "response": 19,
+      "terminal_call": 18,
+      "terminal_result": 18,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 40,
+      "time": "2026-10-08T20:40:03.890778+00:00",
+      "tool_call_id": "call_4ca7a24edc0047beb34d02f9",
+      "command": "ls -la /app && cat /app/smoke.py 2>/dev/null | head -100",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 77,
+      "time": "2026-10-08T20:40:16.697198+00:00",
+      "tool_call_id": "call_509d896c5e044146b02417a3",
+      "command": "cat /app/main.py; echo ---; cat /app/public_contract.py; echo ---; cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 3643,
+      "time": "2026-10-08T20:40:58.610803+00:00",
+      "tool_call_id": "call_db77b86a827a48fdab70d54b",
+      "command": "cd /app && python3 - <<'EOF'\nimport json,zlib,struct\ncases=json.load(open('examples.json'))\nfor c in cases:\n    log=bytes.fromhex(c['request']['log'])\n    print(c['id'], len(log))\n    pos=0\n    while pos+13<=len(log):\n        pl=int.from_bytes(log[pos:pos+4],'little')\n        if pos+17+pl>len(log): print(' incomplete at',pos,'pl',pl); break\n        seq=int.from_bytes(log[pos+4:pos+8],'little')\n        kind=log[pos+8]\n        tx=int.from_bytes(log[pos+9:pos+13],'little')\n        pay=log[pos+13:pos+13+pl]\n        crc=int.from_bytes(log[pos+13+pl:pos+17+pl],'little')\n        ok=zlib.crc32(log[pos:pos+13+pl])&0xffffffff==crc\n        print(' rec',pos,'pl',pl,'seq',seq,'kind',kind,'tx',tx,'pay',pay.hex(),'crcok',ok)\n        pos+=17+pl\n    print(' tail',len(log)-pos)\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 3928,
+      "time": "2026-10-08T20:41:12.464526+00:00",
+      "tool_call_id": "call_4e1bfc02f3ee430c9101d35c",
+      "command": "cd /app && python3 -c \"\nimport zlib\nfor p in ['0000000002001122','0000010002003344']:\n    print(p, hex(zlib.crc32(bytes.fromhex(p))&0xffffffff))\nprint(hex(zlib.crc32(b'')&0xffffffff))\n\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6416,
+      "time": "2026-10-08T20:41:40.789360+00:00",
+      "tool_call_id": "call_23e572ca08c541b782301f38",
+      "command": "cd /app && cat > main.py <<'EOF'\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nReads newline-delimited JSON requests on stdin, writes one JSON response per\nline on stdout.  See instruction.md for the format contract.\n\"\"\"\n\nimport json\nimport struct\nimport sys\nimport zlib\n\nMAX_PAYLOAD = 4096\nHEADER = 13          # payload_length + sequence + kind + transaction_id\nTRAILER = 4          # crc\nKIND_BEGIN = 1\nKIND_PATCH = 2\nKIND_COMMIT = 3\nKIND_ABORT = 4\n\n\ndef _unhex(text):\n    \"\"\"Decode a hex string, tolerating an odd trailing nibble (torn byte).\"\"\"\n    if len(text) & 1:\n        text = text[:-1]\n    return bytes.fromhex(text)\n\n\ndef solve(request):\n    pages = [bytearray(_unhex(p)) for p in request[\"pages\"]]\n    checkpoint = int(request[\"checkpoint\"])\n    log = _unhex(request[\"log\"])\n\n    page_count = len(pages)\n    n = len(log)\n    pos = 0\n    valid_bytes = 0\n    last_seq = 0\n\n    # txid -> [list of (page_index, byte_offset, data), patch_count, concat bytes]\n    active = {}\n\n    while pos + HEADER + TRAILER <= n:\n        payload_len = int.from_bytes(log[pos:pos + 4], \"little\")\n        if payload_len > MAX_PAYLOAD:\n            break\n        end = pos + HEADER + payload_len + TRAILER\n        if end > n:\n            break  # incomplete/torn record\n        seq = int.from_bytes(log[pos + 4:pos + 8], \"little\")\n        kind = log[pos + 8]\n        txid = int.from_bytes(log[pos + 9:pos + 13], \"little\")\n        payload = log[pos + HEADER:pos + HEADER + payload_len]\n        crc = int.from_bytes(log[pos + HEADER + payload_len:end], \"little\")\n\n        if zlib.crc32(",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 12669,
+      "time": "2026-10-08T20:42:40.638137+00:00",
+      "tool_call_id": "call_f666fc2195954b49bcc8954b",
+      "command": "cd /app && cat > test_solution.py <<'EOF'\n\"\"\"Hand-verified tests for main.py (run: python3 test_solution.py).\"\"\"\nimport json, struct, subprocess, sys, zlib, pathlib\n\nHERE = pathlib.Path(__file__).resolve().parent\n\ndef rec(seq, kind, txid, payload=b\"\", plen=None, crc=None):\n    pl = len(payload) if plen is None else plen\n    body = struct.pack(\"<IIBI\", pl, seq, kind, txid) + payload\n    c = zlib.crc32(body) & 0xFFFFFFFF if crc is None else crc\n    return body + struct.pack(\"<I\", c)\n\ndef patch_rec(seq, txid, page, off, data):\n    payload = struct.pack(\"<HHH\", page, off, len(data)) + data\n    return rec(seq, 2, txid, payload)\n\ndef commit_rec(seq, txid, count, digest):\n    return rec(seq, 3, txid, struct.pack(\"<II\", count, digest))\n\ndef digest_of(*patch_payloads):\n    return zlib.crc32(b\"\".join(patch_payloads)) & 0xFFFFFFFF\n\ndef solve(req):\n    p = subprocess.run([sys.executable, str(HERE / \"main.py\")],\n                       input=json.dumps(req) + \"\\n\", text=True, capture_output=True, cwd=HERE)\n    assert p.returncode == 0, p.stderr\n    return json.loads(p.stdout.splitlines()[0])\n\ndef expect(name, req, pages, vb, ls):\n    got = solve(req)\n    exp = {\"pages\": pages, \"valid_bytes\": vb, \"last_seq\": ls}\n    if got != exp:\n        print(\"FAIL\", name)\n        print(\"  got\", got)\n        print(\"  exp\", exp)\n        return False\n    return True\n\nok = True\nP0 = \"00000000\"\nP2 = [\"00000000\", \"00000000\"]\n\n# A: empty log\nok &= expect(\"A-empty\", {\"pages\": P2, \"checkpoint\": 0, \"log\": \"\"}, P2, 0, 0)\n\n# B: simple commit at various checkpoints\np = patch_rec(2, 1, 0, 0, b\"\\x11\\x22\")\nd = digest_",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 13586,
+      "time": "2026-10-08T20:43:00.502392+00:00",
+      "tool_call_id": "call_9392589153314d64bc4d3c64",
+      "command": "cd /app && python3 - <<'EOF'\nimport re, pathlib\np = pathlib.Path('test_solution.py')\ns = p.read_text()\ns = s.replace('''def digest_of(*patch_payloads):\n    return zlib.crc32(b\"\".join(patch_payloads)) & 0xFFFFFFFF''',\n'''def payload_of(r):\n    pl = int.from_bytes(r[:4], \"little\")\n    return r[13:13 + pl]\n\ndef digest_of(*records):\n    return zlib.crc32(b\"\".join(payload_of(r) for r in records)) & 0xFFFFFFFF''')\n# replace digest_of(p[13:]) / digest_of(p1[13:],p2[13:]) etc.\ns = re.sub(r'digest_of\\(([^()]*?)\\[13:\\]([^()]*?)\\)', lambda m: 'digest_of(' + m.group(1) + m.group(2) + ')', s)\ns = s.replace('\"log\": (rec(1,1,1) + patch_rec(2,1,0,2,b\"\\\\x01\\\\x02\")).hex()}, P2, 34, 2)',\n              '\"log\": (rec(1,1,1) + patch_rec(2,1,0,2,b\"\\\\x01\\\\x02\")).hex()}, P2, 42, 2)')\ns = s.replace('P3 = [\"0000000000\", \"0000000000\"]\\np = patch_rec(2,1,1,7,b\"\\\\xde\\\\xad\\\\xbe\")',\n              'P3 = [\"00000000000000000000\", \"00000000000000000000\"]\\np = patch_rec(2,1,1,7,b\"\\\\xde\\\\xad\\\\xbe\")')\ns = s.replace('[\"0000000000\",\"00000000deadbe\"[0:10]]', '[\"00000000000000000000\",\"0000000000deadbe0000\"]')\np.write_text(s)\nEOF\npython3 test_solution.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 14050,
+      "time": "2026-10-08T20:43:18.441237+00:00",
+      "tool_call_id": "call_389b5f67c48f47699575217d",
+      "command": "cd /app && grep -n \"digest_of\" test_solution.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 14274,
+      "time": "2026-10-08T20:43:32.704467+00:00",
+      "tool_call_id": "call_d86439d3c4184b14ad326c6b",
+      "command": "cd /app && python3 - <<'EOF'\nimport pathlib\np = pathlib.Path('test_solution.py'); s = p.read_text()\ns = s.replace('digest_of(p1,p2[13:])', 'digest_of(p1,p2)')\ns = s.replace('digest_of(patch_rec(2,1,0,0,b\"\\\\xaa\")[13:])', 'digest_of(patch_rec(2,1,0,0,b\"\\\\xaa\"))')\ns = s.replace('[\"00000000000000000000\",\"0000000000deadbe0000\"]', '[\"00000000000000000000\",\"00000000000000deadbe\"]')\np.write_text(s)\nEOF\npython3 test_solution.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 16664,
+      "time": "2026-10-08T20:44:04.770975+00:00",
+      "tool_call_id": "call_e2bcbb2b185a44c0a8d25b26",
+      "command": "cd /app && cat > ref_check.py <<'EOF'\n\"\"\"Independent re-implementation used only for differential testing.\"\"\"\nimport zlib\n\ndef recover(pages_hex, checkpoint, log_hex):\n    pages = [bytearray.fromhex(x) for x in pages_hex]\n    log = bytes.fromhex(log_hex)\n    off = 0\n    good = 0\n    last = 0\n    inc = {}\n    while True:\n        if len(log) - off < 17:\n            break\n        plen = int.from_bytes(log[off:off+4], 'little')\n        if plen > 4096:\n            break\n        if off + 17 + plen > len(log):\n            break\n        seq = int.from_bytes(log[off+4:off+8], 'little')\n        kind = log[off+8]\n        tx = int.from_bytes(log[off+9:off+13], 'little')\n        pay = log[off+13:off+13+plen]\n        want = int.from_bytes(log[off+13+plen:off+17+plen], 'little')\n        if zlib.crc32(log[off:off+13+plen]) & 0xffffffff != want:\n            break\n        if not (0 < seq) or seq <= last or tx == 0:\n            break\n        shape_ok = False\n        if kind in (1, 4):\n            shape_ok = plen == 0\n        elif kind == 2:\n            if plen >= 6:\n                pi = int.from_bytes(pay[0:2], 'little')\n                bo = int.from_bytes(pay[2:4], 'little')\n                bc = int.from_bytes(pay[4:6], 'little')\n                if bc > 0 and plen == 6 + bc and pi < len(pages) and bo + bc <= len(pages[pi]):\n                    shape_ok = True\n        elif kind == 3:\n            shape_ok = plen == 8\n        if not shape_ok:\n            break\n        good = off + 17 + plen\n        last = seq\n        if kind == 1:\n            inc[tx] = [[], bytearray()]\n        elif kind == 2:\n",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 16925,
+      "time": "2026-10-08T20:46:14.149246+00:00",
+      "tool_call_id": "call_cdbc161b16074c468abc2567",
+      "command": "cd /app && sed -i 's/^import json, os, random, struct, subprocess, sys, zlib$/import json, os, random, struct, subprocess, sys, zlib\\nimport main/' fuzz_test.py && python3 - <<'EOF'\nimport pathlib\np = pathlib.Path('fuzz_test.py'); s = p.read_text()\ns = s.replace('''    p = subprocess.run([sys.executable, \"main.py\"], input=json.dumps(req) + \"\\\\n\",\n                       text=True, capture_output=True, cwd=os.path.dirname(os.path.abspath(__file__)))\n    if p.returncode != 0:\n        print(\"CRASH\", it, p.stderr); bad += 1; break\n    out = json.loads(p.stdout)''', '''    out = main.solve(req)''')\np.write_text(s)\nEOF\ntime python3 fuzz_test.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 18287,
+      "time": "2026-10-08T20:46:36.427115+00:00",
+      "tool_call_id": "call_6cd3bf87fedb4803a1fbad1c",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, struct, subprocess, sys, time, zlib\nimport main\n\ndef rec(seq, kind, tx, payload=b\"\"):\n    body = struct.pack(\"<IIBI\", len(payload), seq, kind, tx) + payload\n    return body + struct.pack(\"<I\", zlib.crc32(body) & 0xffffffff)\n\n# max payload boundary: PATCH count=4090 -> payload_len=4096 valid\nnpages, plen = 1, 64\npages = [bytes(64).hex()]\ndata = bytes(range(256))*16\npay = struct.pack(\"<HHH\", 0, 0, 4090) + data[:4090]\nlog = rec(1,1,1) + rec(2,2,1,pay) + rec(3,3,1,struct.pack(\"<II\",1,zlib.crc32(pay)&0xffffffff))\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log.hex()})\nassert out[\"pages\"][0][:20] == (data[:4090]+bytes(64))[:10].hex(), out[\"pages\"][0][:20]\nassert out[\"last_seq\"] == 3\n# payload_len 4097 -> invalid\npay2 = struct.pack(\"<HHH\", 0, 0, 4091) + data[:4091]\nlog2 = rec(1,1,1) + rec(2,2,1,pay2)\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log2.hex()})\nassert out[\"valid_bytes\"] == 17 and out[\"last_seq\"] == 1, out\n# page size 1 bounds\nout = main.solve({\"pages\":[\"aa\"],\"checkpoint\":0,\"log\":(rec(1,1,1)+rec(2,2,1,struct.pack(\"<HHH\",0,0,1)+b\"z\")).hex()})\nassert out[\"pages\"] == [\"7a\"], out\nout = main.solve({\"pages\":[\"aa\"],\"checkpoint\":0,\"log\":(rec(1,1,1)+rec(2,2,1,struct.pack(\"<HHH\",0,1,1)+b\"z\")).hex()})\nassert out[\"pages\"] == [\"aa\"] and out[\"valid_bytes\"] == 17, out\n\n# perf: ~64KiB of tiny records, 1000 requests\nchunk = b\"\".join(rec(i+1, 1 if i%2 else 4, 1) for i in range(65536//17))\nlog_hex = chunk.hex()\nreq = {\"pages\": [\"00\"*64]*8, \"checkpoint\": 3, \"log\": log_hex}\nt=time.time()\nfor _ in range(1000):\n    main.solve(req)\npr",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 19623,
+      "time": "2026-10-08T20:46:52.262959+00:00",
+      "tool_call_id": "call_b2306eeeb664427ebacbeb0a",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, struct, subprocess, sys, time, zlib\nimport main\n\ndef rec(seq, kind, tx, payload=b\"\"):\n    body = struct.pack(\"<IIBI\", len(payload), seq, kind, tx) + payload\n    return body + struct.pack(\"<I\", zlib.crc32(body) & 0xffffffff)\n\n# 64-byte page, full-page patch count=64 valid\npages = [bytes(64).hex()]\ndata = bytes(range(64))\npay = struct.pack(\"<HHH\", 0, 0, 64) + data\nlog = rec(1,1,1) + rec(2,2,1,pay) + rec(3,3,1,struct.pack(\"<II\",1,zlib.crc32(pay)&0xffffffff))\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log.hex()})\nassert out[\"pages\"] == [data.hex()] and out[\"last_seq\"] == 3, out\n# payload_len 4096 with count 4090: shape-invalid (page too small)\nbig = struct.pack(\"<HHH\", 0, 0, 4090) + bytes(4090)\nlog2 = rec(1,1,1) + rec(2,2,1,big)\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log2.hex()})\nassert out[\"valid_bytes\"] == 17 and out[\"last_seq\"] == 1, out\n# payload_len 4097: length-invalid\nbig2 = b\"\\x00\"*4097\nlog3 = rec(1,1,1) + rec(2,2,1,big2)\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log3.hex()})\nassert out[\"valid_bytes\"] == 17 and out[\"last_seq\"] == 1, out\n# 1-byte page bounds\nout = main.solve({\"pages\":[\"aa\"],\"checkpoint\":0,\"log\":(rec(1,1,1)+rec(2,2,1,struct.pack(\"<HHH\",0,0,1)+b\"z\")).hex()})\nassert out[\"pages\"] == [\"7a\"], out\nout = main.solve({\"pages\":[\"aa\"],\"checkpoint\":0,\"log\":(rec(1,1,1)+rec(2,2,1,struct.pack(\"<HHH\",0,1,1)+b\"z\")).hex()})\nassert out[\"pages\"] == [\"aa\"] and out[\"valid_bytes\"] == 17, out\n\n# perf: ~64KiB of tiny records, 1000 requests\nchunk = b\"\".join(rec(i+1, 1 if i%2 else 4, 1) for i in range(6553",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 21935,
+      "time": "2026-10-08T20:47:13.041272+00:00",
+      "tool_call_id": "call_a4d92375c081469ea7c85ccf",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, struct, subprocess, sys, time, zlib\nimport main\n\ndef rec(seq, kind, tx, payload=b\"\"):\n    body = struct.pack(\"<IIBI\", len(payload), seq, kind, tx) + payload\n    return body + struct.pack(\"<I\", zlib.crc32(body) & 0xffffffff)\n\n# 64-byte page, full-page patch count=64 valid, commit applies\npages = [bytes(64).hex()]\ndata = bytes(range(64))\npay = struct.pack(\"<HHH\", 0, 0, 64) + data\nlog = rec(1,1,1) + rec(2,2,1,pay) + rec(3,3,1,struct.pack(\"<II\",1,zlib.crc32(pay)&0xffffffff))\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log.hex()})\nassert out[\"pages\"] == [data.hex()] and out[\"last_seq\"] == 3, out\n# payload_len 4096 with count 4090: shape-invalid (page too small)\nbig = struct.pack(\"<HHH\", 0, 0, 4090) + bytes(4090)\nlog2 = rec(1,1,1) + rec(2,2,1,big)\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log2.hex()})\nassert out[\"valid_bytes\"] == 17 and out[\"last_seq\"] == 1, out\n# payload_len 4097: length-invalid\nlog3 = rec(1,1,1) + rec(2,2,1,b\"\\x00\"*4097)\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log3.hex()})\nassert out[\"valid_bytes\"] == 17 and out[\"last_seq\"] == 1, out\n# 1-byte page bounds: in-bounds record valid, out-of-bounds stops prefix\ninb = rec(1,1,1)+rec(2,2,1,struct.pack(\"<HHH\",0,0,1)+b\"z\")\noob = rec(1,1,1)+rec(2,2,1,struct.pack(\"<HHH\",0,1,1)+b\"z\")\nout = main.solve({\"pages\":[\"aa\"],\"checkpoint\":0,\"log\":inb.hex()})\nassert out[\"valid_bytes\"] == 41 and out[\"last_seq\"] == 2, out\nout = main.solve({\"pages\":[\"aa\"],\"checkpoint\":0,\"log\":oob.hex()})\nassert out[\"valid_bytes\"] == 17 and out[\"last_seq\"] == 1, out\n\n# perf: ~64KiB",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 23869,
+      "time": "2026-10-08T20:47:41.192307+00:00",
+      "tool_call_id": "call_86361750227d4830a9d11500",
+      "command": "cd /app && python3 - <<'EOF'\nimport pathlib\np = pathlib.Path('main.py'); s = p.read_text()\ns = s.replace('''        out.write(json.dumps(solve(json.loads(line))) + \"\\\\n\")\n    out.flush()''','''        out.write(json.dumps(solve(json.loads(line))) + \"\\\\n\")\n        out.flush()''')\np.write_text(s)\nEOF\npython3 smoke.py && python3 test_solution.py && python3 fuzz_test.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 24775,
+      "time": "2026-10-08T20:47:54.050799+00:00",
+      "tool_call_id": "call_0ae19cee0b6e454fa861052b",
+      "command": "cd /app && python3 - <<'EOF'\nimport json, random, struct, subprocess, sys, zlib\nfrom ref_check import recover\n\ndef rec(seq, kind, tx, payload=b\"\"):\n    body = struct.pack(\"<IIBI\", len(payload), seq, kind, tx) + payload\n    return body + struct.pack(\"<I\", zlib.crc32(body) & 0xffffffff)\n\nrng = random.Random(999)\nreqs, exps = [], []\nfor it in range(600):\n    npages = rng.randint(1, 8); plen = rng.randint(1, 64)\n    pages = [bytes(rng.randrange(256) for _ in range(plen)).hex() for _ in range(npages)]\n    log = bytearray()\n    seq = 0\n    live = {}\n    for _ in range(rng.randint(0, 40)):\n        seq += rng.randint(1, 2)\n        kind = rng.choice([1,1,2,2,3,3,4])\n        tx = rng.randint(1, 3)\n        if kind == 1:\n            log += rec(seq,1,tx); live[tx]=[]\n        elif kind == 2:\n            pi=rng.randrange(npages); bc=rng.randint(1,min(8,plen)); bo=rng.randint(0,plen-bc)\n            pay=struct.pack(\"<HHH\",pi,bo,bc)+bytes(rng.randrange(256) for _ in range(bc))\n            log += rec(seq,2,tx,pay)\n            if tx in live: live[tx].append(pay)\n        elif kind == 3:\n            pays=live.pop(tx,None)\n            if pays is None: cnt=rng.randint(0,2); dig=rng.getrandbits(32)\n            else:\n                cnt=len(pays); dig=zlib.crc32(b\"\".join(pays))&0xffffffff\n                if rng.random()<0.2: cnt+=1\n            log += rec(seq,3,tx,struct.pack(\"<II\",cnt,dig))\n        else:\n            log += rec(seq,4,tx); live.pop(tx,None)\n    if rng.random()<0.5:\n        log = log[:rng.randrange(len(log)+1)] if log else log\n    if rng.random()<0.3:\n        log += bytes(rng.randrange",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 25533,
+      "time": "2026-10-08T20:48:04.511542+00:00",
+      "tool_call_id": "call_ba96277cf5f64a4cab9156de",
+      "command": "cd /app && cat main.py && python3 smoke.py && ls -la",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 26766,
+      "time": "2026-10-08T20:48:18.244327+00:00",
+      "tool_call_id": "call_73c4aa42169a4ef0b2127b03",
+      "command": "cd /app && python3 - <<'EOF'\nimport struct, zlib, main\n\ndef rec(seq, kind, tx, payload=b\"\"):\n    body = struct.pack(\"<IIBI\", len(payload), seq, kind, tx) + payload\n    return body + struct.pack(\"<I\", zlib.crc32(body) & 0xffffffff)\ndef patch(seq,tx,pi,bo,data): return rec(seq,2,tx,struct.pack(\"<HHH\",pi,bo,len(data))+data)\ndef commit(seq,tx,c,d): return rec(seq,3,tx,struct.pack(\"<II\",c,d))\n\nP=[\"00000000\",\"00000000\"]\n# matching commit at/below checkpoint closes; later orphan commit inert\np = patch(2,1,0,0,b\"\\xaa\")\nlog = rec(1,1,1)+p+commit(3,1,1,zlib.crc32(p[13:13+len(p)-17])&0xffffffff)+commit(4,1,1,zlib.crc32(p[13:13+len(p)-17])&0xffffffff)\no = main.solve({\"pages\":P,\"checkpoint\":3,\"log\":log.hex()})\nassert o == {\"pages\":P,\"valid_bytes\":len(log),\"last_seq\":4}, o\n# inactive out-of-bounds patch must still stop prefix\nlog = patch(1,1,99,0,b\"\\xaa\")\no = main.solve({\"pages\":P,\"checkpoint\":0,\"log\":log.hex()})\nassert o == {\"pages\":P,\"valid_bytes\":0,\"last_seq\":0}, o\n# ignored patch (inactive) not counted in digest; BEGIN resets nothing else\np2 = patch(3,1,0,0,b\"\\xbb\")\nlog = patch(1,1,0,0,b\"\\xaa\") + rec(2,1,1) + p2 + commit(4,1,1,zlib.crc32(p2[13:13+len(p2)-17])&0xffffffff)\no = main.solve({\"pages\":P,\"checkpoint\":0,\"log\":log.hex()})\nassert o == {\"pages\":[\"bb000000\",\"00000000\"],\"valid_bytes\":len(log),\"last_seq\":4}, o\n# sequence regression excludes the rest\nlog = rec(1,1,1)+rec(1,1,2)+rec(2,1,2)\no = main.solve({\"pages\":P,\"checkpoint\":0,\"log\":log.hex()})\nassert o == {\"pages\":P,\"valid_bytes\":17,\"last_seq\":1}, o\n# huge seq/tx values\nlog = rec(0xffffffff,1,0xffffffff)\no = main.solve({\"pages\":P",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 41,
+      "time": "2026-10-08T20:40:04.269984+00:00",
+      "tool_call_id": "call_4ca7a24edc0047beb34d02f9",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:39 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:39 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 12670,
+      "time": "2026-10-08T20:42:43.580805+00:00",
+      "tool_call_id": "call_f666fc2195954b49bcc8954b",
+      "return_code": 1,
+      "stdout": "FAIL B-cp0\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n  exp {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL B-cp2\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n  exp {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL C-torn\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n  exp {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL C-tail\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n  exp {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL I-exact\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 42, 'last_seq': 2}\n  exp {'pages': ['00000000', '00000000'], 'valid_bytes': 34, 'last_seq': 2}\nFAIL L-restart\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 108, 'last_seq': 5}\n  exp {'pages': ['0000cc00', '00000000'], 'valid_bytes': 108, 'last_seq': 5}\nFAIL M-mismatch\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\n  exp {'pages': ['00000000', 'bb000000'], 'valid_bytes': 132, 'last_seq': 6}\nFAIL O-order\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n  exp {'pages': ['11224400', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\nFAIL U-span\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\n  exp {'pages': ['aa000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL V-mixed\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\n  exp {'pages': ['aabb0000', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\nFAIL W-upper\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\n  exp {'pages': ['aa000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL X-overlap\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 92, 'last_seq': 4}\n  exp {'pages': ['01ff0300', '00000000'], 'valid_bytes': 92, 'last_seq': 4}\nFAIL Z-page\n  got {'pages': ['0000000000', '0000000000'], 'valid_bytes': 17, 'last_seq': 1}\n  exp {'pages': ['0000000000', '00000000de'], 'valid_bytes': 68, 'last_seq': 3}\nSOME FAILED\n",
+      "stderr": "",
+      "stdout_tail": "FAIL B-cp0\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n  exp {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL B-cp2\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n  exp {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL C-torn\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n  exp {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL C-tail\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\n  exp {'pages': ['11220000', '00000000'], 'valid_bytes': 67, 'last_seq': 3}\nFAIL I-exact\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 42, 'last_seq': 2}\n  exp {'pages': ['00000000', '00000000'], 'valid_bytes': 34, 'last_seq': 2}\nFAIL L-restart\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 108, 'last_seq': 5}\n  exp {'pages': ['0000cc00', '00000000'], 'valid_bytes': 108, 'last_seq': 5}\nFAIL M-mismatch\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 132, 'last_seq': 6}\n  exp {'pages': ['00000000', 'bb000000'], 'valid_bytes': 132, 'last_seq': 6}\nFAIL O-order\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\n  exp {'pages': ['11224400', '00000000'], 'valid_bytes': 134, 'last_seq': 6}\nFAIL U-span\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\n  exp {'pages': ['aa000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL V-mixed\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\n  exp {'pages': ['aabb0000', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\nFAIL W-upper\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\n  exp {'pages': ['aa000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL X-overlap\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 92, 'last_seq': 4}\n  exp {'pages': ['01ff0300', '00000000'], 'valid_bytes': 92, 'last_seq': 4}\nFAIL Z-page\n  got {'pages': ['0000000000', '0000000000'], 'valid_bytes': 17, 'last_seq': 1}\n  exp {'pages': ['0000000000', '00000000de'], 'valid_bytes': 68, 'last_seq': 3}\nSOME FAILED\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 13587,
+      "time": "2026-10-08T20:43:03.781400+00:00",
+      "tool_call_id": "call_9392589153314d64bc4d3c64",
+      "return_code": 1,
+      "stdout": "FAIL U-span\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\n  exp {'pages': ['aa000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL V-mixed\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\n  exp {'pages': ['aabb0000', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\nFAIL X-overlap\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 92, 'last_seq': 4}\n  exp {'pages': ['01ff0300', '00000000'], 'valid_bytes': 92, 'last_seq': 4}\nFAIL Z-page\n  got {'pages': ['00000000000000000000', '00000000000000deadbe'], 'valid_bytes': 68, 'last_seq': 3}\n  exp {'pages': ['00000000000000000000', '0000000000deadbe0000'], 'valid_bytes': 68, 'last_seq': 3}\nSOME FAILED\n",
+      "stderr": "",
+      "stdout_tail": "FAIL U-span\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\n  exp {'pages': ['aa000000', '00000000'], 'valid_bytes': 66, 'last_seq': 3}\nFAIL V-mixed\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\n  exp {'pages': ['aabb0000', '00000000'], 'valid_bytes': 107, 'last_seq': 5}\nFAIL X-overlap\n  got {'pages': ['00000000', '00000000'], 'valid_bytes': 92, 'last_seq': 4}\n  exp {'pages': ['01ff0300', '00000000'], 'valid_bytes': 92, 'last_seq': 4}\nFAIL Z-page\n  got {'pages': ['00000000000000000000', '00000000000000deadbe'], 'valid_bytes': 68, 'last_seq': 3}\n  exp {'pages': ['00000000000000000000', '0000000000deadbe0000'], 'valid_bytes': 68, 'last_seq': 3}\nSOME FAILED\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 16665,
+      "time": "2026-10-08T20:46:05.483099+00:00",
+      "tool_call_id": "call_e2bcbb2b185a44c0a8d25b26",
+      "return_code": 124,
+      "stdout": "",
+      "stderr": "",
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "step": 16926,
+      "time": "2026-10-08T20:46:15.017378+00:00",
+      "tool_call_id": "call_cdbc161b16074c468abc2567",
+      "return_code": 0,
+      "stdout": "fuzz done, mismatches: 0\n",
+      "stderr": "\nreal\t0m0.409s\nuser\t0m0.293s\nsys\t0m0.004s\n",
+      "stdout_tail": "fuzz done, mismatches: 0\n",
+      "stderr_tail": "\nreal\t0m0.409s\nuser\t0m0.293s\nsys\t0m0.004s\n"
+    },
+    {
+      "step": 18288,
+      "time": "2026-10-08T20:46:37.210605+00:00",
+      "tool_call_id": "call_6cd3bf87fedb4803a1fbad1c",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 15, in <module>\nAssertionError: 00000000000000000000\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"<stdin>\", line 15, in <module>\nAssertionError: 00000000000000000000\n"
+    },
+    {
+      "step": 19624,
+      "time": "2026-10-08T20:46:52.588824+00:00",
+      "tool_call_id": "call_b2306eeeb664427ebacbeb0a",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 27, in <module>\nAssertionError: {'pages': ['aa'], 'valid_bytes': 41, 'last_seq': 2}\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"<stdin>\", line 27, in <module>\nAssertionError: {'pages': ['aa'], 'valid_bytes': 41, 'last_seq': 2}\n"
+    },
+    {
+      "step": 23870,
+      "time": "2026-10-08T20:47:46.563446+00:00",
+      "tool_call_id": "call_86361750227d4830a9d11500",
+      "return_code": 0,
+      "stdout": "Passed 3 public examples\nALL PASS\nfuzz done, mismatches: 0\n",
+      "stderr": "",
+      "stdout_tail": "Passed 3 public examples\nALL PASS\nfuzz done, mismatches: 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 24776,
+      "time": "2026-10-08T20:47:55.164224+00:00",
+      "tool_call_id": "call_0ae19cee0b6e454fa861052b",
+      "return_code": 0,
+      "stdout": "cli batch: 600 requests, mismatches: 0\n",
+      "stderr": "",
+      "stdout_tail": "cli batch: 600 requests, mismatches: 0\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 19623,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport json, struct, subprocess, sys, time, zlib\nimport main\n\ndef rec(seq, kind, tx, payload=b\"\"):\n    body = struct.pack(\"<IIBI\", len(payload), seq, kind, tx) + payload\n    return body + struct.pack(\"<I\", zlib.crc32(body) & 0xffffffff)\n\n# 64-byte page, full-page patch count=64 valid\npages = [bytes(64).hex()]\ndata = bytes(range(64))\npay = struct.pack(\"<HHH\", 0, 0, 64) + data\nlog = rec(1,1,1) + rec(2,2,1,pay) + rec(3,3,1,struct.pack(\"<II\",1,zlib.crc32(pay)&0xffffffff))\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log.hex()})\nassert out[\"pages\"] == [data.hex()] and out[\"last_seq\"] == 3, out\n# payload_len 4096 with count 4090: shape-invalid (page too small)\nbig = struct.pack(\"<HHH\", 0, 0, 4090) + bytes(4090)\nlog2 = rec(1,1,1) + rec(2,2,1,big)\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log2.hex()})\nassert out[\"valid_bytes\"] == 17 and out[\"last_seq\"] == 1, out\n# payload_len 4097: length-invalid\nbig2 = b\"\\x00\"*4097\nlog3 = rec(1,1,1) + rec(2,2,1,"
+    },
+    {
+      "step": 19624,
+      "kind": "terminal_result",
+      "return_code": 1,
+      "summary": "Traceback (most recent call last):\n  File \"<stdin>\", line 27, in <module>\nAssertionError: {'pages': ['aa'], 'valid_bytes': 41, 'last_seq': 2}\n"
+    },
+    {
+      "step": 21935,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport json, struct, subprocess, sys, time, zlib\nimport main\n\ndef rec(seq, kind, tx, payload=b\"\"):\n    body = struct.pack(\"<IIBI\", len(payload), seq, kind, tx) + payload\n    return body + struct.pack(\"<I\", zlib.crc32(body) & 0xffffffff)\n\n# 64-byte page, full-page patch count=64 valid, commit applies\npages = [bytes(64).hex()]\ndata = bytes(range(64))\npay = struct.pack(\"<HHH\", 0, 0, 64) + data\nlog = rec(1,1,1) + rec(2,2,1,pay) + rec(3,3,1,struct.pack(\"<II\",1,zlib.crc32(pay)&0xffffffff))\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log.hex()})\nassert out[\"pages\"] == [data.hex()] and out[\"last_seq\"] == 3, out\n# payload_len 4096 with count 4090: shape-invalid (page too small)\nbig = struct.pack(\"<HHH\", 0, 0, 4090) + bytes(4090)\nlog2 = rec(1,1,1) + rec(2,2,1,big)\nout = main.solve({\"pages\":pages,\"checkpoint\":0,\"log\":log2.hex()})\nassert out[\"valid_bytes\"] == 17 and out[\"last_seq\"] == 1, out\n# payload_len 4097: length-invalid\nlog3 = rec(1,1,1) + rec(2,2,1,b\"\\x"
+    },
+    {
+      "step": 21936,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "1000 x 64KiB tiny-record solves: 3.914 s\n1000 commit-heavy solves: 3.153 s  log bytes 60030\nrc 0 lines ['{\"pages\": [\"00000000\"], \"valid_bytes\": 0, \"last_seq\": 0}', '{\"pages\": [\"00000000\"], \"valid_bytes\": 0, \"last_seq\": 0}'] stderr ''\n"
+    },
+    {
+      "step": 23869,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport pathlib\np = pathlib.Path('main.py'); s = p.read_text()\ns = s.replace('''        out.write(json.dumps(solve(json.loads(line))) + \"\\\\n\")\n    out.flush()''','''        out.write(json.dumps(solve(json.loads(line))) + \"\\\\n\")\n        out.flush()''')\np.write_text(s)\nEOF\npython3 smoke.py && python3 test_solution.py && python3 fuzz_test.py"
+    },
+    {
+      "step": 23870,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\nALL PASS\nfuzz done, mismatches: 0\n"
+    },
+    {
+      "step": 24775,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport json, random, struct, subprocess, sys, zlib\nfrom ref_check import recover\n\ndef rec(seq, kind, tx, payload=b\"\"):\n    body = struct.pack(\"<IIBI\", len(payload), seq, kind, tx) + payload\n    return body + struct.pack(\"<I\", zlib.crc32(body) & 0xffffffff)\n\nrng = random.Random(999)\nreqs, exps = [], []\nfor it in range(600):\n    npages = rng.randint(1, 8); plen = rng.randint(1, 64)\n    pages = [bytes(rng.randrange(256) for _ in range(plen)).hex() for _ in range(npages)]\n    log = bytearray()\n    seq = 0\n    live = {}\n    for _ in range(rng.randint(0, 40)):\n        seq += rng.randint(1, 2)\n        kind = rng.choice([1,1,2,2,3,3,4])\n        tx = rng.randint(1, 3)\n        if kind == 1:\n            log += rec(seq,1,tx); live[tx]=[]\n        elif kind == 2:\n            pi=rng.randrange(npages); bc=rng.randint(1,min(8,plen)); bo=rng.randint(0,plen-bc)\n            pay=struct.pack(\"<HHH\",pi,bo,bc)+bytes(rng.randrange(256) for _ in range(bc))\n            log += rec(seq"
+    },
+    {
+      "step": 24776,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "cli batch: 600 requests, mismatches: 0\n"
+    },
+    {
+      "step": 25533,
+      "kind": "terminal_call",
+      "summary": "cd /app && cat main.py && python3 smoke.py && ls -la"
+    },
+    {
+      "step": 25534,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nReads newline-delimited JSON requests on stdin, writes one JSON response per\nline on stdout.  See instruction.md for the format contract.\n\"\"\"\n\nimport json\nimport struct\nimport sys\nimport zlib\n\nMAX_PAYLOAD = 4096\nHEADER = 13          # payload_length + sequence + kind + transaction_id\nTRAILER = 4          # crc\nKIND_BEGIN = 1\nKIND_PATCH = 2\nKIND_COMMIT = 3\nKIND_ABORT = 4\n\n\ndef _unhex(text):\n    \"\"\"Decode a hex string, tolerating an odd trailing nibble (torn byte).\"\"\"\n    if len(text) & 1:\n        text = text[:-1]\n    return bytes.fromhex(text)\n\n\ndef solve(request):\n    pages = [bytearray(_unhex(p)) for p in request[\"pages\"]]\n    checkpoint = int(request[\"checkpoint\"])\n    log = _unhex(request[\"log\"])\n\n    page_count = len(pages)\n    n = len(log)\n    pos = 0\n    valid_bytes = 0\n    last_seq = 0\n\n    # txid -> [list of (page_index, byte_offset, data), patch_count, concat bytes]\n    active = {}\n\n    while pos + HEADER + TRAILER <= n:\n        payload_len = int.from_bytes(log[pos:pos + 4], \"little\")\n        if payload_len > MAX_PAYLOAD:\n            break\n        end = pos + HEADER + payload_len + TRAILER\n        if "
+    },
+    {
+      "step": 26766,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport struct, zlib, main\n\ndef rec(seq, kind, tx, payload=b\"\"):\n    body = struct.pack(\"<IIBI\", len(payload), seq, kind, tx) + payload\n    return body + struct.pack(\"<I\", zlib.crc32(body) & 0xffffffff)\ndef patch(seq,tx,pi,bo,data): return rec(seq,2,tx,struct.pack(\"<HHH\",pi,bo,len(data))+data)\ndef commit(seq,tx,c,d): return rec(seq,3,tx,struct.pack(\"<II\",c,d))\n\nP=[\"00000000\",\"00000000\"]\n# matching commit at/below checkpoint closes; later orphan commit inert\np = patch(2,1,0,0,b\"\\xaa\")\nlog = rec(1,1,1)+p+commit(3,1,1,zlib.crc32(p[13:13+len(p)-17])&0xffffffff)+commit(4,1,1,zlib.crc32(p[13:13+len(p)-17])&0xffffffff)\no = main.solve({\"pages\":P,\"checkpoint\":3,\"log\":log.hex()})\nassert o == {\"pages\":P,\"valid_bytes\":len(log),\"last_seq\":4}, o\n# inactive out-of-bounds patch must still stop prefix\nlog = patch(1,1,99,0,b\"\\xaa\")\no = main.solve({\"pages\":P,\"checkpoint\":0,\"log\":log.hex()})\nassert o == {\"pages\":P,\"valid_bytes\":0,\"last_seq\":0}, o\n# ignored patch (inactive) not "
+    },
+    {
+      "step": 26767,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "extra edge checks OK\n"
+    }
+  ]
+}

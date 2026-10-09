@@ -1,0 +1,228 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-checkpointed-journal-7-a1-27594c95",
+    "task": "checkpointed-journal",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 7,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-kimi-checkpointed-journal-7-a1-27594c95.json",
+    "tool_calls": 12,
+    "agent_elapsed_seconds": 468.154164,
+    "input_tokens": 143992,
+    "output_tokens": 17983,
+    "uncached_cost_estimate": 0.701721,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "d8d11fbc9c313dee5f7ea800c437032525e4a127ab66f84e54dc1f1eda3b36cb",
+    "network_mode": "none",
+    "artifact_sha256": "36b8adc4bc85e3fcadf322f226e2659f2a1e3fb70d789477f250244ba86028e6",
+    "normalized_artifact_sha256": "027ecfaca30d40d8de290c484a553eb9b3a9b89f4938d38a6f5e890808cbd8b9",
+    "terminal_nonzero_or_error_text_events": 2,
+    "protected_path_command_mentions": [
+      11871,
+      13342,
+      14501,
+      15241,
+      16766
+    ],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 6137,
+        "time": "2026-10-08T20:44:42.468708+00:00",
+        "artifact_sha256": "36b8adc4bc85e3fcadf322f226e2659f2a1e3fb70d789477f250244ba86028e6",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 164.564407,
+    "event_counts": {
+      "initial": 1,
+      "request": 11,
+      "stream_chunk": 17512,
+      "response": 11,
+      "terminal_call": 12,
+      "terminal_result": 12,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 77,
+      "time": "2026-10-08T20:42:03.152812+00:00",
+      "tool_call_id": "call_2b7dade730914a64bf8424b9",
+      "command": "ls -la /app/ 2>/dev/null && echo \"---\" && cat /app/smoke.py 2>/dev/null",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 79,
+      "time": "2026-10-08T20:42:03.473830+00:00",
+      "tool_call_id": "call_116abdb36b7a490883e0a852",
+      "command": "python3 --version && cat /app/main.py 2>/dev/null; echo \"exit: $?\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 123,
+      "time": "2026-10-08T20:42:06.756376+00:00",
+      "tool_call_id": "call_3387b2b48f74494f98710ba7",
+      "command": "cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 125,
+      "time": "2026-10-08T20:42:07.235663+00:00",
+      "tool_call_id": "call_c1dafea97c9f4a72ab3002e3",
+      "command": "cat /app/public_contract.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 4910,
+      "time": "2026-10-08T20:44:15.350829+00:00",
+      "tool_call_id": "call_346e45fb79914627a487f6f4",
+      "command": "cd /app && python3 - <<'EOF'\nimport zlib, json\nlog = bytes.fromhex(\"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\")\npos = 0\nwhile pos < len(log):\n    plen = int.from_bytes(log[pos:pos+4],'little')\n    seq = int.from_bytes(log[pos+4:pos+8],'little')\n    kind = log[pos+8]\n    txid = int.from_bytes(log[pos+9:pos+13],'little')\n    payload = log[pos+13:pos+13+plen]\n    crc = int.from_bytes(log[pos+13+plen:pos+17+plen],'little')\n    ok = zlib.crc32(log[pos:pos+13+plen]) & 0xffffffff\n    print(f\"plen={plen} seq={seq} kind={kind} txid={txid} payload={payload.hex()} crc_ok={ok==crc}\")\n    if kind==2:\n        print(\"   patch payload crc:\", hex(zlib.crc32(payload)&0xffffffff))\n    pos += 17+plen\nprint(\"total\", len(log))\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6137,
+      "time": "2026-10-08T20:44:42.468708+00:00",
+      "tool_call_id": "call_1d1935c902d844929164f5d5",
+      "command": "cat > /app/main.py <<'EOF'\n\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nReplay only structurally valid prefix records and only complete, correctly\nsealed transactions newer than the supplied checkpoint.\n\nRecord layout (all integers unsigned, little-endian):\n    payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32\n    | payload | crc:u32\ncrc = zlib.crc32(header + payload) & 0xffffffff, header is the 13 fixed bytes.\n\"\"\"\n\nimport json\nimport sys\nimport zlib\n\nHEADER_LEN = 13\nCRC_LEN = 4\nMAX_PAYLOAD = 4096\n\nKIND_BEGIN = 1\nKIND_PATCH = 2\nKIND_COMMIT = 3\nKIND_ABORT = 4\n\n\ndef solve(request):\n    pages = [bytearray(bytes.fromhex(p)) for p in request[\"pages\"]]\n    checkpoint = request[\"checkpoint\"]\n    log_hex = request[\"log\"]\n    log = bytes.fromhex(log_hex) if log_hex else b\"\"\n\n    n_pages = len(pages)\n    n = len(log)\n    pos = 0\n    prev_seq = 0\n    last_seq = 0\n    valid_bytes = 0\n    # txid -> [staged_patch_count, running_payload_crc, [(page, offset, data)]]\n    active = {}\n\n    while True:\n        remaining = n - pos\n        if remaining < HEADER_LEN:\n            break  # incomplete record header\n        header = log[pos:pos + HEADER_LEN]\n        payload_length = int.from_bytes(header[0:4], \"little\")\n        sequence = int.from_bytes(header[4:8], \"little\")\n        kind = header[8]\n        txid = int.from_bytes(header[9:13], \"little\")\n\n        if payload_length > MAX_PAYLOAD:\n            break  # invalid header\n        end = pos + HEADER_LEN + payload_length + CRC_LEN\n        if end > n:\n            break  # incomplete record body/crc\n    ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 11871,
+      "time": "2026-10-08T20:47:03.829198+00:00",
+      "tool_call_id": "call_e13216e245594231ada4f8c3",
+      "command": "mkdir -p /app/tests && cat > /app/tests/helpers.py <<'EOF'\nimport struct, zlib\n\ndef rec(seq, kind, txid, payload=b\"\"):\n    header = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n    return header + payload + struct.pack(\"<I\", zlib.crc32(header + payload) & 0xffffffff)\n\ndef begin(seq, txid): return rec(seq, 1, txid)\n\ndef patch(seq, txid, page, off, data):\n    return rec(seq, 2, txid, struct.pack(\"<HHH\", page, off, len(data)) + data)\n\ndef commit(seq, txid, payloads):\n    blob = b\"\".join(payloads)\n    return rec(seq, 3, txid, struct.pack(\"<II\", len(payloads), zlib.crc32(blob) & 0xffffffff))\n\ndef commit_bad(seq, txid, count, digest):\n    return rec(seq, 3, txid, struct.pack(\"<II\", count, digest))\n\ndef abort(seq, txid): return rec(seq, 4, txid)\n\ndef patch_payload(page, off, data):\n    return struct.pack(\"<HHH\", page, off, len(data)) + data\nEOF\ncat > /app/tests/test_targeted.py <<'EOF'\nimport sys, json\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/tests\")\nfrom helpers import *\nfrom main import solve\n\ndef run(pages, checkpoint, log):\n    req = {\"pages\": pages, \"checkpoint\": checkpoint, \"log\": log.hex() if isinstance(log, bytes) else log}\n    return solve(req)\n\nfails = 0\ndef check(name, got, exp_pages, exp_vb, exp_seq):\n    global fails\n    ok = (got[\"pages\"] == exp_pages and got[\"valid_bytes\"] == exp_vb and got[\"last_seq\"] == exp_seq)\n    if not ok:\n        fails += 1\n        print(f\"FAIL {name}\\n  got  {got}\\n  want pages={exp_pages} vb={exp_vb} seq={exp_seq}\")\n    else:\n        print(f\"ok   {name}\")\n\nP = [\"aaaaaaaa\", \"bbbbbbbb\"]  # 4-byte pages\n\n# A: interleaved tran",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 13342,
+      "time": "2026-10-08T20:47:38.401772+00:00",
+      "tool_call_id": "call_1d271abb37ff46868fd36681",
+      "command": "cat > /app/tests/fuzz.py <<'EOF'\nimport random, struct, zlib, sys, json\nsys.path.insert(0, \"/app\")\nfrom main import solve\n\ndef reference(pages_hex, checkpoint, log):\n    pages = [bytearray(bytes.fromhex(p)) for p in pages_hex]\n    pos, prev, last, vb = 0, 0, 0, 0\n    active = {}\n    L = len(log)\n    while L - pos >= 13:\n        plen, seq = struct.unpack_from(\"<II\", log, pos)\n        kind = log[pos+8]\n        (txid,) = struct.unpack_from(\"<I\", log, pos+9)\n        if plen > 4096: break\n        end = pos + 17 + plen\n        if end > L: break\n        payload = log[pos+13:pos+13+plen]\n        (crc,) = struct.unpack_from(\"<I\", log, pos+13+plen)\n        if zlib.crc32(log[pos:pos+13+plen]) & 0xffffffff != crc: break\n        if not (seq > prev): break  # covers seq==0 since prev starts at 0\n        if txid == 0: break\n        if kind == 1:\n            if plen != 0: break\n        elif kind == 2:\n            if plen < 6: break\n            pi, off, cnt = struct.unpack_from(\"<HHH\", payload, 0)\n            if cnt == 0 or plen != 6 + cnt: break\n            if pi >= len(pages) or off + cnt > len(pages[pi]): break\n        elif kind == 3:\n            if plen != 8: break\n        elif kind == 4:\n            if plen != 0: break\n        else:\n            break\n        prev, last, vb, pos = seq, seq, end, end\n        if kind == 1:\n            active[txid] = []\n        elif kind == 2:\n            if txid in active:\n                active[txid].append((pi, off, payload[6:], payload))\n        elif kind == 3:\n            st = active.pop(txid, None)\n            if st is not None:\n                cnt, ",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 14501,
+      "time": "2026-10-08T20:48:11.890451+00:00",
+      "tool_call_id": "call_a70b2cc5a4524fe681e43b0a",
+      "command": "cat > /app/tests/fuzz2.py <<'EOF'\nimport random, struct, zlib, sys, json\nsys.path.insert(0, \"/app\")\nfrom main import solve\nfrom fuzz import reference  # reuse reference impl\n\ndef mk_rec(seq, kind, txid, payload):\n    h = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n    return h + payload + struct.pack(\"<I\", zlib.crc32(h + payload) & 0xffffffff)\n\nrng = random.Random(777)\nfor trial in range(4000):\n    npages = rng.randint(1, 8)\n    plens = [rng.randint(1, 64) for _ in range(npages)]\n    pages = [bytes(rng.randrange(256) for _ in range(L)).hex() for L in plens]\n    ops = []\n    seq = 0\n    txids = list(range(1, rng.randint(2, 5)))\n    gen_active = {}  # txid -> list of payloads (generator's mirror of semantics)\n    nrec = rng.randint(0, 40)\n    for _ in range(nrec):\n        seq += rng.randint(1, 2)\n        tx = rng.choice(txids)\n        roll = rng.random()\n        if roll < 0.25:\n            ops.append(mk_rec(seq, 1, tx, b\"\")); gen_active[tx] = []\n        elif roll < 0.6:\n            pi = rng.randrange(npages); off = rng.randrange(plens[pi])\n            cnt = rng.randint(1, plens[pi] - off)\n            data = bytes(rng.randrange(256) for _ in range(cnt))\n            pl = struct.pack(\"<HHH\", pi, off, cnt) + data\n            ops.append(mk_rec(seq, 2, tx, pl))\n            if tx in gen_active: gen_active[tx].append(pl)\n        elif roll < 0.85:\n            st = gen_active.get(tx)\n            if st is not None and rng.random() < 0.7:\n                seal = struct.pack(\"<II\", len(st), zlib.crc32(b\"\".join(st)) & 0xffffffff)  # correct seal\n            else:\n                sea",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 15241,
+      "time": "2026-10-08T20:48:34.789200+00:00",
+      "tool_call_id": "call_fb32886a07e249c082fc5a27",
+      "command": "cat > /app/tests/perf.py <<'EOF'\nimport json, random, struct, zlib, subprocess, sys, time\n\ndef mk_rec(seq, kind, txid, payload):\n    h = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n    return h + payload + struct.pack(\"<I\", zlib.crc32(h + payload) & 0xffffffff)\n\nrng = random.Random(1)\nreqs = []\n# worst case 1: many small records filling 64 KiB\nfor _ in range(50):\n    pages = [\"00\" * 64] * 8\n    recs = []\n    seq = 0\n    size = 0\n    active = []\n    while size < 65500:\n        seq += 1\n        if not active or rng.random() < 0.3:\n            r = mk_rec(seq, 1, seq % 1000 + 1, b\"\")\n            active.append(seq % 1000 + 1)\n        elif rng.random() < 0.7:\n            tx = rng.choice(active)\n            data = bytes(rng.randrange(256) for _ in range(58))\n            r = mk_rec(seq, 2, tx, struct.pack(\"<HHH\", rng.randrange(8), rng.randrange(6), 58) + data)\n        else:\n            tx = active.pop()\n            r = mk_rec(seq, 4, tx, b\"\")\n        if size + len(r) > 65536: break\n        recs.append(r); size += len(r)\n    reqs.append({\"pages\": pages, \"checkpoint\": rng.randint(0, seq), \"log\": b\"\".join(recs).hex()})\n# worst case 2: max payload records (4096) that are structurally fine until shape check\nfor _ in range(5):\n    big = bytes(4096)\n    recs = [mk_rec(i+1, 2, 1, big) for i in range(15)]  # shape-invalid at first, stops fast\n    reqs.append({\"pages\": [\"00\"*64], \"checkpoint\": 0, \"log\": b\"\".join(recs).hex()})\n# max single-page minimal\nreqs.append({\"pages\": [\"ff\"], \"checkpoint\": 0, \"log\": \"\"})\n\ninp = \"\".join(json.dumps(r) + \"\\n\" for r in reqs)\nt0 = time.time()\np = sub",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 16766,
+      "time": "2026-10-08T20:49:14.268351+00:00",
+      "tool_call_id": "call_77192499a6954f57a76938a9",
+      "command": "cd /app && python3 - <<'EOF'\nimport sys, struct, zlib, json\nsys.path.insert(0, \"/app\"); sys.path.insert(0, \"/app/tests\")\nfrom helpers import *\nfrom main import solve\n\nfails = 0\ndef check(name, got, exp):\n    global fails\n    if got != exp:\n        fails += 1; print(\"FAIL\", name, \"\\n got\", got, \"\\n exp\", exp)\n    else: print(\"ok  \", name)\n\n# Spec's example request\ngot = solve({\"pages\":[\"00000000\"],\"checkpoint\":0,\"log\":\"\"})\ncheck(\"spec example\", got, {\"pages\":[\"00000000\"],\"valid_bytes\":0,\"last_seq\":0})\n\n# 1-byte page, patch fits exactly\npp = patch_payload(0,0,b\"\\x7f\")\nlog = begin(1,1)+patch(2,1,0,0,b\"\\x7f\")+commit(3,1,[pp])\ncheck(\"1-byte page\", solve({\"pages\":[\"00\"],\"checkpoint\":0,\"log\":log.hex()}),\n      {\"pages\":[\"7f\"],\"valid_bytes\":len(log),\"last_seq\":3})\n\n# u16 max offsets rejected (structural stop)\nbad = rec(1, 2, 1, struct.pack(\"<HHH\",0,65535,1)+b\"\\x00\")\ncheck(\"offset 65535\", solve({\"pages\":[\"00\"],\"checkpoint\":0,\"log\":bad.hex()}),\n      {\"pages\":[\"00\"],\"valid_bytes\":0,\"last_seq\":0})\nbad = rec(1, 2, 1, struct.pack(\"<HHH\",0,65535,65535)+b\"\\x00\"*65535)\ncheck(\"offset+count wrap\", solve({\"pages\":[\"00\"],\"checkpoint\":0,\"log\":bad.hex()}),\n      {\"pages\":[\"00\"],\"valid_bytes\":0,\"last_seq\":0})\n\n# pages of differing lengths: patch valid on long page, invalid on short\npages = [\"aa\"*64, \"bb\"]  # page0 64B, page1 2B\npp = patch_payload(0,63,b\"\\x01\")\nlog = begin(1,1)+patch(2,1,0,63,b\"\\x01\")+commit(3,1,[pp])\nexp_pages = [\"aa\"*63+\"01\", \"bb\"]\ncheck(\"last byte of long page\", solve({\"pages\":pages,\"checkpoint\":0,\"log\":log.hex()}),\n      {\"pages\":exp_pages,\"valid_bytes\":len(log),\"last_seq\":3})",
+      "protected_path_mentions": true
+    },
+    {
+      "step": 17060,
+      "time": "2026-10-08T20:49:27.590619+00:00",
+      "tool_call_id": "call_0980bf781bff4df6957e2dba",
+      "command": "cat /app/main.py && echo '{\"pages\":[\"00000000\"],\"checkpoint\":0,\"log\":\"\"}\n{\"pages\":[\"00000000\",\"00000000\"],\"checkpoint\":0,\"log\":\"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"}' | python3 /app/main.py",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 78,
+      "time": "2026-10-08T20:42:03.473681+00:00",
+      "tool_call_id": "call_2b7dade730914a64bf8424b9",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:41 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:41 ..\n-rw-r--r-- 1 agent agent 1358 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\n---\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('checkpointed-journal',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 11872,
+      "time": "2026-10-08T20:47:04.135435+00:00",
+      "tool_call_id": "call_e13216e245594231ada4f8c3",
+      "return_code": 0,
+      "stdout": "ok   A interleave commit order\nok   B seal mismatch\nok   C checkpoint gating (apply)\nok   D checkpoint gating (no replay)\nok   D2 checkpoint beyond all\nok   E reincarnation empty commit\nok   E2 stale seal after restart\nok   F orphan records\nok   G bad crc\nok   H torn tail\nok   H2 torn header\nok   I equal seq\nok   I2 decreasing seq\nok   I3 zero seq\nok   J oversize payload\nok   K patch oob\nok   K2 page oob\nok   K3 full-page patch\nok   L inactive patch invalid bounds\nok   M abort then commit\nok   N count mismatch\nok   O uppercase hex\nok   P patch length mismatch\nok   P2 zero count\nok   Q kind 0\nok   Q kind 5\nok   Q txid 0\nok   Q begin payload\nok   Q abort payload\nok   Q commit size\nok   R empty incarnation nonzero digest\nok   S page1 patch\nok   T exact end\nok   U empty log\nok   V seq gaps\nFAILURES: 0\n",
+      "stderr": "",
+      "stdout_tail": "ok   A interleave commit order\nok   B seal mismatch\nok   C checkpoint gating (apply)\nok   D checkpoint gating (no replay)\nok   D2 checkpoint beyond all\nok   E reincarnation empty commit\nok   E2 stale seal after restart\nok   F orphan records\nok   G bad crc\nok   H torn tail\nok   H2 torn header\nok   I equal seq\nok   I2 decreasing seq\nok   I3 zero seq\nok   J oversize payload\nok   K patch oob\nok   K2 page oob\nok   K3 full-page patch\nok   L inactive patch invalid bounds\nok   M abort then commit\nok   N count mismatch\nok   O uppercase hex\nok   P patch length mismatch\nok   P2 zero count\nok   Q kind 0\nok   Q kind 5\nok   Q txid 0\nok   Q begin payload\nok   Q abort payload\nok   Q commit size\nok   R empty incarnation nonzero digest\nok   S page1 patch\nok   T exact end\nok   U empty log\nok   V seq gaps\nFAILURES: 0\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 11871,
+      "kind": "terminal_call",
+      "summary": "mkdir -p /app/tests && cat > /app/tests/helpers.py <<'EOF'\nimport struct, zlib\n\ndef rec(seq, kind, txid, payload=b\"\"):\n    header = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n    return header + payload + struct.pack(\"<I\", zlib.crc32(header + payload) & 0xffffffff)\n\ndef begin(seq, txid): return rec(seq, 1, txid)\n\ndef patch(seq, txid, page, off, data):\n    return rec(seq, 2, txid, struct.pack(\"<HHH\", page, off, len(data)) + data)\n\ndef commit(seq, txid, payloads):\n    blob = b\"\".join(payloads)\n    return rec(seq, 3, txid, struct.pack(\"<II\", len(payloads), zlib.crc32(blob) & 0xffffffff))\n\ndef commit_bad(seq, txid, count, digest):\n    return rec(seq, 3, txid, struct.pack(\"<II\", count, digest))\n\ndef abort(seq, txid): return rec(seq, 4, txid)\n\ndef patch_payload(page, off, data):\n    return struct.pack(\"<HHH\", page, off, len(data)) + data\nEOF\ncat > /app/tests/test_targeted.py <<'EOF'\nimport sys, json\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/tests\")\nfrom helpers import *\nfr"
+    },
+    {
+      "step": 11872,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "ok   A interleave commit order\nok   B seal mismatch\nok   C checkpoint gating (apply)\nok   D checkpoint gating (no replay)\nok   D2 checkpoint beyond all\nok   E reincarnation empty commit\nok   E2 stale seal after restart\nok   F orphan records\nok   G bad crc\nok   H torn tail\nok   H2 torn header\nok   I equal seq\nok   I2 decreasing seq\nok   I3 zero seq\nok   J oversize payload\nok   K patch oob\nok   K2 page oob\nok   K3 full-page patch\nok   L inactive patch invalid bounds\nok   M abort then commit\nok   N count mismatch\nok   O uppercase hex\nok   P patch length mismatch\nok   P2 zero count\nok   Q kind 0\nok   Q kind 5\nok   Q txid 0\nok   Q begin payload\nok   Q abort payload\nok   Q commit size\nok   R empty incarnation nonzero digest\nok   S page1 patch\nok   T exact end\nok   U empty log\nok   V seq gaps\nFAILURES: 0\n"
+    },
+    {
+      "step": 13342,
+      "kind": "terminal_call",
+      "summary": "cat > /app/tests/fuzz.py <<'EOF'\nimport random, struct, zlib, sys, json\nsys.path.insert(0, \"/app\")\nfrom main import solve\n\ndef reference(pages_hex, checkpoint, log):\n    pages = [bytearray(bytes.fromhex(p)) for p in pages_hex]\n    pos, prev, last, vb = 0, 0, 0, 0\n    active = {}\n    L = len(log)\n    while L - pos >= 13:\n        plen, seq = struct.unpack_from(\"<II\", log, pos)\n        kind = log[pos+8]\n        (txid,) = struct.unpack_from(\"<I\", log, pos+9)\n        if plen > 4096: break\n        end = pos + 17 + plen\n        if end > L: break\n        payload = log[pos+13:pos+13+plen]\n        (crc,) = struct.unpack_from(\"<I\", log, pos+13+plen)\n        if zlib.crc32(log[pos:pos+13+plen]) & 0xffffffff != crc: break\n        if not (seq > prev): break  # covers seq==0 since prev starts at 0\n        if txid == 0: break\n        if kind == 1:\n            if plen != 0: break\n        elif kind == 2:\n            if plen < 6: break\n            pi, off, cnt = struct.unpack_from(\"<HHH\", payload, 0)\n    "
+    },
+    {
+      "step": 13343,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "fuzz OK: 4000 trials\n"
+    },
+    {
+      "step": 14501,
+      "kind": "terminal_call",
+      "summary": "cat > /app/tests/fuzz2.py <<'EOF'\nimport random, struct, zlib, sys, json\nsys.path.insert(0, \"/app\")\nfrom main import solve\nfrom fuzz import reference  # reuse reference impl\n\ndef mk_rec(seq, kind, txid, payload):\n    h = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n    return h + payload + struct.pack(\"<I\", zlib.crc32(h + payload) & 0xffffffff)\n\nrng = random.Random(777)\nfor trial in range(4000):\n    npages = rng.randint(1, 8)\n    plens = [rng.randint(1, 64) for _ in range(npages)]\n    pages = [bytes(rng.randrange(256) for _ in range(L)).hex() for L in plens]\n    ops = []\n    seq = 0\n    txids = list(range(1, rng.randint(2, 5)))\n    gen_active = {}  # txid -> list of payloads (generator's mirror of semantics)\n    nrec = rng.randint(0, 40)\n    for _ in range(nrec):\n        seq += rng.randint(1, 2)\n        tx = rng.choice(txids)\n        roll = rng.random()\n        if roll < 0.25:\n            ops.append(mk_rec(seq, 1, tx, b\"\")); gen_active[tx] = []\n        elif roll < 0.6:\n         "
+    },
+    {
+      "step": 14502,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "fuzz OK: 4000 trials\nfuzz2 OK: 4000 trials with mostly-correct seals\n"
+    },
+    {
+      "step": 15241,
+      "kind": "terminal_call",
+      "summary": "cat > /app/tests/perf.py <<'EOF'\nimport json, random, struct, zlib, subprocess, sys, time\n\ndef mk_rec(seq, kind, txid, payload):\n    h = struct.pack(\"<IIBI\", len(payload), seq, kind, txid)\n    return h + payload + struct.pack(\"<I\", zlib.crc32(h + payload) & 0xffffffff)\n\nrng = random.Random(1)\nreqs = []\n# worst case 1: many small records filling 64 KiB\nfor _ in range(50):\n    pages = [\"00\" * 64] * 8\n    recs = []\n    seq = 0\n    size = 0\n    active = []\n    while size < 65500:\n        seq += 1\n        if not active or rng.random() < 0.3:\n            r = mk_rec(seq, 1, seq % 1000 + 1, b\"\")\n            active.append(seq % 1000 + 1)\n        elif rng.random() < 0.7:\n            tx = rng.choice(active)\n            data = bytes(rng.randrange(256) for _ in range(58))\n            r = mk_rec(seq, 2, tx, struct.pack(\"<HHH\", rng.randrange(8), rng.randrange(6), 58) + data)\n        else:\n            tx = active.pop()\n            r = mk_rec(seq, 4, tx, b\"\")\n        if size + len(r) > 65536: break\n   "
+    },
+    {
+      "step": 15242,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "56 requests (incl. 50 near-64KiB logs) in 0.21s, stderr=''\n"
+    },
+    {
+      "step": 16766,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'EOF'\nimport sys, struct, zlib, json\nsys.path.insert(0, \"/app\"); sys.path.insert(0, \"/app/tests\")\nfrom helpers import *\nfrom main import solve\n\nfails = 0\ndef check(name, got, exp):\n    global fails\n    if got != exp:\n        fails += 1; print(\"FAIL\", name, \"\\n got\", got, \"\\n exp\", exp)\n    else: print(\"ok  \", name)\n\n# Spec's example request\ngot = solve({\"pages\":[\"00000000\"],\"checkpoint\":0,\"log\":\"\"})\ncheck(\"spec example\", got, {\"pages\":[\"00000000\"],\"valid_bytes\":0,\"last_seq\":0})\n\n# 1-byte page, patch fits exactly\npp = patch_payload(0,0,b\"\\x7f\")\nlog = begin(1,1)+patch(2,1,0,0,b\"\\x7f\")+commit(3,1,[pp])\ncheck(\"1-byte page\", solve({\"pages\":[\"00\"],\"checkpoint\":0,\"log\":log.hex()}),\n      {\"pages\":[\"7f\"],\"valid_bytes\":len(log),\"last_seq\":3})\n\n# u16 max offsets rejected (structural stop)\nbad = rec(1, 2, 1, struct.pack(\"<HHH\",0,65535,1)+b\"\\x00\")\ncheck(\"offset 65535\", solve({\"pages\":[\"00\"],\"checkpoint\":0,\"log\":bad.hex()}),\n      {\"pages\":[\"00\"],\"valid_bytes\":0,\"last_seq\":0}"
+    },
+    {
+      "step": 16767,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "ok   spec example\nok   1-byte page\nok   offset 65535\nok   offset+count wrap\nok   last byte of long page\nok   off==pagelen invalid\nok   commit isolation\nok   orphan abort\nFAILURES: 0\n---\nPassed 3 public examples\ntargeted-ok\nfuzz OK: 4000 trials\nfuzz2 OK: 4000 trials with mostly-correct seals\n"
+    },
+    {
+      "step": 17060,
+      "kind": "terminal_call",
+      "summary": "cat /app/main.py && echo '{\"pages\":[\"00000000\"],\"checkpoint\":0,\"log\":\"\"}\n{\"pages\":[\"00000000\",\"00000000\"],\"checkpoint\":0,\"log\":\"00000000010000000101000000141cd39d080000000200000002010000000000000002001122610f8367080000000300000003010000000100000016759249120496b6\"}' | python3 /app/main.py"
+    },
+    {
+      "step": 17061,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "\"\"\"Deterministic recovery of a checkpointed transactional byte journal.\n\nReplay only structurally valid prefix records and only complete, correctly\nsealed transactions newer than the supplied checkpoint.\n\nRecord layout (all integers unsigned, little-endian):\n    payload_length:u32 | sequence:u32 | kind:u8 | transaction_id:u32\n    | payload | crc:u32\ncrc = zlib.crc32(header + payload) & 0xffffffff, header is the 13 fixed bytes.\n\"\"\"\n\nimport json\nimport sys\nimport zlib\n\nHEADER_LEN = 13\nCRC_LEN = 4\nMAX_PAYLOAD = 4096\n\nKIND_BEGIN = 1\nKIND_PATCH = 2\nKIND_COMMIT = 3\nKIND_ABORT = 4\n\n\ndef solve(request):\n    pages = [bytearray(bytes.fromhex(p)) for p in request[\"pages\"]]\n    checkpoint = request[\"checkpoint\"]\n    log_hex = request[\"log\"]\n    log = bytes.fromhex(log_hex) if log_hex else b\"\"\n\n    n_pages = len(pages)\n    n = len(log)\n    pos = 0\n    prev_seq = 0\n    last_seq = 0\n    valid_bytes = 0\n    # txid -> [staged_patch_count, running_payload_crc, [(page, offset, data)]]\n    active = {}\n\n    while True:\n        remaining = n - pos\n        if remaining < HEADER_LEN:\n            break  # incomplete record header\n        header = log[pos:pos + HEADER_LEN]\n        payload_length = int.from_"
+    }
+  ]
+}

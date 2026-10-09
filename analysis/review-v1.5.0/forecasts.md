@@ -1,0 +1,23 @@
+# Forecast revision · 1.5.0
+
+**Inferred:** These are retrospective development-panel updates, made before any evaluator overnight or frontier outcomes. They do not replace the frozen Day 1 preregistration. Predictions assume the packaged 1,800-second agent allowance and valid graders. **Unknown:** Actual target scaffold, token limits, and model-specific transfer. Neither Fable nor any GPT-5.6 model was run.
+
+| Rank | Task | Predicted K/8 | Expected K | P(K ≤ 2) | Rationale |
+|---|---|---:|---:|---:|---|
+| 1 | atomic-range-history | 6 | 6.38 | 4.0% | **Verified:** 24/24 completed passes; 13 traces finish within 30 minutes. **Inferred:** Search is feasible, but deadline sensitivity warrants the largest adverse scenario. |
+| 2 | exact-fused-dot | 7 | 6.63 | 1.9% | **Verified:** 24/24; 17 finish within 30 minutes. **Inferred:** Exact integer arithmetic and self-generated checks resolve the main crux; rounding mistakes are recoverable. |
+| 3 | typecheck-soundness-witness | 7 | 6.75 | 1.5% | **Verified:** 24/24; 19 finish within 30 minutes; the negative generator baseline coexists with structured agent success. **Inferred:** One long search is weaker evidence than repeated independent discoveries. |
+| 4 | mixed-width-tso | 7 | 6.81 | 1.4% | **Verified:** 24/24; 20 finish within 30 minutes. **Inferred:** Bounded exhaustive state exploration is a reliable strategy. |
+| 5 | checkpointed-journal | 7 | 7.06 | 1.3% | **Verified:** 24/24; all finish within 30 minutes. **Inferred:** Most credible easy control. |
+
+**Inferred method:** The predictive distribution for eight target trials is a subjective mixture of beta-binomial distributions: 60% Beta(9,1), 20% Beta(1+s,25−s), and 20% Beta(3,1), where `s` is the number of this task's 24 completed traces finishing within 30 minutes. The first component uses the uniform-prior posterior for one family at 8/8. All three families yield that same posterior; they are alternative predictors, not multiplied evidence. The second is an intentionally pessimistic deadline scenario that assumes every late completion would fail at cutoff. The third is broad target/scaffold discrepancy. Component weights and the discrepancy prior are analyst choices, not learned transfer parameters. No automatic frontier strength bonus is applied.
+
+**Unknown:** Late-completion outcomes at cutoff. Consequently, the deadline component is a sensitivity assumption, not a measured failure rate. The expected count is rounded only as a compact point forecast. Full P(K=0) through P(K=8), an ample-time scenario, and a pessimistic deadline scenario are saved in `forecast-revision.json`. Confidence is low for every target forecast. Extra digits in JSON support reproducibility, not accuracy.
+
+**Inferred statistical limit:** Under an iid Bernoulli assumption, 8/8 gives a two-sided 95% exact lower bound of about 0.631 for one proxy family. That interval is not a frontier interval. Pooling families as 24 identical Bernoulli trials would hide family and scaffold differences. Exclusions, repeated replacement attempts, shared resources, and model correlation further limit interpretation.
+
+**Reported historical anchors:** The previously inspected GPT-5/Codex CLI cells are break-filter-js-from-html 0/5, bn-fit-modify 3/4, build-cython-ext 4/4, and build-pmars 5/5, from the pinned [benchmark notebook](https://github.com/laude-institute/terminal-bench-experiments/blob/043386442be68526403431b2024f50d3080abb72/notebooks/model_task_heatmaps.ipynb). Extraction and task-file inspection are documented in the [research memo](../../portfolio/analysis/research-memo.md). These results were not rerun here.
+
+**Inferred use of anchors:** Counterexample discovery links structurally to the checker task; semantic modeling links weakly to the numerical/history tasks; successful build tasks caution against assuming unfamiliar systems content is hard. Per user steering, older-generation hardness is treated as an upper bound on difficulty, not as an estimate for Fable/GPT-5.6 Sol. This is a working assumption, not a proven monotonic relation across scaffolds. No numeric anchor pseudo-count enters the forecast: relevance is too weak. Current same-task development evidence dominates the update.
+
+**Inferred falsification:** Atomic is ranked first only because of the deadline scenario. If it reaches at least seven frontier passes while a lower-ranked task reaches two or fewer under the same evaluator conditions, that ranking is contradicted. If all five reach at least seven, the weak difficulty conclusion is supported. No present task is a strong candidate for the assignment's hard-task threshold.

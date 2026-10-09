@@ -1,0 +1,675 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-glm-atomic-range-history-4-a2-342d0937",
+    "task": "atomic-range-history",
+    "model": "accounts/fireworks/models/glm-5p3",
+    "replicate": 4,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-glm-atomic-range-history-4-a2-342d0937.json",
+    "tool_calls": 62,
+    "agent_elapsed_seconds": 2586.792575,
+    "input_tokens": 5151301,
+    "output_tokens": 109912,
+    "uncached_cost_estimate": 7.695434199999999,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "0394d78a13f92ee8d23d743036bbe83ddf27e851f710c693546df8f800e4c3f3",
+    "network_mode": "none",
+    "artifact_sha256": "422328286045a7f04418417c97ac3c51a2c40d67677278f9cb27494e9b5c79d0",
+    "normalized_artifact_sha256": "8915a617690dad1680292faed677d034da78b48f37e79ff1d57787574c9688f3",
+    "terminal_nonzero_or_error_text_events": 13,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": false,
+    "final_artifact_literal_writes": [],
+    "final_artifact_literal_written_by_30_min": false,
+    "first_literal_final_artifact_seconds": null,
+    "event_counts": {
+      "initial": 1,
+      "request": 62,
+      "stream_chunk": 110098,
+      "response": 62,
+      "terminal_call": 62,
+      "terminal_result": 62,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 79,
+      "time": "2026-10-08T21:07:28.065715+00:00",
+      "tool_call_id": "chatcmpl-tool-a780c8236d89d8b4",
+      "command": "ls -la /app && cat /app/smoke.py 2>/dev/null | head -100",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 81,
+      "time": "2026-10-08T21:07:28.277946+00:00",
+      "tool_call_id": "chatcmpl-tool-93095fe84709e510",
+      "command": "ls -la /app/* 2>/dev/null; find /app -type f | head -50",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 122,
+      "time": "2026-10-08T21:07:31.708709+00:00",
+      "tool_call_id": "chatcmpl-tool-903d0ac1ab3951b8",
+      "command": "cat /app/main.py; echo ====; cat /app/public_contract.py; echo ====; cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 19919,
+      "time": "2026-10-08T21:13:09.411420+00:00",
+      "tool_call_id": "chatcmpl-tool-b110846d6e5d3593",
+      "command": "python3 --version; cd /app && python3 smoke.py; nproc; free -m",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 21935,
+      "time": "2026-10-08T21:13:39.780946+00:00",
+      "tool_call_id": "chatcmpl-tool-9b90d82deabd773b",
+      "command": "cat > /app/main.py << 'PYEOF'\n\"\"\"Linearizability checker for atomic range transactions.\n\nA whole transaction is one atomic operation, so a witness is a linear order of\nthe transactions that respects real time (A.end <= B.start => A before B) and\nwhose sequential execution from `initial` reproduces every observed value and\nends exactly at `final`.\n\nApproach\n--------\n1. Every transaction is symbolically executed once (\"compiled\").  Because a\n   transaction is atomic, its effect on an incoming state is completely\n   determined by that state:\n\n     * reads (`get`, `cas` compare, `scan`) of keys not written earlier inside\n       the transaction turn into *constraints* on the incoming state,\n     * writes turn into a final overlay (last write per key wins),\n     * a failed `cas` on an incoming key turns into a *disequality*.\n\n   If a transaction contradicts itself it can never be part of any witness, so\n   the answer is immediately `null`.\n\n2. The search is a DFS over (set of already placed transactions, current\n   state).  That pair fully determines the future, so failures are memoised and\n   never re-explored.  Only transactions whose real-time predecessors are all\n   placed are considered.\n\"\"\"\n\nimport json\nimport sys\n\nREAD_OPS = (\"get\", \"put\", \"del\", \"cas\")\n\n\ndef compile_tx(tx, kidx, keys):\n    \"\"\"Symbolically execute one transaction.\n\n    Returns (eqs, neqs, overlay) where\n      eqs    -- tuple of (key_index, value) the incoming state must satisfy\n      neqs   -- tuple of (key_index, value) the incoming state must NOT satisfy\n      overlay-- tuple of (key_index, value_or_None",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 23068,
+      "time": "2026-10-08T21:14:00.259604+00:00",
+      "tool_call_id": "chatcmpl-tool-845e727dccdb6d56",
+      "command": "cd /app && python3 - << 'EOF'\nimport re, pathlib\np = pathlib.Path('main.py')\ns = p.read_text()\ns = s.replace('''def main():\n    out = []\n    for line in sys.stdin:\n        if not line.strip():\n            continue\n        out.append(json.dumps(solve(json.loads(line))))\n        # flush incrementally so a long batch streams results\n        sys.stdout.write(out[-1] + \"\\\\n\")\n        sys.stdout.flush()\n        out.pop()\n''', '''def main():\n    for line in sys.stdin:\n        if not line.strip():\n            continue\n        sys.stdout.write(json.dumps(solve(json.loads(line))))\n        sys.stdout.write(\"\\\\n\")\n        sys.stdout.flush()\n''')\np.write_text(s)\nEOF\ntail -20 /app/main.py; cd /app && python3 smoke.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 23911,
+      "time": "2026-10-08T21:14:14.074858+00:00",
+      "tool_call_id": "chatcmpl-tool-9ca2823fe7c32bbb",
+      "command": "mkdir -p /app/dev && cat > /app/dev/reference.py << 'PYEOF'\n\"\"\"Independent brute-force reference + history simulator (dev only).\"\"\"\nimport itertools\n\n\ndef exec_ops(ops, state):\n    \"\"\"Sequentially apply ops to a dict state. None on observation mismatch.\"\"\"\n    d = dict(state)\n    for op in ops:\n        k = op[0]\n        if k == \"get\":\n            if d.get(op[1]) != op[2]:\n                return None\n        elif k == \"put\":\n            d[op[1]] = op[2]\n        elif k == \"del\":\n            d.pop(op[1], None)\n        elif k == \"cas\":\n            _, key, old, new, succ = op\n            ok = d.get(key) == old\n            if ok != succ:\n                return None\n            if ok:\n                if new is None:\n                    d.pop(key, None)\n                else:\n                    d[key] = new\n        elif k == \"scan\":\n            pairs = sorted([[kk, vv] for kk, vv in d.items() if op[1] <= kk < op[2]])\n            if pairs != op[3]:\n                return None\n        else:\n            raise ValueError(\"bad op \" + repr(op))\n    return d\n\n\ndef precedence_ok(order, tx):\n    rank = {t: i for i, t in enumerate(order)}\n    for a in tx:\n        for b in tx:\n            if a[\"end\"] <= b[\"start\"] and rank[a[\"id\"]] >= rank[b[\"id\"]]:\n                return False\n    return True\n\n\ndef brute_exists(request, limit=None):\n    \"\"\"True iff some precedence-respecting serial order is a valid witness.\"\"\"\n    txs = request[\"transactions\"]\n    ids = [t[\"id\"] for t in txs]\n    if limit is not None and len(txs) > limit:\n        raise RuntimeError(\"too many transactions for brute force\")\n  ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 27089,
+      "time": "2026-10-08T21:15:02.320806+00:00",
+      "tool_call_id": "chatcmpl-tool-803a15a263b8b150",
+      "command": "cat > /app/dev/gen.py << 'PYEOF'\n\"\"\"Random history generator (dev only).\"\"\"\nimport random\n\nKEYPOOL = [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\", \"h\", \"i\", \"j\", \"ab\", \"ba\", \"bb\", \"aa\", \"zz\", \"m\", \"q\", \"x\"]\n\n\ndef _val(rng):\n    return rng.randint(-9, 9)\n\n\ndef gen_request(rng, max_tx=6, mode=\"clean\", force_ntx=None):\n    \"\"\"Build a random request.  `mode` decides how satisfiable it is made.\"\"\"\n    nk = rng.randint(1, 6)\n    keys = sorted(rng.sample(KEYPOOL, nk))\n    # extra scan bounds (kept inside the same \"keys\" budget)\n    extra = [k for k in rng.sample(KEYPOOL, 3) if k not in keys]\n    bounds = keys + extra[: max(0, 6 - len(keys))]\n    initial = {k: _val(rng) for k in keys if rng.random() < 0.6}\n\n    ntx = force_ntx if force_ntx is not None else rng.randint(0, max_tx)\n    hidden = list(range(ntx))\n    rng.shuffle(hidden)\n\n    state = dict(initial)\n    txs = []\n    for pos, idx in enumerate(hidden):\n        nops = rng.randint(1, 5)\n        ops = []\n        for _ in range(nops):\n            kind = rng.choices(\n                [\"get\", \"put\", \"del\", \"cas\", \"scan\"],\n                weights=[3, 4, 2, 4, 2],\n            )[0]\n            key = rng.choice(keys)\n            if kind == \"get\":\n                ops.append([\"get\", key, state.get(key)])\n            elif kind == \"put\":\n                v = _val(rng)\n                state[key] = v\n                ops.append([\"put\", key, v])\n            elif kind == \"del\":\n                state.pop(key, None)\n                ops.append([\"del\", key])\n            elif kind == \"cas\":\n                if rng.random() < 0.65:\n                    old = stat",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 27283,
+      "time": "2026-10-08T21:15:07.317180+00:00",
+      "tool_call_id": "chatcmpl-tool-a899b1acedd8934f",
+      "command": "cd /app && (python3 dev/fuzz.py 2 600 7 > /tmp/f2.log 2>&1 &); (python3 dev/fuzz.py 3 600 7 > /tmp/f3.log 2>&1 &); (python3 dev/fuzz.py 4 400 8 > /tmp/f4.log 2>&1 &); sleep 100; tail -3 /tmp/f2.log /tmp/f3.log /tmp/f4.log",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 27334,
+      "time": "2026-10-08T21:16:49.420969+00:00",
+      "tool_call_id": "chatcmpl-tool-a3a9365dc1cd3fda",
+      "command": "cd /app; for f in /tmp/f2.log /tmp/f3.log /tmp/f4.log; do echo \"== $f\"; cat \"$f\"; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 29064,
+      "time": "2026-10-08T21:17:15.890192+00:00",
+      "tool_call_id": "chatcmpl-tool-b695da43c47f7a59",
+      "command": "cat > /app/dev/naive.py << 'PYEOF'\n\"\"\"Independent naive solver: DFS over masks simulating ops on dicts (dev only).\"\"\"\nimport sys\n\nsys.path.insert(0, \"/app/dev\")\nfrom reference import exec_ops  # noqa: E402\n\n\ndef naive_solve(request):\n    txs = request[\"transactions\"]\n    n = len(txs)\n    full = (1 << n) - 1\n    prereq = [0] * n\n    for i, a in enumerate(txs):\n        for j, b in enumerate(txs):\n            if i != j and a[\"end\"] <= b[\"start\"]:\n                prereq[j] |= 1 << i\n    initial = dict(request[\"initial\"])\n    dead = set()\n    path = []\n\n    def dfs(mask, state):\n        if mask == full:\n            return state == request[\"final\"]\n        for i in range(n):\n            bit = 1 << i\n            if mask & bit:\n                continue\n            if prereq[i] & (mask ^ full):\n                continue\n            nxt = exec_ops(txs[i][\"ops\"], state)\n            if nxt is None:\n                continue\n            key = (mask | bit, tuple(sorted(nxt.items())))\n            if key in dead:\n                continue\n            path.append(i)\n            if dfs(mask | bit, nxt):\n                return True\n            path.pop()\n            dead.add(key)\n        return False\n\n    if dfs(0, initial):\n        return {\"order\": [txs[i][\"id\"] for i in path]}\n    return {\"order\": None}\nPYEOF\ncat > /app/dev/adversarial.py << 'PYEOF'\n\"\"\"Adversarial 10-transaction performance harness (dev only).\"\"\"\nimport json\nimport random\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nimport main as solver  # noqa: E402\nimport naive  # noqa: E402\nfrom refere",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 30398,
+      "time": "2026-10-08T21:17:36.099939+00:00",
+      "tool_call_id": "chatcmpl-tool-bbc32b68d5fefd2b",
+      "command": "cat > /app/dev/compare.py << 'PYEOF'\n\"\"\"Cross-check solver vs naive solver + node counting (dev only).\"\"\"\nimport json\nimport random\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nimport main as solver  # noqa: E402\nimport naive  # noqa: E402\nfrom adversarial import gen_writers  # noqa: E402\nfrom gen import gen_request  # noqa: E402\nfrom reference import valid_order  # noqa: E402\n\n\ndef count_nodes(req):\n    \"\"\"Re-run the solver DFS with instrumentation by monkeypatching dfs counts.\"\"\"\n    import main as m\n    orig = m.solve\n    # replicate a node counter by tracing 'dead' set growth is awkward; use a\n    # simple wrapper that recounts via recursion on the same algorithm.\n    return None\n\n\ndef compare(req, label=\"\"):\n    t0 = time.perf_counter()\n    a = solver.solve(req)\n    ta = time.perf_counter() - t0\n    t0 = time.perf_counter()\n    b = naive.naive_solve(req)\n    tb = time.perf_counter() - t0\n    status = \"OK\"\n    if (a[\"order\"] is None) != (b[\"order\"] is None):\n        status = \"DISAGREE-EXISTENCE\"\n    elif a[\"order\"] is not None and not valid_order(req, a[\"order\"]):\n        status = \"INVALID-WITNESS\"\n    elif b[\"order\"] is not None and not valid_order(req, b[\"order\"]):\n        status = \"NAIVE-INVALID\"\n    print(\"%-8s mine=%.4fs naive=%.4fs  sat=%s  %s\" % (\n        label, ta, tb, a[\"order\"] is not None, status), flush=True)\n    return status, ta, tb\n\n\nif __name__ == \"__main__\":\n    seed = int(sys.argv[1]) if len(sys.argv) > 1 else 0\n    n = int(sys.argv[2]) if len(sys.argv) > 2 else 10\n    rng = random.Random(seed)\n    bad = 0\n    wors",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 32452,
+      "time": "2026-10-08T21:18:13.305214+00:00",
+      "tool_call_id": "chatcmpl-tool-aa5f26c2481c3e5e",
+      "command": "cd /app && python3 - << 'EOF'\nimport sys, random, cProfile, pstats, io, json, time\nsys.path.insert(0,'/app'); sys.path.insert(0,'/app/dev')\nimport main as solver\nfrom adversarial import gen_writers\nrng = random.Random(7)\nreq = gen_writers(rng, sat=False, reads=0.0)\nprint(json.dumps(req)[:400])\nt=time.perf_counter(); got=solver.solve(req); print('result', got, '%.5fs'%(time.perf_counter()-t))\npr=cProfile.Profile(); pr.enable(); solver.solve(req); pr.disable()\ns=io.StringIO(); pstats.Stats(pr,stream=s).sort_stats('tottime').print_stats(8); print(s.getvalue())\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 35649,
+      "time": "2026-10-08T21:19:08.376234+00:00",
+      "tool_call_id": "chatcmpl-tool-b2d1ddcf7882b4d6",
+      "command": "cat > /app/dev/hard.py << 'PYEOF'\n\"\"\"Search for the slowest instances: all-overlapping pure writers with a final\nmap whose per-key values are each individually producible (defeats the cheap\nprune) while the combination is infeasible (forces exhaustive search).\"\"\"\nimport json\nimport random\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nimport main as solver  # noqa: E402\nfrom reference import valid_order  # noqa: E402\n\n\ndef gen_hard(rng, ntx=10, nkeys=6, nops=5, distinct_writes=True):\n    keys = [\"k%d\" % i for i in range(nkeys)]\n    txs = []\n    for i in range(ntx):\n        ops = []\n        pool = keys if not distinct_writes else rng.sample(keys, min(nops, nkeys))\n        for k in pool:\n            ops.append([\"put\", k, rng.randint(-9, 9)])\n        if len(ops) < nops and not distinct_writes:\n            ops.append([\"put\", rng.choice(keys), rng.randint(-9, 9)])\n        txs.append({\"id\": \"t%d\" % i, \"start\": 0, \"end\": 1, \"ops\": ops})\n    # final: each key takes the overlay value of a random transaction writing it\n    overlay_vals = {}\n    for t in txs:\n        seen = {}\n        for op in t[\"ops\"]:\n            seen[op[1]] = op[2]\n        for k, v in seen.items():\n            overlay_vals.setdefault(k, []).append(v)\n    final = {}\n    for k in keys:\n        vals = overlay_vals.get(k)\n        if vals:\n            final[k] = rng.choice(vals)\n    return {\"initial\": {}, \"final\": final, \"transactions\": txs}\n\n\ndef main():\n    seed = int(sys.argv[1]) if len(sys.argv) > 1 else 0\n    tries = int(sys.argv[2]) if len(sys.argv) > 2 else 200\n    budget = fl",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 37108,
+      "time": "2026-10-08T21:19:38.139249+00:00",
+      "tool_call_id": "chatcmpl-tool-af314df938cfa822",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/gen.py')\ns = p.read_text()\ns = s.replace(\"\"\"    # --- assign intervals -------------------------------------------------\n    if mode == \"time\":\"\"\", \"\"\"    # --- assign intervals -------------------------------------------------\n    if mode == \"overlap\":\n        for tx in txs:  # all mutually overlapping: maximal branching\n            tx[\"start\"] = 0\n            tx[\"end\"] = 1\n    elif mode == \"time\":\"\"\")\np.write_text(s)\nEOF\ncat > /app/dev/hunt.py << 'PYEOF'\n\"\"\"Hunt for slow instances across many random families (dev only).\"\"\"\nimport json\nimport random\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nimport main as solver  # noqa: E402\nimport naive  # noqa: E402\nfrom gen import gen_request  # noqa: E402\nfrom hard import gen_hard  # noqa: E402\nfrom reference import valid_order  # noqa: E402\n\n\ndef families():\n    return [\n        (\"hard-unsat\", lambda rng: gen_hard(rng)),\n        (\"hard-unsat-dup\", lambda rng: gen_hard(rng, distinct_writes=False)),\n        (\"hard-unsat-k4\", lambda rng: gen_hard(rng, nkeys=4)),\n        (\"hard-unsat-k2\", lambda rng: gen_hard(rng, nkeys=2)),\n        (\"hard-unsat-k6o3\", lambda rng: gen_hard(rng, nops=3)),\n        (\"clean-ov\", lambda rng: gen_request(rng, max_tx=10, force_ntx=10, mode=\"overlap\")),\n        (\"value-ov\", lambda rng: gen_request(rng, max_tx=10, force_ntx=10, mode=\"value\")),\n        (\"final-ov\", lambda rng: gen_request(rng, max_tx=10, force_ntx=10, mode=\"final\")),\n        (\"clean-rand\", lambda rng: gen_request(rng, max_tx=10, force_ntx=10",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 39962,
+      "time": "2026-10-08T21:20:40.732276+00:00",
+      "tool_call_id": "chatcmpl-tool-89cd7168e9e6d292",
+      "command": "cat > /app/dev/space.py << 'PYEOF'\n\"\"\"Measure the true search space: distinct (mask, state) pairs reachable when\nevery transaction is always applicable (pure writers, all overlapping).\"\"\"\nimport itertools\nimport random\nimport sys\n\nsys.path.insert(0, \"/app\")\n\n\ndef space_size(ntx, nkeys, writes, init=None):\n    \"\"\"writes: list per tx of (key_idx, value). Returns total distinct (mask,state).\"\"\"\n    full = (1 << ntx) - 1\n    states = {0: {tuple(init) if init else (None,) * nkeys}}\n    total = 1\n    frontier = [0]\n    seen_masks = {0}\n    # expand layer by layer over masks (BFS over subsets)\n    order = sorted(range(1 << ntx), key=lambda m: bin(m).count(\"1\"))\n    for mask in order:\n        if mask not in states:\n            continue\n        cur = states[mask]\n        for t in range(ntx):\n            bit = 1 << t\n            if mask & bit:\n                continue\n            nm = mask | bit\n            ov = writes[t]\n            tgt = states.setdefault(nm, set())\n            if not ov:\n                tgt.update(cur)\n                continue\n            for s in cur:\n                l = list(s)\n                for i, v in ov:\n                    l[i] = v\n                tgt.add(tuple(l))\n    total = sum(len(v) for v in states.values())\n    return total, {m: len(v) for m, v in states.items()}\n\n\ndef structure(rng, ntx, nkeys, wsize, distinct=True):\n    writes = []\n    for t in range(ntx):\n        ks = rng.sample(range(nkeys), min(wsize, nkeys))\n        writes.append([(k, rng.randint(-9, 9)) for k in ks])\n    return writes\n\n\ndef main():\n    rng = random.Random(int(sys.argv[1]) if l",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43207,
+      "time": "2026-10-08T21:21:42.291758+00:00",
+      "tool_call_id": "chatcmpl-tool-9d9a66f0a6522868",
+      "command": "cat > /app/dev/worst.py << 'PYEOF'\n\"\"\"Construct a deliberately worst-case request: a hidden last-writer cycle makes\nthe history infeasible, but that is only detectable at the end of the order, so\nthe search must sweep the whole reachable (mask,state) space.\"\"\"\nimport json\nimport random\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nimport main as solver  # noqa: E402\nimport naive  # noqa: E402\nfrom reference import valid_order  # noqa: E402\n\n\ndef gen_worst(rng, ntx=10, nkeys=6, wsize=3, cyc_keys=2):\n    keys = [\"k%d\" % i for i in range(nkeys)]\n    txs = []\n    overlay = []  # per tx: dict key->value (last write wins)\n    for t in range(ntx):\n        ks = rng.sample(range(nkeys), wsize)\n        ov = {}\n        ops = []\n        for k in ks:\n            v = rng.randint(-9, 9)\n            ops.append([\"put\", keys[k], v])\n            ov[k] = v\n        txs.append({\"id\": \"t%d\" % t, \"start\": 0, \"end\": 1, \"ops\": ops})\n        overlay.append(ov)\n    # force a cycle on the first `cyc_keys` keys: nobody else writes them,\n    # and the two writers each need to be the last one\n    for k in range(cyc_keys):\n        for t in range(ntx):\n            if k in overlay[t]:\n                ops = txs[t][\"ops\"]\n                for op in list(ops):\n                    if op[1] == keys[k]:\n                        ops.remove(op)\n                del overlay[t][k]\n    a, b = 0, 1\n    if cyc_keys >= 2:\n        for k, (x, y) in zip(range(cyc_keys), [(0, 1), (1, 0)]):\n            va = rng.randint(-9, 9)\n            vb = rng.randint(-9, 9)\n            while vb == va:\n    ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 44949,
+      "time": "2026-10-08T21:22:25.053929+00:00",
+      "tool_call_id": "chatcmpl-tool-9d2e44f53b3cc58d",
+      "command": "cat > /app/dev/hill.py << 'PYEOF'\n\"\"\"Hill-climb write structures to maximise the DFS work (dev only).\"\"\"\nimport random\nimport sys\n\nsys.path.insert(0, \"/app/dev\")\nfrom space import space_size  # noqa: E402\n\n\ndef work(writes, ntx=10, nkeys=6):\n    total, per = space_size(ntx, nkeys, writes)\n    # work ~ sum over masks of (#states * #remaining transactions)\n    w = 0\n    for mask, cnt in per.items():\n        w += cnt * (ntx - bin(mask).count(\"1\"))\n    return total, w\n\n\ndef rand_struct(rng, ntx, nkeys, lo=1, hi=5):\n    return [sorted(rng.sample(range(nkeys), rng.randint(lo, hi))) for _ in range(ntx)]\n\n\ndef mutate(rng, s, nkeys):\n    s = [list(x) for x in s]\n    t = rng.randrange(len(s))\n    mode = rng.random()\n    if mode < 0.4 and len(s[t]) < 5:\n        cand = [k for k in range(nkeys) if k not in s[t]]\n        if cand:\n            s[t].append(rng.choice(cand))\n    elif mode < 0.8 and len(s[t]) > 1:\n        s[t].pop(rng.randrange(len(s[t])))\n    else:\n        cand = [k for k in range(nkeys) if k not in s[t]]\n        if cand and len(s[t]) < 5:\n            s[t].append(rng.choice(cand))\n            s[t].pop(rng.randrange(len(s[t]) - 1))\n    return [sorted(x) for x in s]\n\n\ndef main():\n    rng = random.Random(int(sys.argv[1]) if len(sys.argv) > 1 else 0)\n    ntx, nkeys = 10, 6\n    best = (-1, -1, None)\n    cur = rand_struct(rng, ntx, nkeys)\n    curw = work(cur)[1]\n    for it in range(int(sys.argv[2]) if len(sys.argv) > 2 else 400):\n        cand = mutate(rng, cur, nkeys)\n        tot, w = work(cand)\n        if w >= curw:\n            cur, curw = cand, w\n            if w > best[1]:\n    ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 45368,
+      "time": "2026-10-08T21:22:36.890671+00:00",
+      "tool_call_id": "chatcmpl-tool-b545f92b6b8fcccd",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/space.py'); s = p.read_text()\ns = s.replace(\"\\nmain()\\n\", \"\\nif __name__ == \\\"__main__\\\":\\n    main()\\n\")\np.write_text(s)\np = pathlib.Path('dev/hill.py'); s = p.read_text()\ns = s.replace('''def work(writes, ntx=10, nkeys=6):\n    total, per = space_size(ntx, nkeys, writes)''', '''def to_writes(struct, ntx=10, nkeys=6):\n    \"\"\"unique value per (tx,key) so no two writes collide -> maximal diversity\"\"\"\n    return [[(k, t * 100 + k) for k in struct[t]] for t in range(ntx)]\n\n\ndef work(struct, ntx=10, nkeys=6):\n    writes = to_writes(struct, ntx, nkeys)\n    total, per = space_size(ntx, nkeys, writes)''')\np.write_text(s)\nEOF\ncd /app && timeout 550 python3 dev/hill.py 1 400 2>&1 | tail -15",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 47036,
+      "time": "2026-10-08T21:23:30.380399+00:00",
+      "tool_call_id": "chatcmpl-tool-a1be8fc4c360f6cc",
+      "command": "cat > /app/dev/peak.py << 'PYEOF'\n\"\"\"Build the peak-work request from the best structure and measure (dev only).\"\"\"\nimport json\nimport random\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nimport main as solver  # noqa: E402\nimport naive  # noqa: E402\nfrom reference import valid_order  # noqa: E402\n\nBEST = [[0, 4], [3, 4, 5], [0, 1, 3, 5], [0, 2, 3, 4], [2, 5], [1, 3, 4],\n        [2, 3], [0, 5], [1, 2, 4, 5], [0, 1, 2]]\n\n\ndef build(struct, final_choice=None, seed=0):\n    rng = random.Random(seed)\n    keys = [\"k%d\" % i for i in range(6)]\n    txs, overlays = [], []\n    for t, ks in enumerate(struct):\n        ops, ov = [], {}\n        for k in ks:  # unique value per (tx,key) -> maximal state diversity\n            v = rng.randint(-9, 9)\n            while v in ov.values():\n                v = rng.randint(-9, 9)\n            ops.append([\"put\", keys[k], v])\n            ov[k] = v\n        txs.append({\"id\": \"t%d\" % t, \"start\": 0, \"end\": 1, \"ops\": ops})\n        overlays.append(ov)\n    if final_choice is None:\n        final_choice = {k: rng.choice([ov[k] for ov in overlays if k in ov]) for k in range(6)}\n    final = {keys[k]: v for k, v in final_choice.items()}\n    return {\"initial\": {}, \"final\": final, \"transactions\": txs}\n\n\ndef main():\n    rng = random.Random(int(sys.argv[1]) if len(sys.argv) > 1 else 0)\n    tries = int(sys.argv[2]) if len(sys.argv) > 2 else 20\n    worst = (0.0, None, None)\n    for i in range(tries):\n        req = build(BEST, seed=i)\n        t0 = time.perf_counter()\n        got = solver.solve(req)\n        dt = time.perf_counter() - ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 52053,
+      "time": "2026-10-08T21:24:47.138376+00:00",
+      "tool_call_id": "chatcmpl-tool-bafeda957b3a3d96",
+      "command": "cat > /app/dev/edge.py << 'PYEOF'\n\"\"\"Hand-crafted edge cases, checked with the real public contract + brute force.\"\"\"\nimport json\nimport sys\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nfrom public_contract import check  # noqa: E402  (the real verifier acceptance test)\nimport main as solver  # noqa: E402\nfrom reference import brute_exists  # noqa: E402\n\n\ndef T(i, s, e, ops):\n    return {\"id\": i, \"start\": s, \"end\": e, \"ops\": ops}\n\n\nCASES = []\n\n\ndef case(name, req, expect):\n    \"\"\"expect: None (must be null), 'SAT' (a valid witness must exist), or a list.\"\"\"\n    CASES.append((name, req, expect))\n\n\n# --- empty history ------------------------------------------------------\ncase(\"empty-ok\", {\"initial\": {}, \"final\": {}, \"transactions\": []}, [])\ncase(\"empty-mismatch\", {\"initial\": {\"a\": 1}, \"final\": {\"a\": 2}, \"transactions\": []}, None)\ncase(\"empty-extra-key\", {\"initial\": {}, \"final\": {\"a\": 0}, \"transactions\": []}, None)\n\n# --- absence versus zero ------------------------------------------------\ncase(\"absent-vs-zero\", {\"initial\": {}, \"final\": {}, \"transactions\": [\n    T(\"t0\", 0, 2, [[\"get\", \"a\", 0]])]}, None)\ncase(\"absent-read-ok\", {\"initial\": {}, \"final\": {}, \"transactions\": [\n    T(\"t0\", 0, 2, [[\"get\", \"a\", None]])]}, [])\ncase(\"zero-is-present\", {\"initial\": {\"a\": 0}, \"final\": {\"a\": 0}, \"transactions\": [\n    T(\"t0\", 0, 2, [[\"get\", \"a\", 0]])]}, [])\ncase(\"zero-not-absent\", {\"initial\": {\"a\": 0}, \"final\": {\"a\": 0}, \"transactions\": [\n    T(\"t0\", 0, 2, [[\"get\", \"a\", None]])]}, None)\ncase(\"final-zero-means-present\", {\"initial\": {}, \"final\": {\"a\": 0}, \"transactions\": [\n    ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 53636,
+      "time": "2026-10-08T21:25:12.575422+00:00",
+      "tool_call_id": "chatcmpl-tool-8680b5109c73d413",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('main.py'); s = p.read_text()\nold = '''        elif kind == \"scan\":\n            low, high = op[1], op[2]\n            expected = {}\n            for pair in op[3]:\n                k, v = pair[0], pair[1]\n                if k in expected:\n                    if expected[k] != v:\n                        return None\n                else:\n                    expected[k] = v\n            for k in expected:\n                if not (low <= k < high):\n                    return None'''\nnew = '''        elif kind == \"scan\":\n            low, high = op[1], op[2]\n            # a scan returns the present keys of the range sorted by key, each\n            # exactly once, so the expected pairs must be strictly increasing\n            expected = {}\n            prev = None\n            for pair in op[3]:\n                k, v = pair[0], pair[1]\n                if prev is not None and not (prev < k):\n                    return None  # unsorted or repeated key: never reproducible\n                prev = k\n                expected[k] = v\n            for k in expected:\n                if not (low <= k < high):\n                    return None'''\nassert old in s\ns = s.replace(old, new)\np.write_text(s)\nEOF\npython3 - << 'EOF'\nimport pathlib\n# fix the harness expectation semantics: expect lists must be full orders\np = pathlib.Path('/app/dev/edge.py'); s = p.read_text()\ns = s.replace('case(\"absent-read-ok\", {\"initial\": {}, \"final\": {}, \"transactions\": [\\n    T(\"t0\", 0, 2, [[\"get\", \"a\", None]])]}, [])',\n              'case(\"absent-read-ok\", {\"initia",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 54904,
+      "time": "2026-10-08T21:25:33.154522+00:00",
+      "tool_call_id": "chatcmpl-tool-9904432fce49e230",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/gen.py'); s = p.read_text()\nold = '''            else:\n                if op[3] and rng.random() < 0.6:\n                    pair = rng.choice(op[3])\n                    pair[1] = _val(rng)\n                elif op[3]:\n                    op[3].pop(rng.randrange(len(op[3])))\n                else:\n                    k = rng.choice(keys)\n                    if any(lo <= k < hi for lo, hi in [(op[1], op[2])]):\n                        op[3].append([k, _val(rng)])\n                        op[3].sort()'''\nnew = '''            elif rng.random() < 0.18 and len(op[3]) > 1:\n                rng.shuffle(op[3])          # unsorted pairs -> never reproducible\n            elif rng.random() < 0.15 and op[3]:\n                op[3].insert(rng.randrange(len(op[3]) + 1), list(op[3][0]))  # dup key\n            elif op[3]:\n                if rng.random() < 0.6:\n                    pair = rng.choice(op[3])\n                    pair[1] = _val(rng)\n                else:\n                    op[3].pop(rng.randrange(len(op[3])))\n            else:\n                k = rng.choice(keys)\n                if op[1] <= k < op[2]:\n                    op[3].append([k, _val(rng)])\n                    op[3].sort()'''\nassert old in s\ns = s.replace(old, new)\np.write_text(s)\n\np = pathlib.Path('dev/fuzz.py'); s = p.read_text()\ns = s.replace('''from reference import brute_exists, valid_order  # noqa: E402''',\n              '''from public_contract import check  # noqa: E402\nfrom reference import brute_exists, valid_order  # noqa: E402\n\n\ndef contract_accepts",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 56059,
+      "time": "2026-10-08T21:25:54.408476+00:00",
+      "tool_call_id": "chatcmpl-tool-86dc3ae62a139f34",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/fuzz.py'); s = p.read_text()\ns = s.replace('''def run(seed0, cases, max_tx=6, modes=(\"clean\", \"value\", \"final\", \"time\"), verbose=False):''',\n'''def run(seed0, cases, max_tx=6, modes=(\"clean\", \"value\", \"final\", \"time\"), verbose=False,\n        ref=\"brute\", modes_extra=(\"overlap\",)):''')\ns = s.replace('''    rng = random.Random(seed0)\n    bad = 0\n    stats = {\"null\": 0, \"sat\": 0}''', '''    rng = random.Random(seed0)\n    allmodes = tuple(modes) + tuple(m for m in modes_extra if m not in modes)\n    bad = 0\n    stats = {\"null\": 0, \"sat\": 0}''')\ns = s.replace('''        mode = modes[i % len(modes)]''', '''        mode = allmodes[i % len(allmodes)]''')\ns = s.replace('''        truth = brute_exists(req)''', '''        if ref == \"brute\":\n            truth = brute_exists(req)\n        else:\n            truth = naive_ref.naive_solve(req)[\"order\"] is not None''')\ns = s.replace('''import main as solver  # noqa: E402''', '''import main as solver  # noqa: E402\nimport naive as naive_ref  # noqa: E402''')\ns = s.replace('''    seed = int(sys.argv[1]) if len(sys.argv) > 1 else 1\n    cases = int(sys.argv[2]) if len(sys.argv) > 2 else 400\n    max_tx = int(sys.argv[3]) if len(sys.argv) > 3 else 6\n    sys.exit(1 if run(seed, cases, max_tx=max_tx, verbose=True) else 0)''',\n'''    seed = int(sys.argv[1]) if len(sys.argv) > 1 else 1\n    cases = int(sys.argv[2]) if len(sys.argv) > 2 else 400\n    max_tx = int(sys.argv[3]) if len(sys.argv) > 3 else 6\n    ref = sys.argv[4] if len(sys.argv) > 4 else \"brute\"\n    sys.exit(1 if run(seed, case",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 58027,
+      "time": "2026-10-08T21:26:25.888312+00:00",
+      "tool_call_id": "chatcmpl-tool-9a6b520046a319b5",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib, re\np = pathlib.Path('dev/gen.py'); s = p.read_text()\ns = s.replace('''def gen_request(rng, max_tx=6, mode=\"clean\", force_ntx=None):''',\n              '''PROFILES = {\n    \"flat\": [3, 4, 2, 4, 2],\n    \"read\": [7, 2, 1, 3, 5],\n    \"write\": [1, 7, 3, 2, 1],\n    \"cas\": [2, 2, 1, 8, 3],\n    \"scan\": [2, 3, 1, 3, 8],\n}\n\n\ndef gen_request(rng, max_tx=6, mode=\"clean\", force_ntx=None, profile=\"flat\", dup=False):''')\ns = s.replace('''            kind = rng.choices(\n                [\"get\", \"put\", \"del\", \"cas\", \"scan\"],\n                weights=[3, 4, 2, 4, 2],\n            )[0]''', '''            kind = rng.choices(\n                [\"get\", \"put\", \"del\", \"cas\", \"scan\"],\n                weights=PROFILES[profile],\n            )[0]''')\ns = s.replace('''    final = dict(state)\n\n    # --- assign intervals''', '''    if dup and ntx > 1:  # duplicate some transactions (symmetry stress)\n        for i in range(ntx):\n            if rng.random() < 0.35:\n                src = rng.randrange(ntx)\n                txs[i][\"ops\"] = [list(o) for o in txs[src][\"ops\"]]\n        # recompute final on the (possibly) changed writes\n        st = dict(initial)\n        ok = True\n        for i in hidden:\n            st2 = exec_ops_local(txs[i][\"ops\"], st)\n            if st2 is None:\n                ok = False\n                break\n            st = st2\n        if ok:\n            state = st\n    final = dict(state)\n\n    # --- assign intervals''')\ns = s.replace('''KEYPOOL = [''','''def exec_ops_local(ops, state):\n    d = dict(state)\n    for op in ops:\n        k = op[0]\n        i",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 58183,
+      "time": "2026-10-08T21:26:31.092367+00:00",
+      "tool_call_id": "chatcmpl-tool-a77feeec54e22197",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/campaign.py'); s = p.read_text()\ns = s.replace('sum(c for _, c, _, _ in jobs)', 'sum(j[1] for j in jobs)')\np.write_text(s)\nEOF\ncd /app && timeout 580 python3 dev/campaign.py 40000 6 2>&1 | tail -4",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 67097,
+      "time": "2026-10-08T21:28:58.636483+00:00",
+      "tool_call_id": "chatcmpl-tool-b33483143bf0703a",
+      "command": "cat > /app/main.py << 'PYEOF'\n\"\"\"Linearizability checker for atomic range transactions.\n\nA whole transaction is one atomic operation, so a witness is a linear order of\nthe transactions that respects real time (A.end <= B.start => A before B) and\nwhose sequential execution from `initial` reproduces every observed value and\nends exactly at `final`.\n\nApproach\n--------\n1.  Every transaction is symbolically executed once (\"compiled\").  Because a\n    transaction is atomic, its effect on an incoming state is fully determined\n    by that state:\n\n      * reads (`get`, the compare of `cas`, `scan`) of keys not written earlier\n        inside the same transaction become *constraints* on the incoming state,\n      * writes become a final overlay (last write per key wins),\n      * a `cas` expected to fail on an incoming key becomes a *disequality*.\n\n    A transaction that contradicts itself can never be part of any witness, so\n    the answer is immediately `null`.\n\n2.  The search is a DFS over (set of placed transactions, current state).  That\n    pair determines everything about the future, so dead ends are memoised and\n    never re-explored.  Only transactions whose real-time predecessors are all\n    placed are considered.\n\n3.  Pruning: since every unplaced transaction executes after every placed one,\n    the last writer of a key is an unplaced transaction whenever some unplaced\n    transaction writes that key.  Hence, per set of placed transactions, the\n    final value of such a key must be among the remaining writers' overlay\n    values, and a key that no remaining transaction writes ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 67210,
+      "time": "2026-10-08T21:29:05.356931+00:00",
+      "tool_call_id": "chatcmpl-tool-9c5f0af0adab7476",
+      "command": "cd /app && timeout 300 python3 dev/peak.py 0 20 2>&1 | tail -8; echo ===; timeout 300 python3 dev/hunt.py 11 60 5.0 2>&1 | tail -4",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 70501,
+      "time": "2026-10-08T21:30:02.905750+00:00",
+      "tool_call_id": "chatcmpl-tool-a2c1bf89ae2a7669",
+      "command": "cat > /app/dev/hunt2.py << 'PYEOF'\n\"\"\"Hill-climb adversarial instances against the real solver (dev only).\"\"\"\nimport json\nimport random\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nimport main as solver  # noqa: E402\nimport naive  # noqa: E402\nfrom reference import valid_order  # noqa: E402\n\nNTX, NKEYS = 10, 6\n\n\ndef make(struct, values, final_choice):\n    keys = [\"k%d\" % i for i in range(NKEYS)]\n    txs = []\n    for t in range(NTX):\n        ops = []\n        for k in struct[t]:\n            ops.append([\"put\", keys[k], values[t][k]])\n        txs.append({\"id\": \"t%d\" % t, \"start\": 0, \"end\": 1, \"ops\": ops})\n    final = {keys[k]: v for k, v in final_choice.items()}\n    return {\"initial\": {}, \"final\": final, \"transactions\": txs}\n\n\ndef random_instance(rng, wide=0.5):\n    struct = [sorted(rng.sample(range(NKEYS), rng.randint(2, 5))) for _ in range(NTX)]\n    values = [{k: rng.randint(-9, 9) for k in ks} for ks in struct]\n    # final: prefer values written by many transactions (keeps the prune weak)\n    counts = {}\n    for t in range(NTX):\n        for k in struct[t]:\n            counts[(k, values[t][k])] = counts.get((k, values[t][k]), 0) + 1\n    final_choice = {}\n    for k in range(NKEYS):\n        cands = [(kk, v) for (kk, v) in counts if kk == k]\n        if not cands:\n            continue\n        if rng.random() < wide:\n            mx = max(counts[c] for c in cands)\n            cands = [c for c in cands if counts[c] == mx]\n        final_choice[k] = rng.choice(cands)[1]\n    return make(struct, values, final_choice), struct, values, final_choice\n\n\n",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 70656,
+      "time": "2026-10-08T21:30:06.977748+00:00",
+      "tool_call_id": "chatcmpl-tool-9bd4315447c5f6df",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/hunt2.py'); s = p.read_text()\ns = s.replace('''            k = rng.randrange(NKEYS)\n            cands = [v for (kk, v) in values[t] for tt in range(NTX) if False]\n            pool = set()''', '''            k = rng.randrange(NKEYS)\n            pool = set()''')\np.write_text(s)\nEOF\ncd /app && timeout 560 python3 dev/hunt2.py 1 3000 2>&1 | tail -16",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 71064,
+      "time": "2026-10-08T21:30:33.455951+00:00",
+      "tool_call_id": "chatcmpl-tool-a8d2b369d688a67d",
+      "command": "cd /app && (timeout 400 python3 dev/hunt2.py 2 4000 > /tmp/h2.log 2>&1 &); (timeout 400 python3 dev/hunt2.py 3 4000 > /tmp/h3.log 2>&1 &); timeout 400 python3 dev/campaign.py 60000 6 2>&1 | tail -3; echo \"=== hunts:\"; tail -3 /tmp/h2.log; tail -3 /tmp/h3.log",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 71284,
+      "time": "2026-10-08T21:30:49.513825+00:00",
+      "tool_call_id": "chatcmpl-tool-bbfa97eae9c8ed3d",
+      "command": "cd /app; echo \"== h2\"; tail -12 /tmp/h2.log; echo \"== h3\"; tail -12 /tmp/h3.log",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 74357,
+      "time": "2026-10-08T21:31:43.189948+00:00",
+      "tool_call_id": "chatcmpl-tool-86273f077698d276",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/hunt2.py'); s = p.read_text()\ns = s.replace('''        if dt > best[0]:\n            best = (dt, cand[0])\n            print(\"it=%d best=%.4fs\" % (it, dt), flush=True)''',\n'''        if dt > best[0]:\n            best = (dt, cand[0])\n            print(\"it=%d best=%.4fs\" % (it, dt), flush=True)\n            with open(\"/tmp/slow-%s.json\" % SEED, \"w\") as fh:\n                fh.write(json.dumps(cand[0]))''')\ns = s.replace('''def main():\n    rng = random.Random(int(sys.argv[1]) if len(sys.argv) > 1 else 0)''',\n'''SEED = \"0\"\n\n\ndef main():\n    global SEED\n    SEED = sys.argv[1] if len(sys.argv) > 1 else \"0\"\n    rng = random.Random(int(sys.argv[1]) if len(sys.argv) > 1 else 0)''')\np.write_text(s)\nEOF\ncd /app && (timeout 260 python3 dev/hunt2.py 4 3000 > /tmp/h4.log 2>&1 &); (timeout 260 python3 dev/hunt2.py 5 3000 > /tmp/h5.log 2>&1 &); sleep 265; grep best /tmp/h4.log | tail -3; grep best /tmp/h5.log | tail -3; ls -la /tmp/slow-*.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 86608,
+      "time": "2026-10-08T21:39:32.816603+00:00",
+      "tool_call_id": "chatcmpl-tool-b088e6cd17c0c4e7",
+      "command": "cat > /app/main.py << 'PYEOF'\n\"\"\"Linearizability checker for atomic range transactions.\n\nA whole transaction is one atomic operation, so a witness is a linear order of\nthe transactions that respects real time (A.end <= B.start => A before B) and\nwhose sequential execution from `initial` reproduces every observed value and\nends exactly at `final`.\n\nApproach\n--------\n1.  Every transaction is symbolically executed once (\"compiled\").  Because a\n   transaction is atomic, its effect on an incoming state is fully determined\n   by that state:\n\n     * reads (`get`, the compare of `cas`, `scan`) of keys not written earlier\n       inside the same transaction become *constraints* on the incoming state,\n     * writes become a final overlay (last write per key wins),\n     * a `cas` expected to fail on an incoming key becomes a *disequality*.\n\n   A transaction that contradicts itself can never appear in any witness, so\n   the answer is immediately `null`.\n\n2.  States are packed into a single integer, one field per key.  Only values\n   that can actually be stored in a key ever occur (`initial` plus overlay\n   values), so a compiled transaction becomes three bit patterns: an equality\n   test, some disequality tests and an overlay applied by masking.\n\n3.  The search is a DFS over (set of placed transactions, current state).  That\n   pair determines everything about the future, so dead ends are memoised and\n   never re-explored.  Only transactions whose real-time predecessors are all\n   placed are considered.\n\n4.  Pruning: every unplaced transaction executes after every placed one, so the\n   ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 88180,
+      "time": "2026-10-08T21:39:58.290481+00:00",
+      "tool_call_id": "chatcmpl-tool-acc190498f83044d",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('main.py'); s = p.read_text()\nold = '''    try:\n        initial_state = sum(codes[i][initial.get(k)] << offsets[i] for i, k in enumerate(keys))\n        final_state = sum(codes[i][final.get(k)] << offsets[i] for i, k in enumerate(keys))\n    except KeyError:\n        return {\"order\": None}  # `final` holds a value no write can produce\n'''\nnew = '''    initial_state = sum(codes[i][initial.get(k)] << offsets[i] for i, k in enumerate(keys))\n    final_code = []\n    for i, k in enumerate(keys):\n        c = codes[i].get(final.get(k))\n        if c is None:\n            return {\"order\": None}  # `final` holds a value no write can produce\n        final_code.append(c)\n    final_state = sum(c << offsets[i] for i, c in enumerate(final_code))\n'''\nassert old in s\ns = s.replace(old, new)\n\nold = '''        eq_mask = eq_val = 0\n        for i, v in eqs:\n            try:\n                eq_val |= codes[i][v] << offsets[i]\n            except KeyError:\n                return {\"order\": None}  # expects a value that cannot be stored\n            eq_mask |= field[i]'''\nnew = '''        eq_mask = eq_val = 0\n        for i, v in eqs:\n            code = codes[i].get(v)\n            if code is None:\n                return {\"order\": None}  # expects a value that cannot be stored\n            eq_val |= code << offsets[i]\n            eq_mask |= field[i]'''\nassert old in s\ns = s.replace(old, new)\n\nold = '''            for i in range(nkeys):\n                if any_writer[i] & rem:\n                    if not writers[i][codes[i][final.get(keys[i])]] & rem",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 88870,
+      "time": "2026-10-08T21:40:10.346062+00:00",
+      "tool_call_id": "chatcmpl-tool-b219b5fba64f9fd0",
+      "command": "cd /app && python3 - << 'EOF' 2>&1 | tail -30\nimport sys, traceback, json\nsys.path.insert(0,'/app'); sys.path.insert(0,'/app/dev')\nimport main as solver\nimport edge\n# re-run the edge cases but show the traceback\nfor name, req, expect in edge.CASES:\n    try:\n        solver.solve(req)\n    except Exception:\n        print(\"CASE\", name)\n        print(json.dumps(req))\n        traceback.print_exc()\n        break\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 89590,
+      "time": "2026-10-08T21:40:23.095512+00:00",
+      "tool_call_id": "chatcmpl-tool-998de61e07026e46",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('main.py'); s = p.read_text()\nold = '''    writers = [{code: 0 for code in codes[k]} for k in range(nkeys)]'''\nnew = '''    writers = [{code: 0 for code in codes[k].values()} for k in range(nkeys)]'''\nassert old in s\ns = s.replace(old, new)\np.write_text(s)\np = pathlib.Path('dev/edge.py'); s = p.read_text()\ns = s.replace(\"\\nsys.exit(main())\\n\", \"\\nif __name__ == \\\"__main__\\\":\\n    sys.exit(main())\\n\")\np.write_text(s)\nEOF\ncd /app && python3 smoke.py && python3 dev/edge.py 2>&1 | tail -3 && timeout 300 python3 dev/campaign.py 20000 6 2>&1 | tail -2",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 89653,
+      "time": "2026-10-08T21:40:31.356253+00:00",
+      "tool_call_id": "chatcmpl-tool-a76e235ee34610e4",
+      "command": "cd /app && python3 dev/edge.py 2>&1 | grep -A2 FAIL | head -40",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 91973,
+      "time": "2026-10-08T21:41:04.251200+00:00",
+      "tool_call_id": "chatcmpl-tool-87ca3bf3a75696ea",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('main.py'); s = p.read_text()\ns = s.replace('''def make_apply(eq_mask, eq_val, neq_tests, clear_mask, set_val):\n    \"\"\"Fast state transition for one compiled transaction.\"\"\"\n    if eq_mask == 0 and not neq_tests:\n        if clear_mask == 0:                      # pure observer\n            return lambda s: s\n        return lambda s: (s & clear_mask) | set_val\n    if not neq_tests:\n        if clear_mask == 0:                      # reads only, writes nothing\n            def apply(s):\n                if (s & eq_mask) != eq_val:\n                    return None\n                return s\n        else:\n            def apply(s):\n                if (s & eq_mask) != eq_val:\n                    return None\n                return (s & clear_mask) | set_val\n    else:\n        def apply(s):\n            if (s & eq_mask) != eq_val:\n                return None\n            for m, v in neq_tests:\n                if (s & m) == v:\n                    return None\n            return (s & clear_mask) | set_val\n    return apply''','''def make_apply(eq_mask, eq_val, neq_tests, keep_mask, set_val):\n    \"\"\"Fast state transition for one compiled transaction.\n\n    `keep_mask` selects the bits of the incoming state that survive, `set_val`\n    carries the overlay values in the fields that are written.\n    \"\"\"\n    if eq_mask == 0 and not neq_tests:\n        if set_val == 0 and keep_mask == -1:    # pure observer\n            return lambda s: s\n        return lambda s: (s & keep_mask) | set_val\n    if not neq_tests:\n        if keep_mask == -1 and set",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 92160,
+      "time": "2026-10-08T21:41:17.678502+00:00",
+      "tool_call_id": "chatcmpl-tool-ae731861f175fcf3",
+      "command": "cd /app && timeout 200 python3 dev/peak.py 0 20 2>&1 | tail -4; echo ===; timeout 300 python3 dev/hunt2.py 7 2500 2>&1 | grep -E \"best|BEST|mine=|INVALID|DISAG\" | tail -6",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 92798,
+      "time": "2026-10-08T21:41:40.451477+00:00",
+      "tool_call_id": "chatcmpl-tool-bae79b077e81f3df",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/fuzz.py'); s = p.read_text()\ns = s.replace('''        if verbose and (i + 1) % 200 == 0:''',\n'''        if dt > 0.05:\n            with open(\"/tmp/campaign-slow.jsonl\", \"a\") as fh:\n                fh.write(json.dumps({\"dt\": dt, \"mode\": mode, \"req\": req}) + \"\\\\n\")\n        if verbose and (i + 1) % 200 == 0:''')\np.write_text(s)\nEOF\nrm -f /tmp/campaign-slow.jsonl; cd /app && (timeout 420 python3 dev/hunt2.py 2 6000 > /tmp/h2b.log 2>&1 &); (timeout 420 python3 dev/hunt2.py 3 6000 > /tmp/h3b.log 2>&1 &); timeout 420 python3 dev/campaign.py 120000 6 2>&1 | tail -2; echo \"=== slow cases recorded:\"; wc -l /tmp/campaign-slow.jsonl; python3 -c \"\nimport json\nrows=[json.loads(l) for l in open('/tmp/campaign-slow.jsonl')]\nrows.sort(key=lambda r:-r['dt'])\nfor r in rows[:5]: print('%.3fs'%r['dt'], json.dumps(r['req'])[:200])\n\"; echo \"=== hunts:\"; grep -E \"best|BEST\" /tmp/h2b.log | tail -3; grep -E \"best|BEST\" /tmp/h3b.log | tail -3",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 93112,
+      "time": "2026-10-08T21:42:09.035442+00:00",
+      "tool_call_id": "chatcmpl-tool-ab4df856806974b6",
+      "command": "cd /app && python3 -c \"\nimport json\nrows=[json.loads(l) for l in open('/tmp/campaign-slow.jsonl')]\nrows.sort(key=lambda r:-r['dt'])\nprint(json.dumps(rows[0]['req'], indent=1))\nprint('dt', rows[0]['dt'], 'mode', rows[0]['mode'])\n\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 93643,
+      "time": "2026-10-08T21:42:17.745116+00:00",
+      "tool_call_id": "chatcmpl-tool-97d96f604157163b",
+      "command": "cd /app && python3 - << 'EOF'\nimport sys, json, time, cProfile, pstats, io\nsys.path.insert(0,'/app')\nimport main as solver\nrows=[json.loads(l) for l in open('/tmp/campaign-slow.jsonl')]\nrows.sort(key=lambda r:-r['dt'])\nreq=rows[0]['req']\nfor _ in range(3):\n    t=time.perf_counter(); got=solver.solve(req); print('%.4fs'%(time.perf_counter()-t), got)\npr=cProfile.Profile(); pr.enable(); solver.solve(req); pr.disable()\ns=io.StringIO(); pstats.Stats(pr,stream=s).sort_stats('tottime').print_stats(10); print(s.getvalue()[:2500])\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 94171,
+      "time": "2026-10-08T21:42:28.211782+00:00",
+      "tool_call_id": "chatcmpl-tool-8952cba4511177c4",
+      "command": "cd /app && python3 - << 'EOF'\nimport sys, json, time\nsys.path.insert(0,'/app')\nimport main as solver\nrows=[json.loads(l) for l in open('/tmp/campaign-slow.jsonl')]\nrows.sort(key=lambda r:-r['dt'])\nworst=(0,None)\nfor r in rows:\n    t=time.perf_counter(); solver.solve(r['req']); dt=time.perf_counter()-t\n    if dt>worst[0]: worst=(dt, r['dt'], r['mode'])\nprint(\"re-measured sequentially: worst true time %.4fs (recorded %.3fs, mode %s)\"%worst)\n# also the slowest 20 re-measured\nfor r in rows[:20]:\n    t=time.perf_counter(); solver.solve(r['req']); dt=time.perf_counter()-t\n    print(\"recorded %.3fs -> true %.4fs\"%(r['dt'], dt))\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 94509,
+      "time": "2026-10-08T21:42:36.136022+00:00",
+      "tool_call_id": "chatcmpl-tool-88710c36565c1369",
+      "command": "cd /app && timeout 420 python3 dev/hunt2.py 8 8000 2>&1 | grep -E \"best|BEST|mine=|INVALID|DISAG\" | tail -8",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 98856,
+      "time": "2026-10-08T21:44:05.670066+00:00",
+      "tool_call_id": "chatcmpl-tool-b08324658c607907",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('main.py'); s = p.read_text()\nold = '''            expected = {}\n            prev = None\n            for pair in op[3]:\n                k, v = pair[0], pair[1]\n                if prev is not None and not prev < k:\n                    return None  # unsorted or repeated key: never reproducible\n                prev = k\n                expected[k] = v'''\nnew = '''            expected = {}\n            prev = None\n            for pair in op[3]:\n                k, v = pair[0], pair[1]\n                if prev is not None and not prev < k:\n                    return None  # unsorted or repeated key: never reproducible\n                if v is None:\n                    return None  # a present key always holds an integer\n                prev = k\n                expected[k] = v'''\nassert old in s\ns = s.replace(old, new)\n\nold = '''def main():\n    for line in sys.stdin:\n        if not line.strip():\n            continue\n        sys.stdout.write(json.dumps(solve(json.loads(line))))\n        sys.stdout.write(\"\\\\n\")\n    sys.stdout.flush()'''\nnew = '''def main():\n    out = sys.stdout\n    for line in sys.stdin:\n        if not line.strip():\n            continue\n        try:\n            result = solve(json.loads(line))\n        except Exception:  # keep answering the rest of the batch\n            result = {\"order\": None}\n        out.write(json.dumps(result))\n        out.write(\"\\\\n\")\n        out.flush()'''\nassert old in s\ns = s.replace(old, new)\np.write_text(s)\nEOF\ncd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/edge.",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 99340,
+      "time": "2026-10-08T21:44:15.771766+00:00",
+      "tool_call_id": "chatcmpl-tool-846c52c3978975bf",
+      "command": "cd /app && printf '%s\\n' \\\n '{\"initial\":{},\"final\":{},\"transactions\":[]}' \\\n '' \\\n '{\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]}' \\\n '{\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"get\",\"a\",0]]}]}' \\\n 'not json at all' \\\n '{\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t1\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"z\",1]]},{\"id\":\"t2\",\"start\":1,\"end\":2,\"ops\":[[\"get\",\"z\",1]]}]}' \\\n | python3 /app/main.py; echo \"rc=$?\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 99859,
+      "time": "2026-10-08T21:44:25.517438+00:00",
+      "tool_call_id": "chatcmpl-tool-9a8412d943c4ff14",
+      "command": "cd /app && rm -f /tmp/campaign-slow.jsonl && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/fuzz.py'); s = p.read_text()\ns = s.replace('if dt > 0.05:', 'if dt > SLOWBAR:')\ns = s.replace('from public_contract import check  # noqa: E402',\n              'from public_contract import check  # noqa: E402\\n\\nSLOWBAR = 0.02')\np.write_text(s)\nEOF\ncd /app && timeout 400 python3 dev/campaign.py 60000 5 2>&1 | tail -3; echo \"=== slow cases (low contention, bar=0.02s):\"; python3 -c \"\nimport json\nrows=[json.loads(l) for l in open('/tmp/campaign-slow.jsonl')]\nrows.sort(key=lambda r:-r['dt'])\nprint('count over bar:', len(rows))\nfor r in rows[:6]: print('%.4fs'%r['dt'])\n\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 100220,
+      "time": "2026-10-08T21:44:42.719200+00:00",
+      "tool_call_id": "chatcmpl-tool-9a15ba7e97c1d613",
+      "command": "cd /app && python3 - << 'EOF'\nimport sys, json, time\nsys.path.insert(0,'/app')\nimport main as solver\nrows=[json.loads(l) for l in open('/tmp/campaign-slow.jsonl')]\nrows.sort(key=lambda r:-r['dt'])\ntrue=[]\nfor r in rows:\n    best=9\n    for _ in range(3):\n        t=time.perf_counter(); solver.solve(r['req']); best=min(best, time.perf_counter()-t)\n    true.append((best, r['dt'], r['mode']))\ntrue.sort(reverse=True)\nprint(\"true slowest after re-measuring sequentially:\")\nfor b,rec,mode in true[:12]:\n    print(\"  true %.4fs (recorded %.3fs, mode %s)\"%(b,rec,mode))\nprint(\"count > 0.02s true:\", sum(1 for b,_,_ in true if b>0.02), \"of\", len(true))\nimport pathlib\npathlib.Path('/tmp/trueslow.json').write_text(json.dumps([{'true':b,'req':r} for (b,_,_),r in zip(true,[x['req'] for x in rows])] ))\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 101836,
+      "time": "2026-10-08T21:45:11.152498+00:00",
+      "tool_call_id": "chatcmpl-tool-bf70deb721a69cdb",
+      "command": "cat > /app/dev/batch.py << 'PYEOF'\n\"\"\"Feed a realistic mixed batch through the real CLI in one process (dev only).\"\"\"\nimport json\nimport random\nimport subprocess\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nfrom gen import gen_request  # noqa: E402\nfrom hard import gen_hard  # noqa: E402\nfrom peak import BEST  # noqa: E402\n\n\ndef build_batch(n, seed=0):\n    rng = random.Random(seed)\n    reqs = []\n    for i in range(n):\n        r = i % 6\n        if r == 0:\n            reqs.append(gen_request(rng, max_tx=10, force_ntx=10, mode=\"overlap\"))\n        elif r == 1:\n            reqs.append(gen_hard(rng))\n        elif r == 2:\n            reqs.append(gen_request(rng, max_tx=10, force_ntx=10, mode=\"clean\"))\n        elif r == 3:\n            reqs.append(gen_request(rng, max_tx=10, force_ntx=10, mode=\"value\"))\n        elif r == 4:\n            reqs.append(gen_request(rng, max_tx=10, force_ntx=10, mode=\"final\"))\n        else:\n            reqs.append(gen_request(rng, max_tx=10, force_ntx=10, mode=\"time\"))\n    return reqs\n\n\nif __name__ == \"__main__\":\n    n = int(sys.argv[1]) if len(sys.argv) > 1 else 300\n    reqs = build_batch(n, int(sys.argv[2]) if len(sys.argv) > 2 else 0)\n    payload = \"\".join(json.dumps(r) + \"\\n\" for r in reqs)\n    t0 = time.perf_counter()\n    p = subprocess.run([sys.executable, \"/app/main.py\"], input=payload, text=True,\n                       capture_output=True, cwd=\"/app\")\n    dt = time.perf_counter() - t0\n    lines = p.stdout.splitlines()\n    print(\"batch=%d lines=%d total=%.2fs per-case=%.4fs rc=%d\" % (\n        n, len(lines), dt, ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 102747,
+      "time": "2026-10-08T21:45:29.805611+00:00",
+      "tool_call_id": "chatcmpl-tool-aed395979748491a",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\nfor name, guard in [(\"dev/space.py\", \"main()\\n\"), (\"dev/hard.py\", \"main()\\n\"),\n                    (\"dev/worst.py\", \"main()\\n\"), (\"dev/hunt2.py\", \"main()\\n\"),\n                    (\"dev/hunt.py\", \"main()\\n\"), (\"dev/peak.py\", \"main()\\n\"),\n                    (\"dev/compare.py\", \"if __name__ == \\\"__main__\\\":\\n    bad = 0\\n\"),\n                    (\"dev/edge.py\", None), (\"dev/fuzz.py\", None)]:\n    p = pathlib.Path(name)\n    if not p.exists():\n        continue\n    s = p.read_text()\n    if name == \"dev/compare.py\":\n        s = s.replace('''if __name__ == \"__main__\":\n    bad = 0''', '''def main():\n    bad = 0''')\n        s = s.replace('''    print(\"bad=%d worst=%.4fs\" % (bad, worst))''',\n                      '''    print(\"bad=%d worst=%.4fs\" % (bad, worst))\n\n\nif __name__ == \"__main__\":\n    main()''')\n    elif guard:\n        if s.rstrip().endswith(\"main()\"):\n            s = s[: s.rstrip().rfind(\"main()\")] + 'if __name__ == \"__main__\":\\n    main()\\n'\n    p.write_text(s)\nEOF\ncd /app && for f in dev/space.py dev/hard.py dev/worst.py dev/hunt.py dev/hunt2.py dev/peak.py dev/compare.py; do python3 -c \"import ast,sys; ast.parse(open('$f').read())\" && echo \"ok $f\"; done; tail -3 dev/hunt2.py; tail -3 dev/peak.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 102791,
+      "time": "2026-10-08T21:45:32.549517+00:00",
+      "tool_call_id": "chatcmpl-tool-aeee753dd44fc8c3",
+      "command": "cd /app && tail -6 dev/space.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 103006,
+      "time": "2026-10-08T21:45:37.065111+00:00",
+      "tool_call_id": "chatcmpl-tool-b48d7f83a7457545",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('dev/space.py'); s = p.read_text()\ns = s.replace('''if __name__ == \"__main__\":\n    if __name__ == \"__main__\":\n    main()''', '''if __name__ == \"__main__\":\n    main()''')\np.write_text(s)\nEOF\ncd /app && for f in dev/*.py; do python3 -c \"import ast; ast.parse(open('$f').read())\" || echo \"BROKEN $f\"; done; echo \"all parsed\"; cd /app && python3 -c \"\nimport sys; sys.path.insert(0,'/app'); sys.path.insert(0,'/app/dev')\nimport space, hard, worst, hunt, hunt2, peak, compare, edge, fuzz, campaign, gen, reference, naive, batch\nprint('all dev modules import cleanly (no stray output above)')\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 103159,
+      "time": "2026-10-08T21:47:42.317148+00:00",
+      "tool_call_id": "chatcmpl-tool-99c4880e8e55b260",
+      "command": "cd /app && grep -n \"^sys.exit\\|^main()\\|^    main()\" dev/*.py | head -20",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 103389,
+      "time": "2026-10-08T21:47:46.853238+00:00",
+      "tool_call_id": "chatcmpl-tool-97c62e455fadae34",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\n# guard remaining module-level entry points\np = pathlib.Path('dev/campaign.py'); s = p.read_text()\ns = s.replace(\"\\nsys.exit(main())\\n\", \"\\n\\nif __name__ == \\\"__main__\\\":\\n    sys.exit(main())\\n\")\np.write_text(s)\np = pathlib.Path('dev/hill.py'); s = p.read_text()\ns = s.replace(\"\\nmain()\\n\", \"\\n\\nif __name__ == \\\"__main__\\\":\\n    main()\\n\")\np.write_text(s)\nEOF\ncd /app && timeout 120 python3 -c \"\nimport sys; sys.path.insert(0,'/app'); sys.path.insert(0,'/app/dev')\nimport space, hard, worst, hunt, hunt2, peak, compare, edge, fuzz, campaign, gen, reference, naive, batch, hill\nprint('all dev modules import cleanly')\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 103560,
+      "time": "2026-10-08T21:47:51.186006+00:00",
+      "tool_call_id": "chatcmpl-tool-85123b759bd175a1",
+      "command": "cd /app && cat -n main.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 105935,
+      "time": "2026-10-08T21:48:31.961954+00:00",
+      "tool_call_id": "chatcmpl-tool-8b693769e2f407d7",
+      "command": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('main.py'); s = p.read_text()\ns = s.replace('TOUCHING_OPS = (\"get\", \"put\", \"del\", \"cas\")',\n              'KEY_OPS = (\"get\", \"put\", \"del\", \"cas\")  # operations that name one key')\ns = s.replace('            if op[0] in TOUCHING_OPS:', '            if op[0] in KEY_OPS:')\ns = s.replace('''        vals = sorted(poss[i], key=lambda v: (v is not None, v if v is not None else 0))''',\n              '''        # absent sorts first, so every key gets a stable {value: code} map\n        vals = sorted(poss[i], key=lambda v: (v is not None, v if v is not None else 0))''')\np.write_text(s)\nEOF\ncd /app && python3 smoke.py && python3 dev/edge.py 2>&1 | tail -1 && python3 dev/batch.py 500 9 | tail -1",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 105985,
+      "time": "2026-10-08T21:48:35.340457+00:00",
+      "tool_call_id": "chatcmpl-tool-81ccaf34f3da96c4",
+      "command": "cd /app && timeout 400 python3 dev/campaign.py 100000 6 2>&1 | tail -2",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 107804,
+      "time": "2026-10-08T21:49:18.891326+00:00",
+      "tool_call_id": "chatcmpl-tool-a94b228980e9bfe2",
+      "command": "cat > /app/dev/hunt3.py << 'PYEOF'\n\"\"\"Hill-climb mixed-operation instances (reads, CAS, scans) against the solver.\n\nThe last-writer prune does not help when infeasibility comes from read\nconstraints, so this family is searched separately.  Runs in a single process\nso timings are real.\n\"\"\"\nimport json\nimport random\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nimport main as solver  # noqa: E402\nimport naive  # noqa: E402\nfrom gen import gen_request, PROFILES  # noqa: E402\nfrom reference import valid_order  # noqa: E402\n\n\ndef timeit(req):\n    t0 = time.perf_counter()\n    got = solver.solve(req)\n    return time.perf_counter() - t0, got\n\n\ndef mutate(rng, req):\n    req = json.loads(json.dumps(req))\n    txs = req[\"transactions\"]\n    if not txs:\n        return req\n    mode = rng.random()\n    if mode < 0.25:  # re-roll the whole interval structure\n        style = rng.random()\n        for tx in txs:\n            if style < 0.4:\n                tx[\"start\"], tx[\"end\"] = 0, 1            # all overlapping\n            elif style < 0.7:\n                s = rng.randint(0, 12)\n                tx[\"start\"], tx[\"end\"] = s, s + rng.randint(1, 4)\n            else:                                       # random forced chain\n                clock = 0\n                for tx in txs:\n                    tx[\"start\"], tx[\"end\"] = clock, clock + 1\n                    clock += 2\n    elif mode < 0.5:  # corrupt one observed value\n        tx = rng.choice(txs)\n        obs = [o for o in tx[\"ops\"] if o[0] in (\"get\", \"cas\", \"scan\")]\n        if obs:\n            op = rng.choi",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 108224,
+      "time": "2026-10-08T21:49:27.643638+00:00",
+      "tool_call_id": "chatcmpl-tool-8222e81656fa6aea",
+      "command": "cd /app && for s in 9 10; do timeout 200 python3 dev/hunt2.py $s 4000 2>&1 | grep -E \"BEST|mine=|INVALID|DISAG\"; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 109185,
+      "time": "2026-10-08T21:49:59.001718+00:00",
+      "tool_call_id": "chatcmpl-tool-878d098b3564a5bb",
+      "command": "cat > /app/dev/README.md << 'MDEOF'\n# Development test suite for `/app/main.py`\n\nNothing here is needed at run time; `main.py` is self-contained.  These are the\nscripts used to develop and validate the checker.\n\n| file | purpose |\n| --- | --- |\n| `reference.py` | independent reference: sequential op simulator, brute-force enumeration of all precedence-respecting orders, and a full witness validator |\n| `naive.py` | second, independent solver (DFS over masks simulating ops on dicts) used as a cross-check for sizes where brute force is too slow |\n| `gen.py` | random history generator: op-mix profiles, satisfiable/unsatisfiable modes (corrupted observations, unreachable final map, forced real-time order), duplicated transactions, extreme values |\n| `edge.py` | 69 hand-crafted edge cases (absence vs zero, CAS delete, scan ordering/bounds/own-writes, real-time boundary, empty history, unwritable values) all checked with the real `public_contract.check` |\n| `fuzz.py` | randomised comparison of the solver against a reference plus the contract's own acceptance test |\n| `campaign.py` | large parallel fuzzing campaign (brute-force reference up to 7 transactions, naive reference for 8-10) |\n| `batch.py` | pushes a realistic mixed batch through the real CLI in one process (streaming, line counts, throughput) |\n| `space.py`, `hill.py`, `hard.py`, `worst.py`, `peak.py`, `hunt.py`, `hunt2.py`, `hunt3.py`, `adversarial.py`, `compare.py` | worst-case analysis: size of the reachable (placed-set, state) space, hill-climbing adversarial instances *against* the shipped solver, and timings measu",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 109499,
+      "time": "2026-10-08T21:50:05.993311+00:00",
+      "tool_call_id": "chatcmpl-tool-b046f0b59414a3f9",
+      "command": "cd /tmp && printf '%s\\n' '{\"initial\":{},\"final\":{},\"transactions\":[]}' '{\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]}' | python3 /app/main.py; cd /app && timeout 300 python3 dev/campaign.py 60000 6 2>&1 | tail -2",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 80,
+      "time": "2026-10-08T21:07:28.277580+00:00",
+      "tool_call_id": "chatcmpl-tool-a780c8236d89d8b4",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:42 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 21:07 ..\n-rw-r--r-- 1 agent agent 1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('atomic-range-history',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:42 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 21:07 ..\n-rw-r--r-- 1 agent agent 1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('atomic-range-history',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 19920,
+      "time": "2026-10-08T21:13:09.712028+00:00",
+      "tool_call_id": "chatcmpl-tool-b110846d6e5d3593",
+      "return_code": 127,
+      "stdout": "Python 3.12.12\nTraceback (most recent call last):\n  File \"/app/main.py\", line 6, in <module>\n    print(json.dumps(solve(json.loads(line))))\n                     ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 3, in solve\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nNotImplementedError: Implement the contract in instruction.md\n\n10\n",
+      "stderr": "/bin/bash: line 1: free: command not found\n",
+      "stdout_tail": "Python 3.12.12\nTraceback (most recent call last):\n  File \"/app/main.py\", line 6, in <module>\n    print(json.dumps(solve(json.loads(line))))\n                     ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 3, in solve\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nNotImplementedError: Implement the contract in instruction.md\n\n10\n",
+      "stderr_tail": "/bin/bash: line 1: free: command not found\n"
+    },
+    {
+      "step": 27284,
+      "time": "2026-10-08T21:16:47.569972+00:00",
+      "tool_call_id": "chatcmpl-tool-a899b1acedd8934f",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "tail: option used in invalid context -- 3\n",
+      "stdout_tail": "",
+      "stderr_tail": "tail: option used in invalid context -- 3\n"
+    },
+    {
+      "step": 44950,
+      "time": "2026-10-08T21:22:29.909914+00:00",
+      "tool_call_id": "chatcmpl-tool-9d2e44f53b3cc58d",
+      "return_code": 0,
+      "stdout": "wsize=1 worst_total_nodes=5577\nwsize=2 worst_total_nodes=32314\nwsize=3 worst_total_nodes=56785\nwsize=4 worst_total_nodes=38823\nwsize=5 worst_total_nodes=19736\nwsize=6 worst_total_nodes=5121\nBEST 56785\nTraceback (most recent call last):\n  File \"/app/dev/hill.py\", line 58, in <module>\n    main()\n  File \"/app/dev/hill.py\", line 45, in main\n    curw = work(cur)[1]\n           ^^^^^^^^^\n  File \"/app/dev/hill.py\", line 10, in work\n    total, per = space_size(ntx, nkeys, writes)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/dev/space.py\", line 35, in space_size\n    for i, v in ov:\n        ^^^^\nTypeError: cannot unpack non-iterable int object\n",
+      "stderr": "",
+      "stdout_tail": "wsize=1 worst_total_nodes=5577\nwsize=2 worst_total_nodes=32314\nwsize=3 worst_total_nodes=56785\nwsize=4 worst_total_nodes=38823\nwsize=5 worst_total_nodes=19736\nwsize=6 worst_total_nodes=5121\nBEST 56785\nTraceback (most recent call last):\n  File \"/app/dev/hill.py\", line 58, in <module>\n    main()\n  File \"/app/dev/hill.py\", line 45, in main\n    curw = work(cur)[1]\n           ^^^^^^^^^\n  File \"/app/dev/hill.py\", line 10, in work\n    total, per = space_size(ntx, nkeys, writes)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/dev/space.py\", line 35, in space_size\n    for i, v in ov:\n        ^^^^\nTypeError: cannot unpack non-iterable int object\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 52054,
+      "time": "2026-10-08T21:24:47.394967+00:00",
+      "tool_call_id": "chatcmpl-tool-bafeda957b3a3d96",
+      "return_code": 1,
+      "stdout": "ok   empty-ok                                   -> []\nok   empty-mismatch                             -> null\nok   empty-extra-key                            -> null\nok   absent-vs-zero                             -> null\nFAIL absent-read-ok                             expected [] got ['t0']\n     request: {\"initial\": {}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"get\", \"a\", null]]}]}\nFAIL zero-is-present                            expected [] got ['t0']\n     request: {\"initial\": {\"a\": 0}, \"final\": {\"a\": 0}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"get\", \"a\", 0]]}]}\nok   zero-not-absent                            -> null\nFAIL final-zero-means-present                   expected [] got ['t0']\n     request: {\"initial\": {}, \"final\": {\"a\": 0}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"put\", \"a\", 0]]}]}\nFAIL final-absent-after-del                     expected [] got ['t0']\n     request: {\"initial\": {\"a\": 5}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"del\", \"a\"]]}]}\nFAIL del-absent-is-fine                         expected [] got ['t0']\n     request: {\"initial\": {}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"del\", \"a\"]]}]}\nok   boundary-order-forced                      -> ['t0', 't1']\nok   boundary-order-conflict                    -> null\nok   boundary-order-ok                          -> ['t0', 't1']\nok   overlap-no-order                           -> ['t1', 't0']\nok   negative-times                             -> ['t0', 't1']\nok   self-contradiction                         -> null\nok   self-consistent                            -> ['t0']\nok   unsatisfiable-read-pair                    -> null\nok   del-then-read-absent                       -> ['t0']\nok   cas-success                                -> ['t0']\nok   cas-fail                                   -> ['t0']\nok   cas-absent-old                             -> ['t0']\nok   cas-absent-old-fails                       -> ['t0']\nok   cas-delete-on-success                      -> ['t0']\nok   cas-zero-old                               -> ['t0']\nok   cas-expects-fail-but-succeeds              -> null\nok   cas-reads-own-write                        -> null\nok   cas-chain                                  -> ['t0', 't1']\nok   cas-chain-broken                           -> null\nok   failed-cas-then-read                       -> ['t0']\nok   failed-cas-then-read-bad                   -> null\nok   failed-cas-constraint-contradiction        -> null\nok   scan-empty-range                           -> ['t0']\nok   scan-observes-initial                      -> ['t0']\nok   scan-half-open-high                        -> ['t0']\nok   scan-half-open-low                         -> ['t0']\nok   scan-excludes-low                          -> null\nok   scan-sees-own-writes                       -> ['t0']\nok   scan-sees-own-delete                       -> ['t0']\nok   scan-after-failed-cas                      -> ['t0']\nok   scan-expects-never-written-key             -> null\nok   scan-bounds-not-keys                       -> ['t0']\nok   scan-lexicographic                         -> ['t0']\nFAIL scan-order-of-pairs                        disagrees with brute force (truth=False got=['t0'])\n     request: {\"initial\": {\"b\": 2, \"a\": 1}, \"final\": {\"a\": 1, \"b\": 2}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"scan\", \"a\", \"c\", [[\"b\", 2], [\"a\", 1]]]]}]}\nok   scan-value-mismatch                        -> null\nok   scan-empty-but-key-present                 -> null\nok   scan-key-outside-range-in-expected         -> null\nok   final-missing-key                          -> null\nok   final-untouched-key                        -> ['t0']\nok   final-value-never-written                  -> null\nok   final-absent-but-written                   -> ['t0']\nok   write-then-delete-same-tx                  -> ['t0']\nok   delete-then-revive                         -> ['t0']\nok   no-op-transaction                          -> ['t0', 't1']\nok   no-op-transaction-bad-read                 -> null\nok   all-observers-no-writers                   -> ['t0', 't1']\nok   mutual-observation-impossible              -> null\nok   no-ops                                     -> ['t0']\nok   weird-ids                                  -> ['zzz', 'aaa']\nedge cases: 59, failures: 6\n",
+      "stderr": "",
+      "stdout_tail": "        -> null\nok   boundary-order-ok                          -> ['t0', 't1']\nok   overlap-no-order                           -> ['t1', 't0']\nok   negative-times                             -> ['t0', 't1']\nok   self-contradiction                         -> null\nok   self-consistent                            -> ['t0']\nok   unsatisfiable-read-pair                    -> null\nok   del-then-read-absent                       -> ['t0']\nok   cas-success                                -> ['t0']\nok   cas-fail                                   -> ['t0']\nok   cas-absent-old                             -> ['t0']\nok   cas-absent-old-fails                       -> ['t0']\nok   cas-delete-on-success                      -> ['t0']\nok   cas-zero-old                               -> ['t0']\nok   cas-expects-fail-but-succeeds              -> null\nok   cas-reads-own-write                        -> null\nok   cas-chain                                  -> ['t0', 't1']\nok   cas-chain-broken                           -> null\nok   failed-cas-then-read                       -> ['t0']\nok   failed-cas-then-read-bad                   -> null\nok   failed-cas-constraint-contradiction        -> null\nok   scan-empty-range                           -> ['t0']\nok   scan-observes-initial                      -> ['t0']\nok   scan-half-open-high                        -> ['t0']\nok   scan-half-open-low                         -> ['t0']\nok   scan-excludes-low                          -> null\nok   scan-sees-own-writes                       -> ['t0']\nok   scan-sees-own-delete                       -> ['t0']\nok   scan-after-failed-cas                      -> ['t0']\nok   scan-expects-never-written-key             -> null\nok   scan-bounds-not-keys                       -> ['t0']\nok   scan-lexicographic                         -> ['t0']\nFAIL scan-order-of-pairs                        disagrees with brute force (truth=False got=['t0'])\n     request: {\"initial\": {\"b\": 2, \"a\": 1}, \"final\": {\"a\": 1, \"b\": 2}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"scan\", \"a\", \"c\", [[\"b\", 2], [\"a\", 1]]]]}]}\nok   scan-value-mismatch                        -> null\nok   scan-empty-but-key-present                 -> null\nok   scan-key-outside-range-in-expected         -> null\nok   final-missing-key                          -> null\nok   final-untouched-key                        -> ['t0']\nok   final-value-never-written                  -> null\nok   final-absent-but-written                   -> ['t0']\nok   write-then-delete-same-tx                  -> ['t0']\nok   delete-then-revive                         -> ['t0']\nok   no-op-transaction                          -> ['t0', 't1']\nok   no-op-transaction-bad-read                 -> null\nok   all-observers-no-writers                   -> ['t0', 't1']\nok   mutual-observation-impossible              -> null\nok   no-ops                                     -> ['t0']\nok   weird-ids                                  -> ['zzz', 'aaa']\nedge cases: 59, failures: 6\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 53637,
+      "time": "2026-10-08T21:25:12.992615+00:00",
+      "tool_call_id": "chatcmpl-tool-8680b5109c73d413",
+      "return_code": 0,
+      "stdout": "ok   scan-half-open-low                         -> ['t0']\nok   scan-excludes-low                          -> null\nok   scan-sees-own-writes                       -> ['t0']\nok   scan-sees-own-delete                       -> ['t0']\nok   scan-after-failed-cas                      -> ['t0']\nok   scan-expects-never-written-key             -> null\nok   scan-bounds-not-keys                       -> ['t0']\nok   scan-lexicographic                         -> ['t0']\nok   scan-order-of-pairs                        -> null\nok   scan-value-mismatch                        -> null\nok   scan-empty-but-key-present                 -> null\nok   scan-key-outside-range-in-expected         -> null\nok   final-missing-key                          -> null\nok   final-untouched-key                        -> ['t0']\nok   final-value-never-written                  -> null\nok   final-absent-but-written                   -> ['t0']\nok   write-then-delete-same-tx                  -> ['t0']\nok   delete-then-revive                         -> ['t0']\nok   no-op-transaction                          -> ['t0', 't1']\nok   no-op-transaction-bad-read                 -> null\nok   all-observers-no-writers                   -> ['t0', 't1']\nok   mutual-observation-impossible              -> null\nok   no-ops                                     -> ['t0']\nok   weird-ids                                  -> ['zzz', 'aaa']\nedge cases: 59, failures: 0\nPassed 3 public examples\n",
+      "stderr": "",
+      "stdout_tail": "ok   scan-half-open-low                         -> ['t0']\nok   scan-excludes-low                          -> null\nok   scan-sees-own-writes                       -> ['t0']\nok   scan-sees-own-delete                       -> ['t0']\nok   scan-after-failed-cas                      -> ['t0']\nok   scan-expects-never-written-key             -> null\nok   scan-bounds-not-keys                       -> ['t0']\nok   scan-lexicographic                         -> ['t0']\nok   scan-order-of-pairs                        -> null\nok   scan-value-mismatch                        -> null\nok   scan-empty-but-key-present                 -> null\nok   scan-key-outside-range-in-expected         -> null\nok   final-missing-key                          -> null\nok   final-untouched-key                        -> ['t0']\nok   final-value-never-written                  -> null\nok   final-absent-but-written                   -> ['t0']\nok   write-then-delete-same-tx                  -> ['t0']\nok   delete-then-revive                         -> ['t0']\nok   no-op-transaction                          -> ['t0', 't1']\nok   no-op-transaction-bad-read                 -> null\nok   all-observers-no-writers                   -> ['t0', 't1']\nok   mutual-observation-impossible              -> null\nok   no-ops                                     -> ['t0']\nok   weird-ids                                  -> ['zzz', 'aaa']\nedge cases: 59, failures: 0\nPassed 3 public examples\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 58028,
+      "time": "2026-10-08T21:26:27.278396+00:00",
+      "tool_call_id": "chatcmpl-tool-9a6b520046a319b5",
+      "return_code": 1,
+      "stdout": "cases=11 sat=1 null=10 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.001s\ncases=11 sat=1 null=10 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.001s\ncases=11 sat=7 null=4 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.009s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=7 null=4 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.001s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=7 null=4 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=0 null=11 bad=0 slowest=0.000s\ncases=11 sat=8 null=3 bad=0 slowest=0.000s\ncases=11 sat=0 null=11 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.048s\ncases=11 sat=4 null=7 bad=0 slowest=0.059s\ncases=11 sat=3 null=8 bad=0 slowest=0.027s\ncases=11 sat=6 null=5 bad=0 slowest=0.045s\ncases=11 sat=4 null=7 bad=0 slowest=0.041s\ncases=11 sat=5 null=6 bad=0 slowest=0.046s\ncases=11 sat=6 null=5 bad=0 slowest=0.019s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=7 null=4 bad=0 slowest=0.047s\ncases=11 sat=4 null=7 bad=0 slowest=0.006s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=2 null=9 bad=0 slowest=0.000s\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/dev/campaign.py\", line 41, in <module>\n    sys.exit(main())\n             ^^^^^^\n  File \"/app/dev/campaign.py\", line 37, in main\n    len(jobs), sum(c for _, c, _, _ in jobs), sum(results), time.time() - t0))\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/dev/campaign.py\", line 37, in <genexpr>\n    len(jobs), sum(c for _, c, _, _ in jobs), sum(results), time.time() - t0))\n                         ^^^^^^^^^^\nValueError: too many values to unpack (expected 4)\n",
+      "stdout_tail": "cases=11 sat=1 null=10 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.001s\ncases=11 sat=1 null=10 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.001s\ncases=11 sat=7 null=4 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.009s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=7 null=4 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.001s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=5 null=6 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=7 null=4 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=0 null=11 bad=0 slowest=0.000s\ncases=11 sat=8 null=3 bad=0 slowest=0.000s\ncases=11 sat=0 null=11 bad=0 slowest=0.000s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=3 null=8 bad=0 slowest=0.048s\ncases=11 sat=4 null=7 bad=0 slowest=0.059s\ncases=11 sat=3 null=8 bad=0 slowest=0.027s\ncases=11 sat=6 null=5 bad=0 slowest=0.045s\ncases=11 sat=4 null=7 bad=0 slowest=0.041s\ncases=11 sat=5 null=6 bad=0 slowest=0.046s\ncases=11 sat=6 null=5 bad=0 slowest=0.019s\ncases=11 sat=4 null=7 bad=0 slowest=0.000s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=7 null=4 bad=0 slowest=0.047s\ncases=11 sat=4 null=7 bad=0 slowest=0.006s\ncases=11 sat=6 null=5 bad=0 slowest=0.000s\ncases=11 sat=2 null=9 bad=0 slowest=0.000s\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/app/dev/campaign.py\", line 41, in <module>\n    sys.exit(main())\n             ^^^^^^\n  File \"/app/dev/campaign.py\", line 37, in main\n    len(jobs), sum(c for _, c, _, _ in jobs), sum(results), time.time() - t0))\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/dev/campaign.py\", line 37, in <genexpr>\n    len(jobs), sum(c for _, c, _, _ in jobs), sum(results), time.time() - t0))\n                         ^^^^^^^^^^\nValueError: too many values to unpack (expected 4)\n"
+    },
+    {
+      "step": 70502,
+      "time": "2026-10-08T21:30:03.336212+00:00",
+      "tool_call_id": "chatcmpl-tool-a2c1bf89ae2a7669",
+      "return_code": 0,
+      "stdout": "it=0 best=0.0099s\nTraceback (most recent call last):\n  File \"/app/dev/hunt2.py\", line 111, in <module>\n    main()\n  File \"/app/dev/hunt2.py\", line 86, in main\n    cand = mutate(rng, cur) if rng.random() < 0.85 else random_instance(rng)\n           ^^^^^^^^^^^^^^^^\n  File \"/app/dev/hunt2.py\", line 69, in mutate\n    cands = [v for (kk, v) in values[t] for tt in range(NTX) if False]\n                   ^^^^^^^\nTypeError: cannot unpack non-iterable int object\n",
+      "stderr": "",
+      "stdout_tail": "it=0 best=0.0099s\nTraceback (most recent call last):\n  File \"/app/dev/hunt2.py\", line 111, in <module>\n    main()\n  File \"/app/dev/hunt2.py\", line 86, in main\n    cand = mutate(rng, cur) if rng.random() < 0.85 else random_instance(rng)\n           ^^^^^^^^^^^^^^^^\n  File \"/app/dev/hunt2.py\", line 69, in mutate\n    cands = [v for (kk, v) in values[t] for tt in range(NTX) if False]\n                   ^^^^^^^\nTypeError: cannot unpack non-iterable int object\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 88871,
+      "time": "2026-10-08T21:40:10.668103+00:00",
+      "tool_call_id": "chatcmpl-tool-b219b5fba64f9fd0",
+      "return_code": 0,
+      "stdout": "ok   empty-ok                                   -> []\nok   empty-mismatch                             -> null\nok   empty-extra-key                            -> null\nok   absent-vs-zero                             -> null\nok   absent-read-ok                             -> ['t0']\nok   zero-is-present                            -> ['t0']\nok   zero-not-absent                            -> null\nTraceback (most recent call last):\n  File \"<stdin>\", line 4, in <module>\n  File \"/app/dev/edge.py\", line 208, in <module>\n    sys.exit(main())\n             ^^^^^^\n  File \"/app/dev/edge.py\", line 173, in main\n    got = solver.solve(req)\n          ^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 261, in solve\n    writers[i][codes[i][v]] |= 1 << t\n    ~~~~~~~~~~^^^^^^^^^^^^^\nKeyError: 1\n",
+      "stderr": "",
+      "stdout_tail": "ok   empty-ok                                   -> []\nok   empty-mismatch                             -> null\nok   empty-extra-key                            -> null\nok   absent-vs-zero                             -> null\nok   absent-read-ok                             -> ['t0']\nok   zero-is-present                            -> ['t0']\nok   zero-not-absent                            -> null\nTraceback (most recent call last):\n  File \"<stdin>\", line 4, in <module>\n  File \"/app/dev/edge.py\", line 208, in <module>\n    sys.exit(main())\n             ^^^^^^\n  File \"/app/dev/edge.py\", line 173, in main\n    got = solver.solve(req)\n          ^^^^^^^^^^^^^^^^^\n  File \"/app/main.py\", line 261, in solve\n    writers[i][codes[i][v]] |= 1 << t\n    ~~~~~~~~~~^^^^^^^^^^^^^\nKeyError: 1\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 89654,
+      "time": "2026-10-08T21:40:31.908541+00:00",
+      "tool_call_id": "chatcmpl-tool-a76e235ee34610e4",
+      "return_code": 0,
+      "stdout": "FAIL final-absent-after-del                     disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 5}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"del\", \"a\"]]}]}\nok   del-absent-is-fine                         -> ['t0']\n--\nFAIL del-then-read-absent                       disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 3}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"del\", \"a\"], [\"get\", \"a\", null]]}]}\nok   cas-success                                -> ['t0']\n--\nFAIL cas-delete-on-success                      disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 1}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"cas\", \"a\", 1, null, true]]}]}\nok   cas-zero-old                               -> ['t0']\n--\nFAIL cas-chain                                  disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 1}, \"final\": {\"a\": 3}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"cas\", \"a\", 1, 2, true]]}, {\"id\": \"t1\", \"start\": 0, \"end\": 2, \"ops\": [[\"cas\", \"a\", 2, 3, true]]}]}\nok   cas-chain-broken                           -> null\n--\nFAIL scan-sees-own-delete                       disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 1, \"b\": 2}, \"final\": {\"b\": 2}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"del\", \"a\"], [\"scan\", \"a\", \"c\", [[\"b\", 2]]]]}]}\nok   scan-after-failed-cas                      -> ['t0']\n--\nFAIL write-then-delete-same-tx                  disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 9}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"put\", \"a\", 1], [\"del\", \"a\"]]}]}\nok   delete-then-revive                         -> ['t0']\n",
+      "stderr": "",
+      "stdout_tail": "FAIL final-absent-after-del                     disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 5}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"del\", \"a\"]]}]}\nok   del-absent-is-fine                         -> ['t0']\n--\nFAIL del-then-read-absent                       disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 3}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"del\", \"a\"], [\"get\", \"a\", null]]}]}\nok   cas-success                                -> ['t0']\n--\nFAIL cas-delete-on-success                      disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 1}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"cas\", \"a\", 1, null, true]]}]}\nok   cas-zero-old                               -> ['t0']\n--\nFAIL cas-chain                                  disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 1}, \"final\": {\"a\": 3}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"cas\", \"a\", 1, 2, true]]}, {\"id\": \"t1\", \"start\": 0, \"end\": 2, \"ops\": [[\"cas\", \"a\", 2, 3, true]]}]}\nok   cas-chain-broken                           -> null\n--\nFAIL scan-sees-own-delete                       disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 1, \"b\": 2}, \"final\": {\"b\": 2}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"del\", \"a\"], [\"scan\", \"a\", \"c\", [[\"b\", 2]]]]}]}\nok   scan-after-failed-cas                      -> ['t0']\n--\nFAIL write-then-delete-same-tx                  disagrees with brute force (truth=True got=None)\n     request: {\"initial\": {\"a\": 9}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 2, \"ops\": [[\"put\", \"a\", 1], [\"del\", \"a\"]]}]}\nok   delete-then-revive                         -> ['t0']\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 102748,
+      "time": "2026-10-08T21:45:30.361005+00:00",
+      "tool_call_id": "chatcmpl-tool-aed395979748491a",
+      "return_code": 0,
+      "stdout": "ok dev/hard.py\nok dev/worst.py\nok dev/hunt.py\nok dev/hunt2.py\nok dev/peak.py\nok dev/compare.py\n\nif __name__ == \"__main__\":\n    main()\n\nif __name__ == \"__main__\":\n    main()\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/usr/local/lib/python3.12/ast.py\", line 52, in parse\n    return compile(source, filename, mode, flags,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<unknown>\", line 68\n    main()\n    ^^^^\nIndentationError: expected an indented block after 'if' statement on line 67\n",
+      "stdout_tail": "ok dev/hard.py\nok dev/worst.py\nok dev/hunt.py\nok dev/hunt2.py\nok dev/peak.py\nok dev/compare.py\n\nif __name__ == \"__main__\":\n    main()\n\nif __name__ == \"__main__\":\n    main()\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/usr/local/lib/python3.12/ast.py\", line 52, in parse\n    return compile(source, filename, mode, flags,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<unknown>\", line 68\n    main()\n    ^^^^\nIndentationError: expected an indented block after 'if' statement on line 67\n"
+    },
+    {
+      "step": 103007,
+      "time": "2026-10-08T21:47:37.302422+00:00",
+      "tool_call_id": "chatcmpl-tool-b48d7f83a7457545",
+      "return_code": 124,
+      "stdout": "all parsed\n",
+      "stderr": "",
+      "stdout_tail": "all parsed\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 103561,
+      "time": "2026-10-08T21:47:51.392594+00:00",
+      "tool_call_id": "chatcmpl-tool-85123b759bd175a1",
+      "return_code": 0,
+      "stdout": "     1\t\"\"\"Linearizability checker for atomic range transactions.\n     2\t\n     3\tA whole transaction is one atomic operation, so a witness is a linear order of\n     4\tthe transactions that respects real time (A.end <= B.start => A before B) and\n     5\twhose sequential execution from `initial` reproduces every observed value and\n     6\tends exactly at `final`.\n     7\t\n     8\tApproach\n     9\t--------\n    10\t1.  Every transaction is symbolically executed once (\"compiled\").  Because a\n    11\t   transaction is atomic, its effect on an incoming state is fully determined\n    12\t   by that state:\n    13\t\n    14\t     * reads (`get`, the compare of `cas`, `scan`) of keys not written earlier\n    15\t       inside the same transaction become *constraints* on the incoming state,\n    16\t     * writes become a final overlay (last write per key wins),\n    17\t     * a `cas` expected to fail on an incoming key becomes a *disequality*.\n    18\t\n    19\t   A transaction that contradicts itself can never appear in any witness, so\n    20\t   the answer is immediately `null`.\n    21\t\n    22\t2.  States are packed into a single integer, one field per key.  Only values\n    23\t   that can actually be stored in a key ever occur (`initial` plus overlay\n    24\t   values), so a compiled transaction becomes three bit patterns: an equality\n    25\t   test, some disequality tests and an overlay applied by masking.\n    26\t\n    27\t3.  The search is a DFS over (set of placed transactions, current state).  That\n    28\t   pair determines everything about the future, so dead ends are memoised and\n    29\t   never re-explored.  Only transactions whose real-time predecessors are all\n    30\t   placed are considered.\n    31\t\n    32\t4.  Pruning: every unplaced transaction executes after every placed one, so the\n    33\t   last writer of a key is an unplaced transaction whenever some unplaced\n    34\t   transaction writes that key.  Hence, per set of placed transactions, the\n    35\t   final value of such a key must still be written by one of the remaining\n    36\t   writers, while a key no remaining transaction writes must already hold its\n    37\t   final value.  Both tests are single bit comparisons.\n    38\t\"\"\"\n    39\t\n    40\timport json\n    41\timport sys\n    42\t\n    43\tTOUCHING_OPS = (\"get\", \"put\", \"del\", \"cas\")\n    44\t\n    45\t\n    46\tdef compile_tx(tx, kidx, keys):\n    47\t    \"\"\"Symbolically execute one transaction.\n    48\t\n    49\t    Returns (eqs, neqs, overlay) where\n    50\t      eqs    -- tuple of (key_index, value) the incoming state must satisfy\n    51\t      neqs   -- tuple of (key_index, value) the incoming state must NOT satisfy\n    52\t      overlay-- tuple of (key_index, value_or_None) applied afterwards\n    53\t    or None when the transaction can never succeed in any state.\n    54\t    \"\"\"\n    55\t    env = {}      # key index -> value visible to reads inside this transaction\n    56\t    eqs = {}      # key index -> required incoming value\n    57\t    neqs = {}     # key index -> set of forbidden incoming values\n    58\t    writes = []   # ordered (key index, value) writes\n    59\t\n    60\t    for op in tx[\"ops\"]:\n    61\t        kind = op[0]\n    62\t        if kind == \"get\":\n    63\t            i = kidx[op[1]]\n    64\t            want = op[2]\n    65\t            if i in env:\n    66\t                if env[i] != want:\n    67\t                    return None\n    68\t            else:\n    69\t                if want in neqs.get(i, ()):  # contradicts an earlier failed CAS\n    70\t                    return None\n    71\t                eqs[i] = want\n    72\t                env[i] = want\n    73\t        elif kind == \"put\":\n    74\t            i = kidx[op[1]]\n    75\t            env[i] = op[2]\n    76\t            writes.append((i, op[2]))\n    77\t        elif kind == \"del\":\n    78\t            i = kidx[op[1]]\n    79\t            env[i] = None\n    80\t            writes.append((i, None))\n    81\t        elif kind == \"cas\":\n    82\t            i = kidx[op[1]]\n    83\t            old, new, want = op[2], op[3], op[4]\n    84\t            if i in env:\n    85\t                ok = env[i] == old\n    86\t                if ok != bool(want):\n    87\t                    return None\n    88\t                if ok:\n    89\t                    env[i] = new\n    90\t                    writes.append((i, new))\n    91\t            elif want:  # CAS must succeed => incoming value equals `old`\n    92\t                if old in neqs.get(i, ()):\n    93\t                    return None\n    94\t                eqs[i] = old\n    95\t                env[i] = new\n    96\t                writes.append((i, new))\n    97\t            else:       # CAS must fail => incoming value differs from `old`\n    98\t                neqs.setdefault(i, set()).add(old)\n    99\t        elif kind == \"scan\":\n   100\t            low, high = op[1], op[2]\n   101\t            # a scan returns the present keys of the range, sorted by key and\n   102\t            # each exactly once, so the expected pairs must be strictly\n   103\t            # increasing in key\n   104\t            expected = {}\n   105\t            prev = None\n   106\t            for pair in op[3]:\n   107\t                k, v = pair[0], pair[1]\n   108\t                if prev is not None and not prev < k:\n   109\t                    return None  # unsorted or repeated key: never reproducible\n   110\t                if v is None:\n   111\t                    return None  # a present key always holds an integer\n   112\t                prev = k\n   113\t                expected[k] = v\n   114\t            for k in expected:\n   115\t                if not (low <= k < high):\n   116\t                    return None  # a reported key outside the range\n   117\t            for i, k in enumerate(keys):\n   118\t                if low <= k < high:\n   119\t                    want = expected.get(k)  # None means the key is expected absent\n   120\t                    if i in env:\n   121\t                        if env[i] != want:\n   122\t                            return None\n   123\t                    else:",
+      "stderr": "",
+      "stdout_tail": "7\t                    if not writers[i][final_code[i]] & rem:\n   288\t                        ok = False\n   289\t                        break\n   290\t                else:  # nothing will write this key any more\n   291\t                    must_mask |= field[i]\n   292\t                    must_val |= final_code[i] << offsets[i]\n   293\t            info = (ok, must_mask, must_val)\n   294\t            mask_info[mask] = info\n   295\t        return info\n   296\t\n   297\t    # Transactions that write nothing are pure observers: placing them changes\n   298\t    # nothing but the mask, so try them last.\n   299\t    order_hint = sorted(\n   300\t        range(ntx),\n   301\t        key=lambda t: (len(overlays[t]) == 0, -len(compiled[t][0]) - len(compiled[t][1])))\n   302\t\n   303\t    candidates = {}  # per mask: transactions that may be placed next\n   304\t\n   305\t    def eligible(mask):\n   306\t        cands = candidates.get(mask)\n   307\t        if cands is None:\n   308\t            rem = mask ^ full\n   309\t            cands = tuple(t for t in order_hint\n   310\t                          if rem >> t & 1 and not prereq[t] & rem)\n   311\t            candidates[mask] = cands\n   312\t        return cands\n   313\t\n   314\t    dead = set()\n   315\t    path = []\n   316\t\n   317\t    def dfs(mask, state):\n   318\t        if mask == full:\n   319\t            return state == final_state\n   320\t        for t in eligible(mask):\n   321\t            nxt = applies[t](state)\n   322\t            if nxt is None:  # the transaction would not observe what it saw\n   323\t                continue\n   324\t            nmask = mask | (1 << t)\n   325\t            ok, must_mask, must_val = mask_check(nmask)\n   326\t            if not ok:\n   327\t                continue\n   328\t            if (nxt & must_mask) != must_val:\n   329\t                continue  # a settled key no longer holds its final value\n   330\t            key = (nmask << width_total) | nxt\n   331\t            if key in dead:\n   332\t                continue\n   333\t            path.append(t)\n   334\t            if dfs(nmask, nxt):\n   335\t                return True\n   336\t            path.pop()\n   337\t            dead.add(key)\n   338\t        return False\n   339\t\n   340\t    ok, must_mask, must_val = mask_check(0)\n   341\t    if not ok or (initial_state & must_mask) != must_val:\n   342\t        return {\"order\": None}\n   343\t    if dfs(0, initial_state):\n   344\t        return {\"order\": [txs[t][\"id\"] for t in path]}\n   345\t    return {\"order\": None}\n   346\t\n   347\t\n   348\tdef main():\n   349\t    out = sys.stdout\n   350\t    for line in sys.stdin:\n   351\t        if not line.strip():\n   352\t            continue\n   353\t        try:\n   354\t            result = solve(json.loads(line))\n   355\t        except Exception:  # keep answering the rest of the batch\n   356\t            result = {\"order\": None}\n   357\t        out.write(json.dumps(result))\n   358\t        out.write(\"\\n\")\n   359\t        out.flush()\n   360\t\n   361\t\n   362\tif __name__ == \"__main__\":\n   363\t    main()\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 105935,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - << 'EOF'\nimport pathlib\np = pathlib.Path('main.py'); s = p.read_text()\ns = s.replace('TOUCHING_OPS = (\"get\", \"put\", \"del\", \"cas\")',\n              'KEY_OPS = (\"get\", \"put\", \"del\", \"cas\")  # operations that name one key')\ns = s.replace('            if op[0] in TOUCHING_OPS:', '            if op[0] in KEY_OPS:')\ns = s.replace('''        vals = sorted(poss[i], key=lambda v: (v is not None, v if v is not None else 0))''',\n              '''        # absent sorts first, so every key gets a stable {value: code} map\n        vals = sorted(poss[i], key=lambda v: (v is not None, v if v is not None else 0))''')\np.write_text(s)\nEOF\ncd /app && python3 smoke.py && python3 dev/edge.py 2>&1 | tail -1 && python3 dev/batch.py 500 9 | tail -1"
+    },
+    {
+      "step": 105936,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\nedge cases: 69, failures: 0\nbatch=500 lines=500 total=0.11s per-case=0.0002s rc=0\n"
+    },
+    {
+      "step": 105985,
+      "kind": "terminal_call",
+      "summary": "cd /app && timeout 400 python3 dev/campaign.py 100000 6 2>&1 | tail -2"
+    },
+    {
+      "step": 105986,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "cases=1667 sat=746 null=921 bad=0 slowest=0.100s\njobs=60 total_cases~100020 failures=0 elapsed=14.4s\n"
+    },
+    {
+      "step": 107804,
+      "kind": "terminal_call",
+      "summary": "cat > /app/dev/hunt3.py << 'PYEOF'\n\"\"\"Hill-climb mixed-operation instances (reads, CAS, scans) against the solver.\n\nThe last-writer prune does not help when infeasibility comes from read\nconstraints, so this family is searched separately.  Runs in a single process\nso timings are real.\n\"\"\"\nimport json\nimport random\nimport sys\nimport time\n\nsys.path.insert(0, \"/app\")\nsys.path.insert(0, \"/app/dev\")\n\nimport main as solver  # noqa: E402\nimport naive  # noqa: E402\nfrom gen import gen_request, PROFILES  # noqa: E402\nfrom reference import valid_order  # noqa: E402\n\n\ndef timeit(req):\n    t0 = time.perf_counter()\n    got = solver.solve(req)\n    return time.perf_counter() - t0, got\n\n\ndef mutate(rng, req):\n    req = json.loads(json.dumps(req))\n    txs = req[\"transactions\"]\n    if not txs:\n        return req\n    mode = rng.random()\n    if mode < 0.25:  # re-roll the whole interval structure\n        style = rng.random()\n        for tx in txs:\n            if style < 0.4:\n                tx[\"start\"], t"
+    },
+    {
+      "step": 107805,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "it=0 best=0.0000s sat=False\nit=19 best=0.0001s sat=True\nit=79 best=0.0002s sat=True\nit=137 best=0.0003s sat=False\nit=141 best=0.0005s sat=False\nit=2364 best=0.0005s sat=False\nit=3024 best=0.0009s sat=False\nit=3025 best=0.0009s sat=False\nBEST 0.0009s\nmine sat=False naive sat=False agree=True\n{\"initial\": {\"x\": 0}, \"final\": {}, \"transactions\": [{\"id\": \"t0\", \"start\": 0, \"end\": 1, \"ops\": [[\"get\", \"x\", 0], [\"put\", \"x\", 5], [\"del\", \"x\"], [\"cas\", \"x\", 3, -4, false], [\"put\", \"x\", 9]]}, {\"id\": \"t3\", \"start\": 0, \"end\": 1, \"ops\": [[\"put\", \"x\", 2]]}, {\"id\": \"t1\", \"start\": 0, \"end\": 1, \"ops\": [[\"put\", \"x\", 9]]}, {\"id\": \"t5\", \"start\": 0, \"end\": 1, \"ops\": [[\"put\", \"x\", 0], [\"scan\", \"b\", \"d\", []], [\"cas\", \"x\", 0, null, true]]}, {\"id\": \"t4\", \"start\": 0, \"end\": 1, \"ops\": [[\"cas\", \"x\", null, 0, true], [\"put\", \"x\", 0], [\"scan\", \"b\", \"m\", []], [\"get\", \"x\", 0], [\"put\", \"x\", -9]]}, {\"id\": \"t9\", \"start\": 0, \"end\": 1, \"ops\": [[\"del\", \"x\"], [\"cas\", \"x\", null, 0, true], [\"get\", \"x\", 0]]}, {\"id\": \"t6\", \"start\": 0, \"end\": 1, \"ops\": [[\"put\", \"x\", 0], [\"cas\", \"x\", 0, -4, true], [\"put\", \"x\", 0]]}, {\"id\": \"t2\", \"start\": 0, \"end\": 1, \"ops\": [[\"put\", \"x\", -4], [\"cas\", \"x\", -3, null, false]]}, {\"id\": \"t7\", \"start\": 0,"
+    },
+    {
+      "step": 108224,
+      "kind": "terminal_call",
+      "summary": "cd /app && for s in 9 10; do timeout 200 python3 dev/hunt2.py $s 4000 2>&1 | grep -E \"BEST|mine=|INVALID|DISAG\"; done"
+    },
+    {
+      "step": 108225,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "BEST 0.0107s\nmine=True naive=True\nBEST 0.0090s\nmine=True naive=True\n"
+    },
+    {
+      "step": 109185,
+      "kind": "terminal_call",
+      "summary": "cat > /app/dev/README.md << 'MDEOF'\n# Development test suite for `/app/main.py`\n\nNothing here is needed at run time; `main.py` is self-contained.  These are the\nscripts used to develop and validate the checker.\n\n| file | purpose |\n| --- | --- |\n| `reference.py` | independent reference: sequential op simulator, brute-force enumeration of all precedence-respecting orders, and a full witness validator |\n| `naive.py` | second, independent solver (DFS over masks simulating ops on dicts) used as a cross-check for sizes where brute force is too slow |\n| `gen.py` | random history generator: op-mix profiles, satisfiable/unsatisfiable modes (corrupted observations, unreachable final map, forced real-time order), duplicated transactions, extreme values |\n| `edge.py` | 69 hand-crafted edge cases (absence vs zero, CAS delete, scan ordering/bounds/own-writes, real-time boundary, empty history, unwritable values) all checked with the real `public_contract.check` |\n| `fuzz.py` | randomised comparison "
+    },
+    {
+      "step": 109186,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": ".:\ntotal 44\ndrwxr-xr-x 1 agent agent  4096 Oct  8 21:14 .\ndrwxr-xr-x 1 root  root   4096 Oct  8 21:07 ..\ndrwxr-xr-x 2 agent agent  4096 Oct  8 21:49 dev\n-rw-r--r-- 1 agent agent  1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent 13918 Oct  8 21:48 main.py\n-rw-r--r-- 1 agent agent  3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent   695 Oct  8 17:32 smoke.py\n\ndev:\ntotal 108\ndrwxr-xr-x 2 agent agent  4096 Oct  8 21:49 .\ndrwxr-xr-x 1 agent agent  4096 Oct  8 21:14 ..\n-rw-r--r-- 1 agent agent  1919 Oct  8 21:49 README.md\n-rw-r--r-- 1 agent agent  2472 Oct  8 21:17 adversarial.py\n-rw-r--r-- 1 agent agent  1780 Oct  8 21:45 batch.py\n-rw-r--r-- 1 agent agent  1337 Oct  8 21:47 campaign.py\n-rw-r--r-- 1 agent agent  2219 Oct  8 21:45 compare.py\n-rw-r--r-- 1 agent agent 13267 Oct  8 21:45 edge.py\n-rw-r--r-- 1 agent agent  3052 Oct  8 21:45 fuzz.py\n-rw-r--r-- 1 agent agent  6531 Oct  8 21:26 gen.py\n-rw-r--r-- 1 agent agent  2484 Oct  8 21:45 hard.py\n-rw-r--r-- 1 agent agent  2045 Oct  8 21:47 hill.py\n-rw-r--r-- 1 agent agent  2658 Oct  8 21:45 hunt.py\n-rw-r--r-- 1 agent agent  4107 Oct  8 21:45 hunt2.py\n-rw-r--r-- 1 agent agent  4301 Oct  8 21:49 hunt3.py\n-rw-r--r-- 1 agent"
+    },
+    {
+      "step": 109499,
+      "kind": "terminal_call",
+      "summary": "cd /tmp && printf '%s\\n' '{\"initial\":{},\"final\":{},\"transactions\":[]}' '{\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]}' | python3 /app/main.py; cd /app && timeout 300 python3 dev/campaign.py 60000 6 2>&1 | tail -2"
+    },
+    {
+      "step": 109500,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "{\"order\": []}\n{\"order\": [\"t0\"]}\ncases=1001 sat=423 null=578 bad=0 slowest=0.101s\njobs=60 total_cases~60060 failures=0 elapsed=9.8s\n"
+    }
+  ]
+}

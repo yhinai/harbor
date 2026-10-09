@@ -1,0 +1,198 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-typecheck-soundness-witness-7-a1-47037c40",
+    "task": "typecheck-soundness-witness",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 7,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-kimi-typecheck-soundness-witness-7-a1-47037c40.json",
+    "tool_calls": 11,
+    "agent_elapsed_seconds": 1568.666626,
+    "input_tokens": 352883,
+    "output_tokens": 55099,
+    "uncached_cost_estimate": 1.885134,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "f8533fec81fb07fce69411f0a561942c3eff68130c27483264d3354db7369353",
+    "network_mode": "none",
+    "artifact_sha256": "7955cbe8b88701012da84f81313702c3c40707fbd8d83f75279470639151eecf",
+    "normalized_artifact_sha256": "de23ea69d461c3672fd3cdbf6f1e6889dceb2d8e9a728c39b2ec1a92d83179b7",
+    "terminal_nonzero_or_error_text_events": 1,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [],
+    "final_artifact_literal_written_by_30_min": false,
+    "first_literal_final_artifact_seconds": null,
+    "event_counts": {
+      "initial": 1,
+      "request": 10,
+      "stream_chunk": 54524,
+      "response": 10,
+      "terminal_call": 11,
+      "terminal_result": 11,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 38,
+      "time": "2026-10-08T20:35:34.169152+00:00",
+      "tool_call_id": "call_2379faec3958429ab1823ea7",
+      "command": "ls -la /app && cat /app/LANGUAGE.md",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 95,
+      "time": "2026-10-08T20:35:38.532634+00:00",
+      "tool_call_id": "call_d2b22b81637f423296dd4a7e",
+      "command": "cat /app/language.py /app/checker.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 97,
+      "time": "2026-10-08T20:35:38.834940+00:00",
+      "tool_call_id": "call_50cb3d55acc54c47a054d4b1",
+      "command": "cat /app/interpreter.py /app/evaluate.py /app/witness.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 25794,
+      "time": "2026-10-08T20:48:00.445148+00:00",
+      "tool_call_id": "call_5f96abe619f543df98ef7109",
+      "command": "cd /app && python3 evaluate.py witness.json; echo \"exit=$?\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 25796,
+      "time": "2026-10-08T20:48:01.343525+00:00",
+      "tool_call_id": "call_6b746d1cdb7046b0a153844e",
+      "command": "cd /app && python3 -c \"\nimport json\n# sanity test: simple accepted program\np={'cells':{'box':{'types':['int','text'],'value':0}},'inputs':{},'body':[['eval',['add',['get','box'],['lit',1]]]]}\nopen('/tmp/t1.json','w').write(json.dumps(p))\n\" && python3 evaluate.py /tmp/t1.json; echo \"exit=$?\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 25937,
+      "time": "2026-10-08T20:48:09.058966+00:00",
+      "tool_call_id": "call_05c7269a67fa4922a901f3b6",
+      "command": "cd /app && python3 -c \"\nimport json\n# rejected by checker? box is {int,text} so add(get box) fails statically\np={'cells':{'box':{'types':['int','text'],'value':0}},'inputs':{},'body':[['set','box',['lit','hi']],['eval',['add',['get','box'],['lit',1]]]]}\nopen('/tmp/t2.json','w').write(json.dumps(p))\n\" && python3 evaluate.py /tmp/t2.json; echo \"exit=$?\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 35235,
+      "time": "2026-10-08T20:53:00.435567+00:00",
+      "tool_call_id": "call_35a7fa0d15fb4a88bc571a6b",
+      "command": "mkdir -p /tmp/fuzz && cat > /tmp/fuzz/gen.py << 'EOF'\nimport random, json, sys\nsys.path.insert(0,'/app')\nfrom language import load, InvalidProgram, StaticError\nfrom checker import check\nfrom interpreter import run\n\nKINDS=['int','text','bool','unit']\n\ndef lit_of(k, rng):\n    if k=='int': return ['lit', rng.randint(-10,10)]\n    if k=='text': return ['lit', rng.choice(['','a','bc','xyz','hello'])]\n    if k=='bool': return ['lit', rng.choice([True,False])]\n    return ['lit', None]\n\nclass Gen:\n    def __init__(self, rng, cells):\n        self.rng=rng\n        self.bounds={c:frozenset(t) for c,t in cells.items()}\n        self.counter=0\n    def fresh(self):\n        self.counter+=1\n        return 'v%d'%self.counter\n\n    # type rep: ('s', frozenset) or ('f', result_type, frozenset(writes))\n    def gen_scalar(self, k, env, facts, depth):\n        # returns expr with static type exactly {k}\n        rng=self.rng\n        opts=['lit']\n        for n,t in env.items():\n            if t[0]=='s' and t[1]==frozenset([k]): opts.append(('var',n))\n        for c in facts:\n            if facts[c]==frozenset([k]): opts.append(('get',c))\n        if depth>0:\n            opts += ['rec']*4\n        o=rng.choice(opts)\n        if o=='lit': return lit_of(k,rng)\n        if isinstance(o,tuple):\n            return [o[0],o[1]]\n        # recursive\n        if k=='int':\n            return ['add', self.gen_scalar('int',env,facts,depth-1), self.gen_scalar('int',env,facts,depth-1)]\n        if k=='text':\n            return ['cat', self.gen_scalar('text',env,facts,depth-1), self.gen_scalar('text',env,facts,depth-1)]\n     ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 45775,
+      "time": "2026-10-08T20:57:51.675497+00:00",
+      "tool_call_id": "call_20ca10e8dcea4a549486fdec",
+      "command": "cd /app && python3 << 'EOF'\nimport json\nfrom language import load, StaticError, InvalidProgram\nfrom checker import check\nfrom interpreter import run\n\ndef ev(p):\n    text=json.dumps(p)\n    try:\n        prog=load(text)\n    except Exception as e:\n        return ('invalid', str(e))\n    try:\n        check(prog)\n    except StaticError as e:\n        return ('static_error', str(e))\n    r=run(prog)\n    return (r['status'], r.get('message',''))\n\n# Probe 1: function writes a cell; after call, facts widened to bounds.\np1={'cells':{'box':{'types':['int','text'],'value':0}},\n    'inputs':{},\n    'body':[\n      ['let','f',['fn', [['set','box',['lit','hi']]], ['lit',0]]],\n      ['eval',['call',['var','f']]],\n      # now box should be {int,text} per checker; runtime box=\"hi\"\n      ['eval',['add',['get','box'],['lit',1]]]   # checker should REJECT (union)\n    ]}\nprint('p1', ev(p1))\n\n# Probe 2: is-refinement prunes else branch\np2={'cells':{'box':{'types':['int','text'],'value':0}},\n    'inputs':{},\n    'body':[\n      ['if',['is','box','int'],\n        [['eval',['add',['get','box'],['lit',1]]]],\n        [['eval',['cat',['get','box'],['lit','x']]]]],\n    ]}\nprint('p2', ev(p2))\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 53085,
+      "time": "2026-10-08T21:00:54.969683+00:00",
+      "tool_call_id": "call_06e352a98f8e447594e9dcaa",
+      "command": "cd /app && python3 << 'EOF'\nimport json\nfrom language import load, StaticError\nfrom checker import check\nfrom interpreter import run\n\np={\n \"cells\": {\"box\": {\"types\": [\"int\",\"text\"], \"value\": 0}},\n \"inputs\": {},\n \"body\": [\n   [\"let\",\"g\",[\"fn\",[],[\"lit\",0]]],\n   [\"let\",\"f\",[\"fn\",[],[\"fn\",[],[\"lit\",0]]]],\n   [\"repeat\",[\"lit\",2],[\n       [\"assign\",\"f\",[\"fn\",[],[\"var\",\"g\"]]],\n       [\"assign\",\"g\",[\"fn\",[[\"set\",\"box\",[\"lit\",\"hi\"]]],[\"lit\",0]]]\n   ]],\n   [\"eval\",[\"call\",[\"call\",[\"var\",\"f\"]]]],\n   [\"eval\",[\"add\",[\"get\",\"box\"],[\"lit\",1]]]\n ]\n}\ntext=json.dumps(p)\nprog=load(text)\ntry:\n    check(prog)\n    print(\"ACCEPTED\")\nexcept StaticError as e:\n    print(\"static_error:\", e)\nr=run(prog)\nprint(\"status:\", r['status'], r.get('message',''), \"steps:\", r['steps'])\nEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 53554,
+      "time": "2026-10-08T21:01:08.628405+00:00",
+      "tool_call_id": "call_fd2f05b12059489ea1a0554c",
+      "command": "cd /app && python3 << 'EOF'\nimport json\np={\n \"cells\": {\"box\": {\"types\": [\"int\",\"text\"], \"value\": 0}},\n \"inputs\": {},\n \"body\": [\n   [\"let\",\"g\",[\"fn\",[],[\"lit\",0]]],\n   [\"let\",\"f\",[\"fn\",[],[\"fn\",[],[\"lit\",0]]]],\n   [\"repeat\",[\"lit\",2],[\n       [\"assign\",\"f\",[\"fn\",[],[\"var\",\"g\"]]],\n       [\"assign\",\"g\",[\"fn\",[[\"set\",\"box\",[\"lit\",\"hi\"]]],[\"lit\",0]]]\n   ]],\n   [\"eval\",[\"call\",[\"call\",[\"var\",\"f\"]]]],\n   [\"eval\",[\"add\",[\"get\",\"box\"],[\"lit\",1]]]\n ]\n}\nopen('/app/witness.json','w').write(json.dumps(p,indent=1))\nprint(\"bytes:\", len(json.dumps(p)))\nEOF\npython3 /app/evaluate.py /app/witness.json; echo \"exit=$?\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 53912,
+      "time": "2026-10-08T21:01:19.779697+00:00",
+      "tool_call_id": "call_88c908c22def40ba829b1dda",
+      "command": "cd /app && python3 << 'EOF'\nimport json\nfrom language import load, validate\ntext=open('/app/witness.json').read()\nprint(\"file bytes:\", len(text.encode('utf-8')), \"(limit 65536)\")\np=load(text)\n# count nodes + depth via validate (returns count)\nprint(\"AST nodes:\", validate(p), \"(limit 512)\")\n# depth check\ndef depth(e, d=0):\n    if isinstance(e, list):\n        if not e: return d\n        return max(depth(x, d+1) for x in e)\n    return d\nprint(\"body depth:\", depth(p['body']), \"(limit 32)\")\nprint(\"max block len:\", max(len(b) for b in [p['body'], p['body'][2][2]]), \"(limit 128)\")\nEOF\nfor i in 1 2 3; do python3 /app/evaluate.py /app/witness.json >/dev/null; echo \"run$i exit=$?\"; done\nls -la /app/witness.json",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 98,
+      "time": "2026-10-08T20:35:39.079826+00:00",
+      "tool_call_id": "call_50cb3d55acc54c47a054d4b1",
+      "return_code": 0,
+      "stdout": "\"\"\"Concrete Reed interpreter, using an explicit stack of continuations.\"\"\"\nfrom dataclasses import dataclass\nfrom language import RuntimeTypeError,StepLimit,MAX_STEPS,kind,validate\n\n@dataclass\nclass Closure:\n    body:list\n    result:list\n    captured:dict\n\nclass Machine:\n    def __init__(self,p,limit=MAX_STEPS):\n        self.cells={n:d['value'] for n,d in p['cells'].items()}\n        self.steps=0;self.limit=limit;self.trace=[]\n        self.values=[];self.work=[]\n    def tick(self,label):\n        if self.steps>=self.limit:raise StepLimit('step limit')\n        self.steps+=1;self.trace.append({'step':self.steps,'operation':label})\n    def require(self,v,k):\n        actual='function' if isinstance(v,Closure) else kind(v)\n        if actual!=k:raise RuntimeTypeError('expected '+k+', got '+actual)\n    def schedule(self,body,env):\n        for s in reversed(body):self.work.append(('statement',s,env))\n    def execute(self,body,env):\n        self.schedule(body,env)\n        while self.work:\n            tag,x,env=self.work.pop()\n            if tag=='statement':\n                op=x[0];self.tick('stmt:'+op)\n                if op in ('let','assign','set'):\n                    self.work.append((op,x[1],env));self.work.append(('expression',x[2],env))\n                elif op=='eval':\n                    self.work.append(('discard',None,env));self.work.append(('expression',x[1],env))\n                else:\n                    self.work.append((op,x,env));self.work.append(('expression',x[1],env))\n            elif tag=='expression':\n                op=x[0];self.tick('expr:'+op)\n                if op=='lit':self.values.append(x[1])\n                elif op=='var':self.values.append(env[x[1]])\n                elif op=='get':self.values.append(self.cells[x[1]])\n                elif op=='is':self.values.append(kind(self.cells[x[1]])==x[2])\n                elif op=='fn':self.values.append(Closure(x[1],x[2],env.copy()))\n                elif op in ('call','not'):\n                    self.work.append((op,None,env));self.work.append(('expression',x[1],env))\n                else:\n                    self.work.append(('binary',op,env));self.work.append(('expression',x[2],env));self.work.append(('expression',x[1],env))\n            elif tag in ('let','assign'):env[x]=self.values.pop()\n            elif tag=='set':self.cells[x]=self.values.pop()\n            elif tag=='discard':self.values.pop()\n            elif tag=='call':\n                f=self.values.pop();self.require(f,'function');local=f.captured.copy()\n                self.work.append(('expression',f.result,local));self.schedule(f.body,local)\n            elif tag=='not':\n                a=self.values.pop();self.require(a,'bool');self.values.append(not a)\n            elif tag=='binary':\n                b=self.values.pop();a=self.values.pop();k='text' if x=='cat' else 'int'\n                self.require(a,k);self.require(b,k)\n                value=(a<b) if x=='lt' else (a+b)[:1024] if x=='cat' else ((a+b+2**31)%2**32)-2**31\n                self.values.append(value)\n            elif tag=='if':\n                cond=self.values.pop();self.require(cond,'bool')\n                self.work.append(('scope',set(env),env));self.schedule(x[2] if cond else x[3],env)\n            elif tag=='repeat':\n                count=self.values.pop();self.require(count,'int')\n                old=set(env)\n                for _ in range(max(0,min(3,count))):\n                    self.work.append(('scope',old,env));self.schedule(x[2],env)\n            elif tag=='scope':\n                for n in set(env)-x:del env[n]\n            else:raise AssertionError(tag)\n\ndef run(p,limit=MAX_STEPS):\n    validate(p);m=Machine(p,limit)\n    try:m.execute(p['body'],p['inputs'].copy())\n    except RuntimeTypeError as e:return {'status':'type_error','message':str(e),'steps':m.steps,'trace':m.trace}\n    except StepLimit:return {'status':'step_limit','steps':m.steps,'trace':m.trace}\n    return {'status':'normal','steps':m.steps,'trace':m.trace}\n\"\"\"Local checker and interpreter entry point.\"\"\"\nimport argparse,json,sys\nfrom pathlib import Path\nfrom language import load,InvalidProgram,StaticError\nfrom checker import check\nfrom interpreter import run\n\ndef evaluate(text):\n    try:p=load(text)\n    except (InvalidProgram,TypeError,ValueError,RecursionError) as e:return {'accepted':False,'status':'invalid_program','message':str(e)}\n    try:check(p)\n    except StaticError as e:return {'accepted':False,'status':'static_error','message':str(e)}\n    try:result=run(p)\n    except (KeyError,InvalidProgram) as e:return {'accepted':True,'status':'other_runtime_error','message':str(e)}\n    result['accepted']=True\n    return result\n\nif __name__=='__main__':\n    ap=argparse.ArgumentParser();ap.add_argument('program');args=ap.parse_args()\n    result=evaluate(Path(args.program).read_text());print(json.dumps(result,indent=2))\n    sys.exit(0 if result['accepted'] and result['status']=='type_error' else 1)\n{\"cells\":{},\"inputs\":{},\"body\":[]}\n",
+      "stderr": "",
+      "stdout_tail": "               self.work.append((op,None,env));self.work.append(('expression',x[1],env))\n                else:\n                    self.work.append(('binary',op,env));self.work.append(('expression',x[2],env));self.work.append(('expression',x[1],env))\n            elif tag in ('let','assign'):env[x]=self.values.pop()\n            elif tag=='set':self.cells[x]=self.values.pop()\n            elif tag=='discard':self.values.pop()\n            elif tag=='call':\n                f=self.values.pop();self.require(f,'function');local=f.captured.copy()\n                self.work.append(('expression',f.result,local));self.schedule(f.body,local)\n            elif tag=='not':\n                a=self.values.pop();self.require(a,'bool');self.values.append(not a)\n            elif tag=='binary':\n                b=self.values.pop();a=self.values.pop();k='text' if x=='cat' else 'int'\n                self.require(a,k);self.require(b,k)\n                value=(a<b) if x=='lt' else (a+b)[:1024] if x=='cat' else ((a+b+2**31)%2**32)-2**31\n                self.values.append(value)\n            elif tag=='if':\n                cond=self.values.pop();self.require(cond,'bool')\n                self.work.append(('scope',set(env),env));self.schedule(x[2] if cond else x[3],env)\n            elif tag=='repeat':\n                count=self.values.pop();self.require(count,'int')\n                old=set(env)\n                for _ in range(max(0,min(3,count))):\n                    self.work.append(('scope',old,env));self.schedule(x[2],env)\n            elif tag=='scope':\n                for n in set(env)-x:del env[n]\n            else:raise AssertionError(tag)\n\ndef run(p,limit=MAX_STEPS):\n    validate(p);m=Machine(p,limit)\n    try:m.execute(p['body'],p['inputs'].copy())\n    except RuntimeTypeError as e:return {'status':'type_error','message':str(e),'steps':m.steps,'trace':m.trace}\n    except StepLimit:return {'status':'step_limit','steps':m.steps,'trace':m.trace}\n    return {'status':'normal','steps':m.steps,'trace':m.trace}\n\"\"\"Local checker and interpreter entry point.\"\"\"\nimport argparse,json,sys\nfrom pathlib import Path\nfrom language import load,InvalidProgram,StaticError\nfrom checker import check\nfrom interpreter import run\n\ndef evaluate(text):\n    try:p=load(text)\n    except (InvalidProgram,TypeError,ValueError,RecursionError) as e:return {'accepted':False,'status':'invalid_program','message':str(e)}\n    try:check(p)\n    except StaticError as e:return {'accepted':False,'status':'static_error','message':str(e)}\n    try:result=run(p)\n    except (KeyError,InvalidProgram) as e:return {'accepted':True,'status':'other_runtime_error','message':str(e)}\n    result['accepted']=True\n    return result\n\nif __name__=='__main__':\n    ap=argparse.ArgumentParser();ap.add_argument('program');args=ap.parse_args()\n    result=evaluate(Path(args.program).read_text());print(json.dumps(result,indent=2))\n    sys.exit(0 if result['accepted'] and result['status']=='type_error' else 1)\n{\"cells\":{},\"inputs\":{},\"body\":[]}\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 25937,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 -c \"\nimport json\n# rejected by checker? box is {int,text} so add(get box) fails statically\np={'cells':{'box':{'types':['int','text'],'value':0}},'inputs':{},'body':[['set','box',['lit','hi']],['eval',['add',['get','box'],['lit',1]]]]}\nopen('/tmp/t2.json','w').write(json.dumps(p))\n\" && python3 evaluate.py /tmp/t2.json; echo \"exit=$?\""
+    },
+    {
+      "step": 25938,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "{\n  \"accepted\": false,\n  \"status\": \"static_error\",\n  \"message\": \"expected int\"\n}\nexit=1\n"
+    },
+    {
+      "step": 35235,
+      "kind": "terminal_call",
+      "summary": "mkdir -p /tmp/fuzz && cat > /tmp/fuzz/gen.py << 'EOF'\nimport random, json, sys\nsys.path.insert(0,'/app')\nfrom language import load, InvalidProgram, StaticError\nfrom checker import check\nfrom interpreter import run\n\nKINDS=['int','text','bool','unit']\n\ndef lit_of(k, rng):\n    if k=='int': return ['lit', rng.randint(-10,10)]\n    if k=='text': return ['lit', rng.choice(['','a','bc','xyz','hello'])]\n    if k=='bool': return ['lit', rng.choice([True,False])]\n    return ['lit', None]\n\nclass Gen:\n    def __init__(self, rng, cells):\n        self.rng=rng\n        self.bounds={c:frozenset(t) for c,t in cells.items()}\n        self.counter=0\n    def fresh(self):\n        self.counter+=1\n        return 'v%d'%self.counter\n\n    # type rep: ('s', frozenset) or ('f', result_type, frozenset(writes))\n    def gen_scalar(self, k, env, facts, depth):\n        # returns expr with static type exactly {k}\n        rng=self.rng\n        opts=['lit']\n        for n,t in env.items():\n            if t[0]=='s' and t[1]==f"
+    },
+    {
+      "step": 35236,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "accepted 10905 found 0\n"
+    },
+    {
+      "step": 45775,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 << 'EOF'\nimport json\nfrom language import load, StaticError, InvalidProgram\nfrom checker import check\nfrom interpreter import run\n\ndef ev(p):\n    text=json.dumps(p)\n    try:\n        prog=load(text)\n    except Exception as e:\n        return ('invalid', str(e))\n    try:\n        check(prog)\n    except StaticError as e:\n        return ('static_error', str(e))\n    r=run(prog)\n    return (r['status'], r.get('message',''))\n\n# Probe 1: function writes a cell; after call, facts widened to bounds.\np1={'cells':{'box':{'types':['int','text'],'value':0}},\n    'inputs':{},\n    'body':[\n      ['let','f',['fn', [['set','box',['lit','hi']]], ['lit',0]]],\n      ['eval',['call',['var','f']]],\n      # now box should be {int,text} per checker; runtime box=\"hi\"\n      ['eval',['add',['get','box'],['lit',1]]]   # checker should REJECT (union)\n    ]}\nprint('p1', ev(p1))\n\n# Probe 2: is-refinement prunes else branch\np2={'cells':{'box':{'types':['int','text'],'value':0}},\n    'inputs':{},\n    '"
+    },
+    {
+      "step": 45776,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "p1 ('static_error', 'expected int')\np2 ('normal', '')\n"
+    },
+    {
+      "step": 53085,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 << 'EOF'\nimport json\nfrom language import load, StaticError\nfrom checker import check\nfrom interpreter import run\n\np={\n \"cells\": {\"box\": {\"types\": [\"int\",\"text\"], \"value\": 0}},\n \"inputs\": {},\n \"body\": [\n   [\"let\",\"g\",[\"fn\",[],[\"lit\",0]]],\n   [\"let\",\"f\",[\"fn\",[],[\"fn\",[],[\"lit\",0]]]],\n   [\"repeat\",[\"lit\",2],[\n       [\"assign\",\"f\",[\"fn\",[],[\"var\",\"g\"]]],\n       [\"assign\",\"g\",[\"fn\",[[\"set\",\"box\",[\"lit\",\"hi\"]]],[\"lit\",0]]]\n   ]],\n   [\"eval\",[\"call\",[\"call\",[\"var\",\"f\"]]]],\n   [\"eval\",[\"add\",[\"get\",\"box\"],[\"lit\",1]]]\n ]\n}\ntext=json.dumps(p)\nprog=load(text)\ntry:\n    check(prog)\n    print(\"ACCEPTED\")\nexcept StaticError as e:\n    print(\"static_error:\", e)\nr=run(prog)\nprint(\"status:\", r['status'], r.get('message',''), \"steps:\", r['steps'])\nEOF"
+    },
+    {
+      "step": 53086,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "ACCEPTED\nstatus: type_error expected int, got text steps: 26\n"
+    },
+    {
+      "step": 53554,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 << 'EOF'\nimport json\np={\n \"cells\": {\"box\": {\"types\": [\"int\",\"text\"], \"value\": 0}},\n \"inputs\": {},\n \"body\": [\n   [\"let\",\"g\",[\"fn\",[],[\"lit\",0]]],\n   [\"let\",\"f\",[\"fn\",[],[\"fn\",[],[\"lit\",0]]]],\n   [\"repeat\",[\"lit\",2],[\n       [\"assign\",\"f\",[\"fn\",[],[\"var\",\"g\"]]],\n       [\"assign\",\"g\",[\"fn\",[[\"set\",\"box\",[\"lit\",\"hi\"]]],[\"lit\",0]]]\n   ]],\n   [\"eval\",[\"call\",[\"call\",[\"var\",\"f\"]]]],\n   [\"eval\",[\"add\",[\"get\",\"box\"],[\"lit\",1]]]\n ]\n}\nopen('/app/witness.json','w').write(json.dumps(p,indent=1))\nprint(\"bytes:\", len(json.dumps(p)))\nEOF\npython3 /app/evaluate.py /app/witness.json; echo \"exit=$?\""
+    },
+    {
+      "step": 53555,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "bytes: 400\n{\n  \"status\": \"type_error\",\n  \"message\": \"expected int, got text\",\n  \"steps\": 26,\n  \"trace\": [\n    {\n      \"step\": 1,\n      \"operation\": \"stmt:let\"\n    },\n    {\n      \"step\": 2,\n      \"operation\": \"expr:fn\"\n    },\n    {\n      \"step\": 3,\n      \"operation\": \"stmt:let\"\n    },\n    {\n      \"step\": 4,\n      \"operation\": \"expr:fn\"\n    },\n    {\n      \"step\": 5,\n      \"operation\": \"stmt:repeat\"\n    },\n    {\n      \"step\": 6,\n      \"operation\": \"expr:lit\"\n    },\n    {\n      \"step\": 7,\n      \"operation\": \"stmt:assign\"\n    },\n    {\n      \"step\": 8,\n      \"operation\": \"expr:fn\"\n    },\n    {\n      \"step\": 9,\n      \"operation\": \"stmt:assign\"\n    },\n    {\n      \"step\": 10,\n      \"operation\": \"expr:fn\"\n    },\n    {\n      \"step\": 11,\n      \"operation\": \"stmt:assign\"\n    },\n    {\n      \"step\": 12,\n      \"operation\": \"expr:fn\"\n    },\n    {\n      \"step\": 13,\n      \"operation\": \"stmt:assign\"\n    },\n    {\n      \"step\": 14,\n      \"operation\": \"expr:fn\"\n    },\n    {\n      \"step\": 15,\n      \"operation\": \"stmt:eval\"\n    },\n    {\n      \"step\": 16,\n      \"operation\": \"expr:call\"\n    },\n    {\n      \"step\": 17,\n      \"operation\": \"expr:call\"\n    },\n    {\n      \"step\": 18,\n      \"operation\": \"expr:var\"\n"
+    },
+    {
+      "step": 53912,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 << 'EOF'\nimport json\nfrom language import load, validate\ntext=open('/app/witness.json').read()\nprint(\"file bytes:\", len(text.encode('utf-8')), \"(limit 65536)\")\np=load(text)\n# count nodes + depth via validate (returns count)\nprint(\"AST nodes:\", validate(p), \"(limit 512)\")\n# depth check\ndef depth(e, d=0):\n    if isinstance(e, list):\n        if not e: return d\n        return max(depth(x, d+1) for x in e)\n    return d\nprint(\"body depth:\", depth(p['body']), \"(limit 32)\")\nprint(\"max block len:\", max(len(b) for b in [p['body'], p['body'][2][2]]), \"(limit 128)\")\nEOF\nfor i in 1 2 3; do python3 /app/evaluate.py /app/witness.json >/dev/null; echo \"run$i exit=$?\"; done\nls -la /app/witness.json"
+    },
+    {
+      "step": 53913,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "file bytes: 930 (limit 65536)\nAST nodes: 25 (limit 512)\nbody depth: 8 (limit 32)\nmax block len: 5 (limit 128)\nrun1 exit=0\nrun2 exit=0\nrun3 exit=0\n-rw-r--r-- 1 agent agent 930 Oct  8 21:01 /app/witness.json\n"
+    }
+  ]
+}

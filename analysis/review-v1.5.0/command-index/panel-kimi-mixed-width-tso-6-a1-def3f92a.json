@@ -1,0 +1,201 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-mixed-width-tso-6-a1-def3f92a",
+    "task": "mixed-width-tso",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 6,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-kimi-mixed-width-tso-6-a1-def3f92a.json",
+    "tool_calls": 10,
+    "agent_elapsed_seconds": 447.633058,
+    "input_tokens": 102428,
+    "output_tokens": 9908,
+    "uncached_cost_estimate": 0.455904,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "fa17ec898523ae3d770d3f9e20b3f4021ed99ee1214b4901a24a8ff6da74f00b",
+    "network_mode": "none",
+    "artifact_sha256": "c111565b1ef0bc486adb748324460ea8052f19478fe03079f5d715fc39662574",
+    "normalized_artifact_sha256": "b815645ee805fbe3944027d47feb4d53bc183de04bb071eb4299f79e7739a19f",
+    "terminal_nonzero_or_error_text_events": 2,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [],
+    "final_artifact_literal_written_by_30_min": false,
+    "first_literal_final_artifact_seconds": null,
+    "event_counts": {
+      "initial": 1,
+      "request": 11,
+      "stream_chunk": 9438,
+      "response": 11,
+      "terminal_call": 10,
+      "terminal_result": 10,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 47,
+      "time": "2026-10-08T20:31:39.140370+00:00",
+      "tool_call_id": "call_81896217f8f7464cbb506b2c",
+      "command": "ls -la /app && cat /app/main.py && cat /app/smoke.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 71,
+      "time": "2026-10-08T20:31:43.718701+00:00",
+      "tool_call_id": "call_f0a233d3b417421d800a9a2e",
+      "command": "cat /app/public_contract.py && cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 4467,
+      "time": "2026-10-08T20:33:49.954564+00:00",
+      "tool_call_id": "call_3ff018d0d73c4e69b6d79eaf",
+      "command": "python3 --version && ls /app",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 5372,
+      "time": "2026-10-08T20:34:10.832180+00:00",
+      "tool_call_id": "call_8f95c26383da499586bdd8b9",
+      "command": "cat > /app/main.py << 'EOF'\nimport json\nimport sys\nfrom functools import lru_cache\n\nsys.setrecursionlimit(100000)\n\n\ndef solve(request):\n    mem0 = tuple(request[\"memory\"])\n    progs = [tuple(tuple(ins) for ins in t) for t in request[\"threads\"]]\n    n = len(progs)\n\n    # Abstract state: (memory tuple, program counters tuple, buffers tuple).\n    # Each buffer is a tuple of (address, width, value) stores, FIFO.\n    # go() returns the frozenset of (obs, final_memory) where obs is a tuple\n    # of per-thread tuples of values observed from this state onward.\n    @lru_cache(maxsize=None)\n    def go(mem, pcs, bufs):\n        results = set()\n        terminal = True\n        for t in range(n):\n            pc = pcs[t]\n            buf = bufs[t]\n            prog = progs[t]\n            if pc < len(prog):\n                terminal = False\n                ins = prog[pc]\n                op = ins[0]\n                npcs = pcs[:t] + (pc + 1,) + pcs[t + 1:]\n                if op == \"store\":\n                    nbufs = bufs[:t] + (buf + ((ins[1], ins[2], ins[3]),),) + bufs[t + 1:]\n                    results.update(go(mem, npcs, nbufs))\n                elif op == \"load\":\n                    addr, width = ins[1], ins[2]\n                    val = 0\n                    for i in range(width):\n                        a = addr + i\n                        b = mem[a]\n                        for sa, sw, sv in reversed(buf):\n                            if sa <= a < sa + sw:\n                                b = (sv >> (8 * (a - sa))) & 0xFF\n                                break\n                        val |= ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6463,
+      "time": "2026-10-08T20:34:37.190465+00:00",
+      "tool_call_id": "call_06edc0fece37415080691267",
+      "command": "cat > /tmp/brute.py << 'EOF'\nimport json, sys, itertools\n\ndef brute(request):\n    mem0 = tuple(request['memory'])\n    progs = [list(t) for t in request['threads']]\n    n = len(progs)\n    outcomes = set()\n    # state: mem, pcs, bufs, obs ; DFS over all executions\n    stack = [(mem0, tuple([0]*n), tuple([()]*n), tuple([()]*n))]\n    while stack:\n        mem, pcs, bufs, obs = stack.pop()\n        moved = False\n        for t in range(n):\n            pc, buf, prog = pcs[t], bufs[t], progs[t]\n            if pc < len(prog):\n                ins = prog[pc]; op = ins[0]\n                npcs = pcs[:t]+(pc+1,)+pcs[t+1:]\n                if op == 'store':\n                    stack.append((mem, npcs, bufs[:t]+(buf+((ins[1],ins[2],ins[3]),),)+bufs[t+1:], obs)); moved=True\n                elif op == 'load':\n                    addr,width = ins[1],ins[2]; val=0\n                    for i in range(width):\n                        a=addr+i; b=mem[a]\n                        for sa,sw,sv in reversed(buf):\n                            if sa<=a<sa+sw:\n                                b=(sv>>(8*(a-sa)))&0xFF; break\n                        val |= b<<(8*i)\n                    stack.append((mem, npcs, bufs, obs[:t]+(obs[t]+(val,),)+obs[t+1:])); moved=True\n                elif op == 'fence':\n                    if not buf:\n                        stack.append((mem, npcs, bufs, obs)); moved=True\n                elif op == 'xchg':\n                    if not buf:\n                        addr,width,sv=ins[1],ins[2],ins[3]; val=0\n                        for i in range(width): val |= mem[addr+i]<<(8*i)\n           ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6897,
+      "time": "2026-10-08T20:34:49.250844+00:00",
+      "tool_call_id": "call_9ccd23a74e824681bd52ccb4",
+      "command": "cd /app && sed -i 's/obs\\[t\\] + (val,)/(val,) + obs[t]/g' main.py && python3 smoke.py && python3 /tmp/brute.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 7827,
+      "time": "2026-10-08T20:38:04.935210+00:00",
+      "tool_call_id": "call_c4e02ffa40d54b19bbd16e95",
+      "command": "cat > /tmp/stress.py << 'EOF'\nimport json, sys, time, random, subprocess\nsys.path.insert(0,'/app')\nfrom main import solve\n\ncases = []\n# Adversarial: 3 threads, 10 instrs total, overlapping wide stores, 8 bytes\ncases.append({'memory':[0]*8,'threads':[\n  [['store',0,4,0xDEADBEEF],['store',2,2,0x1234],['load',0,4],['fence']],\n  [['store',1,4,0xA5A5A5A5],['store',0,1,0xFF],['load',0,2],['load',4,4]],\n  [['store',4,4,0x0F0F0F0F],['load',0,4]],\n]})\n# all stores max\ncases.append({'memory':[0]*8,'threads':[\n  [['store',0,4,1],['store',4,4,2],['store',0,2,3],['store',1,1,4]],\n  [['store',2,4,5],['store',0,4,6],['store',3,2,7],['store',5,1,8]],\n  [['store',6,2,9],['store',0,1,10]],\n]})\n# mixed with xchg/fence\ncases.append({'memory':[0]*8,'threads':[\n  [['store',0,4,1],['xchg',4,4,2],['load',0,4],['fence']],\n  [['store',4,4,3],['xchg',0,4,4],['load',4,4],['fence']],\n  [['xchg',0,2,5],['load',0,4]],\n]})\n# loads heavy\ncases.append({'memory':[1,2,3,4,5,6,7,8],'threads':[\n  [['load',0,4],['load',4,4],['load',0,2],['load',2,2]],\n  [['store',0,4,9],['load',0,4],['load',4,4],['store',4,4,10]],\n  [['store',2,4,11],['load',0,4]],\n]})\nrng=random.Random(999)\nfor _ in range(20):\n    memsz=8\n    threads=[]; left=10\n    for t in range(3):\n        c=min(4,left); c=rng.randint(0,c); left-=c\n        prog=[]\n        for _ in range(c):\n            w=rng.choice([1,2,4]); addr=rng.randint(0,memsz-w)\n            op=rng.choice(['store','store','load','fence','xchg'])\n            if op=='store': prog.append(['store',addr,w,rng.randint(0,(1<<(8*w))-1)])\n            elif op=='load': prog.append(['load',addr,w]",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 8455,
+      "time": "2026-10-08T20:38:22.036861+00:00",
+      "tool_call_id": "call_140c433b654a41dd958b8ceb",
+      "command": "cat > /tmp/sweep.py << 'EOF'\nimport json, sys, time, random\nsys.path.insert(0,'/app')\nfrom main import solve\n\nrng=random.Random(7)\nworst=0; worstreq=None\nfor trial in range(400):\n    memsz=rng.randint(1,8)\n    # force 10 instructions, 3 threads\n    while True:\n        counts=[rng.randint(1,4) for _ in range(3)]\n        if sum(counts)==10: break\n    threads=[]\n    for c in counts:\n        prog=[]\n        for _ in range(c):\n            w=rng.choice([1,2,4]); w=min(w,memsz)\n            addr=rng.randint(0,memsz-w)\n            op=rng.choice(['store','store','store','load','load','fence','xchg'])\n            if op=='store': prog.append(['store',addr,w,rng.randint(0,(1<<(8*w))-1)])\n            elif op=='load': prog.append(['load',addr,w])\n            elif op=='fence': prog.append(['fence'])\n            else: prog.append(['xchg',addr,w,rng.randint(0,(1<<(8*w))-1)])\n        threads.append(prog)\n    req={'memory':[rng.randint(0,255) for _ in range(memsz)],'threads':threads}\n    t0=time.time(); r=solve(req); d=time.time()-t0\n    if d>worst: worst=d; worstreq=req; print(f'trial {trial}: {d:.3f}s, {len(r[\"outcomes\"])} outcomes')\nprint('WORST', worst)\nprint(json.dumps(worstreq)[:300])\nEOF\npython3 /tmp/sweep.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 8874,
+      "time": "2026-10-08T20:38:41.957325+00:00",
+      "tool_call_id": "call_991479b4554b40f5a3eee095",
+      "command": "cd /app && printf '%s\\n' '{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]}' '{\"memory\":[5],\"threads\":[[]]}' '{\"memory\":[0,0,0,0],\"threads\":[[[\"xchg\",0,2,513]],[[\"load\",0,4]],[[\"store\",2,2,7],[\"fence\"],[\"load\",2,2],[\"load\",0,2]]]}' | python3 main.py | python3 -c \"\nimport sys,json\nfor line in sys.stdin:\n    r=json.loads(line)\n    ks=[json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True) for o in r['outcomes']]\n    assert len(ks)==len(set(ks)), 'duplicates!'\n    print(len(r['outcomes']),'outcomes;', 'sample:', json.dumps(r['outcomes'][0])[:120])\n\" && python3 smoke.py && echo OK",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 8967,
+      "time": "2026-10-08T20:38:47.021380+00:00",
+      "tool_call_id": "call_856dc3d124da4c8d9f793c99",
+      "command": "cat /app/main.py",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 48,
+      "time": "2026-10-08T20:31:40.927357+00:00",
+      "tool_call_id": "call_81896217f8f7464cbb506b2c",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:31 ..\n-rw-r--r-- 1 agent agent 2506 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\nimport json, sys\ndef solve(request):\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nif __name__ == '__main__':\n    for line in sys.stdin:\n        print(json.dumps(solve(json.loads(line))))\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:31 ..\n-rw-r--r-- 1 agent agent 2506 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\nimport json, sys\ndef solve(request):\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nif __name__ == '__main__':\n    for line in sys.stdin:\n        print(json.dumps(solve(json.loads(line))))\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 6464,
+      "time": "2026-10-08T20:34:37.566938+00:00",
+      "tool_call_id": "call_06edc0fece37415080691267",
+      "return_code": 1,
+      "stdout": "MISMATCH 0 {\"memory\": [85, 75, 105, 39, 97, 174, 164], \"threads\": [[], [[\"xchg\", 2, 1, 82], [\"xchg\", 0, 2, 34221]], [[\"load\", 1, 4], [\"store\", 5, 2, 54017]]]}\nsolve: ['{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [19285, 105], [1629966923]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [19285, 105], [1629966981]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [19285, 105], [1629972811]]}']\nbrute: ['{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [105, 19285], [1629966923]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [105, 19285], [1629966981]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [105, 19285], [1629972811]]}']\n",
+      "stderr": "",
+      "stdout_tail": "MISMATCH 0 {\"memory\": [85, 75, 105, 39, 97, 174, 164], \"threads\": [[], [[\"xchg\", 2, 1, 82], [\"xchg\", 0, 2, 34221]], [[\"load\", 1, 4], [\"store\", 5, 2, 54017]]]}\nsolve: ['{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [19285, 105], [1629966923]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [19285, 105], [1629966981]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [19285, 105], [1629972811]]}']\nbrute: ['{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [105, 19285], [1629966923]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [105, 19285], [1629966981]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [105, 19285], [1629972811]]}']\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 6463,
+      "kind": "terminal_call",
+      "summary": "cat > /tmp/brute.py << 'EOF'\nimport json, sys, itertools\n\ndef brute(request):\n    mem0 = tuple(request['memory'])\n    progs = [list(t) for t in request['threads']]\n    n = len(progs)\n    outcomes = set()\n    # state: mem, pcs, bufs, obs ; DFS over all executions\n    stack = [(mem0, tuple([0]*n), tuple([()]*n), tuple([()]*n))]\n    while stack:\n        mem, pcs, bufs, obs = stack.pop()\n        moved = False\n        for t in range(n):\n            pc, buf, prog = pcs[t], bufs[t], progs[t]\n            if pc < len(prog):\n                ins = prog[pc]; op = ins[0]\n                npcs = pcs[:t]+(pc+1,)+pcs[t+1:]\n                if op == 'store':\n                    stack.append((mem, npcs, bufs[:t]+(buf+((ins[1],ins[2],ins[3]),),)+bufs[t+1:], obs)); moved=True\n                elif op == 'load':\n                    addr,width = ins[1],ins[2]; val=0\n                    for i in range(width):\n                        a=addr+i; b=mem[a]\n                        for sa,sw,sv in reversed(buf):\n     "
+    },
+    {
+      "step": 6464,
+      "kind": "terminal_result",
+      "return_code": 1,
+      "summary": "MISMATCH 0 {\"memory\": [85, 75, 105, 39, 97, 174, 164], \"threads\": [[], [[\"xchg\", 2, 1, 82], [\"xchg\", 0, 2, 34221]], [[\"load\", 1, 4], [\"store\", 5, 2, 54017]]]}\nsolve: ['{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [19285, 105], [1629966923]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [19285, 105], [1629966981]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [19285, 105], [1629972811]]}']\nbrute: ['{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [105, 19285], [1629966923]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [105, 19285], [1629966981]]}', '{\"memory\": [173, 133, 82, 39, 97, 1, 211], \"reads\": [[], [105, 19285], [1629972811]]}']\n"
+    },
+    {
+      "step": 6897,
+      "kind": "terminal_call",
+      "summary": "cd /app && sed -i 's/obs\\[t\\] + (val,)/(val,) + obs[t]/g' main.py && python3 smoke.py && python3 /tmp/brute.py"
+    },
+    {
+      "step": 6898,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\nAll 3000 random cases match\n"
+    },
+    {
+      "step": 7827,
+      "kind": "terminal_call",
+      "summary": "cat > /tmp/stress.py << 'EOF'\nimport json, sys, time, random, subprocess\nsys.path.insert(0,'/app')\nfrom main import solve\n\ncases = []\n# Adversarial: 3 threads, 10 instrs total, overlapping wide stores, 8 bytes\ncases.append({'memory':[0]*8,'threads':[\n  [['store',0,4,0xDEADBEEF],['store',2,2,0x1234],['load',0,4],['fence']],\n  [['store',1,4,0xA5A5A5A5],['store',0,1,0xFF],['load',0,2],['load',4,4]],\n  [['store',4,4,0x0F0F0F0F],['load',0,4]],\n]})\n# all stores max\ncases.append({'memory':[0]*8,'threads':[\n  [['store',0,4,1],['store',4,4,2],['store',0,2,3],['store',1,1,4]],\n  [['store',2,4,5],['store',0,4,6],['store',3,2,7],['store',5,1,8]],\n  [['store',6,2,9],['store',0,1,10]],\n]})\n# mixed with xchg/fence\ncases.append({'memory':[0]*8,'threads':[\n  [['store',0,4,1],['xchg',4,4,2],['load',0,4],['fence']],\n  [['store',4,4,3],['xchg',0,4,4],['load',4,4],['fence']],\n  [['xchg',0,2,5],['load',0,4]],\n]})\n# loads heavy\ncases.append({'memory':[1,2,3,4,5,6,7,8],'threads':[\n  [['load',0,4],['load',4,4]"
+    },
+    {
+      "step": 7828,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "case 0: 251 outcomes, 0.008s\ncase 1: 26 outcomes, 0.009s\ncase 2: 51 outcomes, 0.001s\ncase 3: 162 outcomes, 0.003s\ncase 4: 3 outcomes, 0.000s\ncase 5: 2 outcomes, 0.000s\ncase 6: 1 outcomes, 0.000s\ncase 7: 2 outcomes, 0.000s\ncase 8: 1 outcomes, 0.000s\ncase 9: 30 outcomes, 0.000s\ncase 10: 5 outcomes, 0.000s\ncase 11: 1 outcomes, 0.000s\ncase 12: 29 outcomes, 0.000s\ncase 13: 9 outcomes, 0.000s\ncase 14: 6 outcomes, 0.000s\ncase 15: 1 outcomes, 0.000s\ncase 16: 1 outcomes, 0.000s\ncase 17: 6 outcomes, 0.000s\ncase 18: 1 outcomes, 0.000s\ncase 19: 1 outcomes, 0.000s\ncase 20: 3 outcomes, 0.000s\ncase 21: 23 outcomes, 0.002s\ncase 22: 2 outcomes, 0.000s\ncase 23: 36 outcomes, 0.000s\nTOTAL 0.024s, 653 outcomes\n"
+    },
+    {
+      "step": 8455,
+      "kind": "terminal_call",
+      "summary": "cat > /tmp/sweep.py << 'EOF'\nimport json, sys, time, random\nsys.path.insert(0,'/app')\nfrom main import solve\n\nrng=random.Random(7)\nworst=0; worstreq=None\nfor trial in range(400):\n    memsz=rng.randint(1,8)\n    # force 10 instructions, 3 threads\n    while True:\n        counts=[rng.randint(1,4) for _ in range(3)]\n        if sum(counts)==10: break\n    threads=[]\n    for c in counts:\n        prog=[]\n        for _ in range(c):\n            w=rng.choice([1,2,4]); w=min(w,memsz)\n            addr=rng.randint(0,memsz-w)\n            op=rng.choice(['store','store','store','load','load','fence','xchg'])\n            if op=='store': prog.append(['store',addr,w,rng.randint(0,(1<<(8*w))-1)])\n            elif op=='load': prog.append(['load',addr,w])\n            elif op=='fence': prog.append(['fence'])\n            else: prog.append(['xchg',addr,w,rng.randint(0,(1<<(8*w))-1)])\n        threads.append(prog)\n    req={'memory':[rng.randint(0,255) for _ in range(memsz)],'threads':threads}\n    t0=time.time(); r"
+    },
+    {
+      "step": 8456,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "trial 0: 0.000s, 6 outcomes\ntrial 1: 0.001s, 31 outcomes\ntrial 2: 0.006s, 1087 outcomes\ntrial 4: 0.011s, 624 outcomes\ntrial 61: 0.012s, 616 outcomes\ntrial 94: 0.014s, 1963 outcomes\ntrial 107: 0.020s, 1845 outcomes\ntrial 115: 0.030s, 698 outcomes\nWORST 0.02971482276916504\n{\"memory\": [105, 182, 78, 46, 73, 21], \"threads\": [[[\"store\", 4, 1, 93], [\"xchg\", 3, 2, 26480], [\"xchg\", 1, 2, 61514], [\"store\", 1, 1, 123]], [[\"store\", 3, 2, 65243], [\"load\", 0, 2], [\"load\", 1, 2]], [[\"store\", 3, 2, 64661], [\"store\", 1, 1, 147], [\"store\", 1, 4, 274602822]]]}\n"
+    },
+    {
+      "step": 8874,
+      "kind": "terminal_call",
+      "summary": "cd /app && printf '%s\\n' '{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]}' '{\"memory\":[5],\"threads\":[[]]}' '{\"memory\":[0,0,0,0],\"threads\":[[[\"xchg\",0,2,513]],[[\"load\",0,4]],[[\"store\",2,2,7],[\"fence\"],[\"load\",2,2],[\"load\",0,2]]]}' | python3 main.py | python3 -c \"\nimport sys,json\nfor line in sys.stdin:\n    r=json.loads(line)\n    ks=[json.dumps({'reads':o['reads'],'memory':o['memory']},sort_keys=True) for o in r['outcomes']]\n    assert len(ks)==len(set(ks)), 'duplicates!'\n    print(len(r['outcomes']),'outcomes;', 'sample:', json.dumps(r['outcomes'][0])[:120])\n\" && python3 smoke.py && echo OK"
+    },
+    {
+      "step": 8875,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "4 outcomes; sample: {\"reads\": [[0], [1]], \"memory\": [1, 1]}\n1 outcomes; sample: {\"reads\": [[]], \"memory\": [5]}\n7 outcomes; sample: {\"reads\": [[0], [459265], [7, 0]], \"memory\": [1, 2, 7, 0]}\nPassed 3 public examples\nOK\n"
+    },
+    {
+      "step": 8967,
+      "kind": "terminal_call",
+      "summary": "cat /app/main.py"
+    },
+    {
+      "step": 8968,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "import json\nimport sys\nfrom functools import lru_cache\n\nsys.setrecursionlimit(100000)\n\n\ndef solve(request):\n    mem0 = tuple(request[\"memory\"])\n    progs = [tuple(tuple(ins) for ins in t) for t in request[\"threads\"]]\n    n = len(progs)\n\n    # Abstract state: (memory tuple, program counters tuple, buffers tuple).\n    # Each buffer is a tuple of (address, width, value) stores, FIFO.\n    # go() returns the frozenset of (obs, final_memory) where obs is a tuple\n    # of per-thread tuples of values observed from this state onward.\n    @lru_cache(maxsize=None)\n    def go(mem, pcs, bufs):\n        results = set()\n        terminal = True\n        for t in range(n):\n            pc = pcs[t]\n            buf = bufs[t]\n            prog = progs[t]\n            if pc < len(prog):\n                terminal = False\n                ins = prog[pc]\n                op = ins[0]\n                npcs = pcs[:t] + (pc + 1,) + pcs[t + 1:]\n                if op == \"store\":\n                    nbufs = bufs[:t] + (buf + ((ins[1], ins[2], ins[3]),),) + bufs[t + 1:]\n                    results.update(go(mem, npcs, nbufs))\n                elif op == \"load\":\n                    addr, width = ins[1], ins[2]\n             "
+    }
+  ]
+}

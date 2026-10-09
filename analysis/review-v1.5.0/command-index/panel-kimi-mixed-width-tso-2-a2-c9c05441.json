@@ -1,0 +1,273 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-mixed-width-tso-2-a2-c9c05441",
+    "task": "mixed-width-tso",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 2,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-kimi-mixed-width-tso-2-a2-c9c05441.json",
+    "tool_calls": 15,
+    "agent_elapsed_seconds": 366.939892,
+    "input_tokens": 156109,
+    "output_tokens": 12614,
+    "uncached_cost_estimate": 0.6575369999999999,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "e148390eb6faab7ebfd31945d47627d5b343f8d9baab8198d6db725df54bbdb7",
+    "network_mode": "none",
+    "artifact_sha256": "fabd39e83cfa9cd39648f78c3293dcd53bc7df073fec00552b9a187b5b37099f",
+    "normalized_artifact_sha256": "f4c2dd11e0e4e34724ed48f1dd8ea47830d362e54c263b42704b0b723fb4e6eb",
+    "terminal_nonzero_or_error_text_events": 5,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 4898,
+        "time": "2026-10-08T20:27:11.045682+00:00",
+        "artifact_sha256": "fabd39e83cfa9cd39648f78c3293dcd53bc7df073fec00552b9a187b5b37099f",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 148.551809,
+    "event_counts": {
+      "initial": 1,
+      "request": 14,
+      "stream_chunk": 12048,
+      "response": 14,
+      "terminal_call": 15,
+      "terminal_result": 15,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 42,
+      "time": "2026-10-08T20:24:54.397342+00:00",
+      "tool_call_id": "call_2a1e28d1c6354c51b09b809a",
+      "command": "ls -la /app && cat /app/main.py && cat /app/smoke.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 66,
+      "time": "2026-10-08T20:25:08.607510+00:00",
+      "tool_call_id": "call_ed3d09126fe54143a0580450",
+      "command": "cat /app/public_contract.py && cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 4898,
+      "time": "2026-10-08T20:27:11.045682+00:00",
+      "tool_call_id": "call_f156e20438eb4c0c987023e4",
+      "command": "cat > /app/main.py <<'EOF'\nimport json\nimport sys\n\n\ndef enumerate_outcomes(request):\n    initial_memory = tuple(request[\"memory\"])\n    programs = [tuple(tuple(ins) for ins in thread) for thread in request[\"threads\"]]\n    n = len(programs)\n\n    # State: (shared memory bytes, program counters, per-thread FIFO store\n    # buffers of (address, width, value), per-thread observation lists).\n    start = (initial_memory, (0,) * n, ((),) * n, ((),) * n)\n\n    outcomes = set()\n    seen = {start}\n    stack = [start]\n\n    while stack:\n        memory, pcs, buffers, observations = stack.pop()\n\n        if all(pcs[t] == len(programs[t]) and not buffers[t] for t in range(n)):\n            outcomes.add((observations, memory))\n            continue\n\n        for t in range(n):\n            # Transition 1: execute the thread's next instruction.\n            if pcs[t] < len(programs[t]):\n                ins = programs[t][pcs[t]]\n                op = ins[0]\n                next_pcs = pcs[:t] + (pcs[t] + 1,) + pcs[t + 1:]\n\n                if op == \"store\":\n                    _, addr, width, value = ins\n                    entry = (addr, width, value)\n                    next_buffers = buffers[:t] + (buffers[t] + (entry,),) + buffers[t + 1:]\n                    nxt = (memory, next_pcs, next_buffers, observations)\n                    if nxt not in seen:\n                        seen.add(nxt)\n                        stack.append(nxt)\n\n                elif op == \"load\":\n                    _, addr, width = ins\n                    value = 0\n                    for i in range(width):\n                        ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6325,
+      "time": "2026-10-08T20:27:47.469744+00:00",
+      "tool_call_id": "call_a10cb0710d684d939ed36885",
+      "command": "mkdir -p /tmp/t && cat > /tmp/t/fuzz.py <<'EOF'\nimport json, random, subprocess, sys, itertools\n\ndef random_case(rng):\n    memsize = rng.randint(1, 8)\n    memory = [rng.randint(0, 255) for _ in range(memsize)]\n    nthreads = rng.randint(1, 3)\n    total_budget = 10\n    threads = []\n    for _ in range(nthreads):\n        k = rng.randint(0, min(4, total_budget))\n        total_budget -= k\n        prog = []\n        for _ in range(k):\n            op = rng.choice([\"store\", \"load\", \"fence\", \"xchg\"])\n            if op == \"store\" or op == \"xchg\":\n                w = rng.choice([1, 2, 4])\n                if memsize < w: \n                    prog.append([\"fence\"]); continue\n                a = rng.randint(0, memsize - w)\n                v = rng.randint(0, (1 << (8*w)) - 1)\n                prog.append([op, a, w, v])\n            elif op == \"load\":\n                w = rng.choice([1, 2, 4])\n                if memsize < w:\n                    prog.append([\"fence\"]); continue\n                a = rng.randint(0, memsize - w)\n                prog.append([\"load\", a, w])\n            else:\n                prog.append([\"fence\"])\n        threads.append(prog)\n    return {\"memory\": memory, \"threads\": threads}\n\ndef random_terminal_outcomes(case, rng, trials):\n    \"\"\"Randomly explore executions; collect terminal outcomes reached.\"\"\"\n    memory0 = case[\"memory\"]\n    progs = case[\"threads\"]\n    n = len(progs)\n    found = set()\n    for _ in range(trials):\n        mem = list(memory0)\n        pcs = [0]*n\n        bufs = [[] for _ in range(n)]\n        obs = [[] for _ in range(n)]\n        while True:\n           ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 7349,
+      "time": "2026-10-08T20:28:19.507965+00:00",
+      "tool_call_id": "call_74708a2356ae4a6f98e42f29",
+      "command": "cat > /tmp/t/targeted.py <<'EOF'\nimport json, subprocess, sys\n\ndef run(cases):\n    inp = \"\".join(json.dumps(c) + \"\\n\" for c in cases)\n    p = subprocess.run([sys.executable, \"/app/main.py\"], input=inp, text=True,\n                       capture_output=True, cwd=\"/app\")\n    assert p.returncode == 0, p.stderr\n    return [json.loads(l) for l in p.stdout.splitlines()]\n\ndef norm(resp):\n    return sorted(json.dumps({\"reads\": o[\"reads\"], \"memory\": o[\"memory\"]}, sort_keys=True) for o in resp[\"outcomes\"])\n\ndef expect(resp, wanted):\n    got = norm(resp)\n    want = sorted(json.dumps(w, sort_keys=True) for w in wanted)\n    assert got == want, f\"\\nGOT:\\n\" + \"\\n\".join(got) + \"\\nWANT:\\n\" + \"\\n\".join(want)\n\ncases = []\n\n# 1. Fence forces drain before load: T0 store x=1; fence; load x -> always 1\ncases.append({\"memory\":[0],\"threads\":[[[\"store\",0,1,1],[\"fence\"],[\"load\",0,1]]]})\n\n# 2. xchg blocked while buffer nonempty: T0 store x=1; xchg x<-2 -> obs always 1 (store drained first)\ncases.append({\"memory\":[0],\"threads\":[[[\"store\",0,1,1],[\"xchg\",0,1,2]]]})\n\n# 3. Drain after thread finishes: T0: store x=5 only. Terminal memory must be [5].\ncases.append({\"memory\":[0],\"threads\":[[[\"store\",0,1,5]]]})\n\n# 4. Load forwarding from own buffer across partial overlap with memory stale byte.\n# mem=[9,9]; store (0,2,0x0201); load(1,1) -> 2 always (from buffer or drained).\ncases.append({\"memory\":[9,9],\"threads\":[[[\"store\",0,2,0x0201],[\"load\",1,1]]]})\n\n# 5. xchg reads memory directly (no forwarding needed, buffer empty), two threads racing xchg on same byte.\ncases.append({\"memory\":[0],\"threads\":[[[\"xchg\",0,1,7]]",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 8693,
+      "time": "2026-10-08T20:28:51.095186+00:00",
+      "tool_call_id": "call_d253d10580f444d190fff6a5",
+      "command": "cat > /tmp/t/targeted.py <<'EOF'\nimport json, subprocess, sys\n\ndef run(cases):\n    inp = \"\".join(json.dumps(c) + \"\\n\" for c in cases)\n    p = subprocess.run([sys.executable, \"/app/main.py\"], input=inp, text=True,\n                       capture_output=True, cwd=\"/app\")\n    assert p.returncode == 0, p.stderr\n    return [json.loads(l) for l in p.stdout.splitlines()]\n\ndef norm(resp):\n    return sorted(json.dumps({\"reads\": o[\"reads\"], \"memory\": o[\"memory\"]}, sort_keys=True) for o in resp[\"outcomes\"])\n\ndef expect(name, resp, wanted):\n    got = norm(resp)\n    want = sorted(json.dumps(w, sort_keys=True) for w in wanted)\n    if got != want:\n        print(\"FAIL\", name)\n        print(\" GOT:\");  [print(\"  \", g) for g in got]\n        print(\" WANT:\"); [print(\"  \", w) for w in want]\n        sys.exit(1)\n    print(\"ok\", name)\n\ncases = [\n    # 0 fence forces drain before load\n    {\"memory\":[0],\"threads\":[[[\"store\",0,1,1],[\"fence\"],[\"load\",0,1]]]},\n    # 1 xchg blocked while buffer nonempty\n    {\"memory\":[0],\"threads\":[[[\"store\",0,1,1],[\"xchg\",0,1,2]]]},\n    # 2 drain after thread finished\n    {\"memory\":[0],\"threads\":[[[\"store\",0,1,5]]]},\n    # 3 forwarding, partial overlap with stale memory byte\n    {\"memory\":[9,9],\"threads\":[[[\"store\",0,2,0x0201],[\"load\",1,1]]]},\n    # 4 racing xchgs\n    {\"memory\":[0],\"threads\":[[[\"xchg\",0,1,7]],[[\"xchg\",0,1,9]]]},\n    # 5 wide load, one byte from buffer one from memory; same before/after drain\n    {\"memory\":[0x11,0x22],\"threads\":[[[\"store\",0,1,0xAA],[\"load\",0,2]]]},\n    # 6 two empty threads\n    {\"memory\":[3,4],\"threads\":[[],[]]},\n    # 7 other thread's lo",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 9230,
+      "time": "2026-10-08T20:29:07.508262+00:00",
+      "tool_call_id": "call_90c1746e3f7f4f97b91fd124",
+      "command": "cd /tmp/t && sed -i 's/{\"reads\":\\[\\[1,5\\]\\],\"memory\":\\[5\\]})/{\"reads\":[[1,5]],\"memory\":[5,0]})/' targeted.py && python3 targeted.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 9232,
+      "time": "2026-10-08T20:29:07.921209+00:00",
+      "tool_call_id": "call_5b02569b36864f4bb78f1d7b",
+      "command": "cat > /tmp/t/converge.py <<'EOF'\nimport json, random, subprocess, sys\nsys.path.insert(0, \"/tmp/t\")\nfrom fuzz import random_case, random_terminal_outcomes\n\nrng = random.Random(999)\nok = 0\nfor trial in range(60):\n    # small dense cases so random walks can cover everything\n    while True:\n        c = random_case(rng)\n        if sum(len(t) for t in c[\"threads\"]) <= 5:\n            break\n    p = subprocess.run([sys.executable, \"/app/main.py\"], input=json.dumps(c)+\"\\n\",\n                       text=True, capture_output=True, cwd=\"/app\")\n    assert p.returncode == 0, p.stderr\n    got = {json.dumps({\"reads\": o[\"reads\"], \"memory\": o[\"memory\"]}, sort_keys=True)\n           for o in json.loads(p.stdout)[\"outcomes\"]}\n    rand = random_terminal_outcomes(c, rng, 3000)\n    randk = {json.dumps({\"reads\": [list(o) for o in obs], \"memory\": list(mem)}, sort_keys=True)\n             for obs, mem in rand}\n    missing = randk - got\n    assert not missing, (\"random found extra\", c, missing)\n    # for very small programs random walks should cover all\n    if sum(len(t) for t in c[\"threads\"]) <= 4 and randk != got:\n        print(\"note: random walk did not cover all (case too big for 3000 walks?)\")\n        print(json.dumps(c)); print(\"uncovered:\", got - randk); sys.exit(1)\n    ok += 1\nprint(\"converge OK\", ok)\nEOF\npython3 /tmp/t/converge.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 9389,
+      "time": "2026-10-08T20:29:20.815920+00:00",
+      "tool_call_id": "call_d108e2d3775046d3a589214d",
+      "command": "cd /tmp/t && sed -i 's/\"memory\":\\[5\\]})/\"memory\":[5,0]})/' targeted.py && python3 targeted.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 9519,
+      "time": "2026-10-08T20:29:25.217746+00:00",
+      "tool_call_id": "call_ef00a278d9ac4432936db3df",
+      "command": "cd /tmp/t && grep -n 'xchg-then-load' targeted.py && python3 - <<'EOF'\nimport re\ns = open('targeted.py').read()\ns = s.replace('expect(\"xchg-then-load\", res[9], [{\"reads\":[[1,5]],\"memory\":[5]}])',\n              'expect(\"xchg-then-load\", res[9], [{\"reads\":[[1,5]],\"memory\":[5,0]}])')\nopen('targeted.py','w').write(s)\nEOF\npython3 targeted.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 10112,
+      "time": "2026-10-08T20:29:43.156707+00:00",
+      "tool_call_id": "call_c41c1adc735147139adf0cf7",
+      "command": "cat > /tmp/t/perf.py <<'EOF'\nimport json, random, subprocess, sys, time\n\ndef heavy(rng, nthreads, instrs, memsize, ops):\n    memory = [rng.randint(0,255) for _ in range(memsize)]\n    threads = []\n    for k in instrs:\n        prog = []\n        for _ in range(k):\n            op = rng.choice(ops)\n            w = rng.choice([1,2,4])\n            if op in (\"store\",\"xchg\"):\n                a = rng.randint(0, memsize-w)\n                prog.append([op,a,w,rng.randint(0,(1<<(8*w))-1)])\n            elif op == \"load\":\n                a = rng.randint(0, memsize-w)\n                prog.append([\"load\",a,w])\n            else:\n                prog.append([\"fence\"])\n        threads.append(prog)\n    return {\"memory\":memory,\"threads\":threads}\n\nrng = random.Random(7)\ncases = []\n# adversarial: max total instructions, narrow memory, overlapping widths, few fences\nfor _ in range(20):\n    cases.append(heavy(rng, 3, [4,4,2], 4, [\"store\",\"load\",\"xchg\"]))\nfor _ in range(20):\n    cases.append(heavy(rng, 3, [4,3,3], 8, [\"store\",\"load\",\"fence\",\"xchg\"]))\nfor _ in range(10):\n    cases.append(heavy(rng, 2, [4,4], 2, [\"store\",\"load\"]))\n\ninp = \"\".join(json.dumps(c)+\"\\n\" for c in cases)\nt0 = time.time()\np = subprocess.run([sys.executable, \"/app/main.py\"], input=inp, text=True,\n                   capture_output=True, cwd=\"/app\")\ndt = time.time()-t0\nassert p.returncode == 0, p.stderr\nlines = p.stdout.splitlines()\nassert len(lines) == len(cases)\ncounts = [len(json.loads(l)[\"outcomes\"]) for l in lines]\nprint(f\"{len(cases)} heavy cases in {dt:.2f}s; outcome counts min/avg/max: \"\n      f\"{min(counts)}/{sum(counts)/",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 10227,
+      "time": "2026-10-08T20:29:48.445520+00:00",
+      "tool_call_id": "call_e8edd0555ac5403fb1166bb2",
+      "command": "cd /tmp/t && python3 - <<'EOF'\ns=open('perf.py').read()\ns=s.replace('''            w = rng.choice([1,2,4])\n            if op in (\"store\",\"xchg\"):''','''            w = rng.choice([1,2,4])\n            if w > memsize: w = 1\n            if op in (\"store\",\"xchg\"):''')\nopen('perf.py','w').write(s)\nEOF\npython3 perf.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 11200,
+      "time": "2026-10-08T20:30:13.260003+00:00",
+      "tool_call_id": "call_980cec06d9e14386ba21b467",
+      "command": "cat > /tmp/t/perf2.py <<'EOF'\nimport json, subprocess, time, sys\n\ncases = []\n# Adversarial: 3 threads, 10 instrs, tiny memory, many overlapping stores + loads\ncases.append({\"memory\":[0,0],\"threads\":[\n    [[\"store\",0,1,1],[\"store\",1,1,2],[\"load\",0,2],[\"load\",1,1]],\n    [[\"store\",0,2,0x0304],[\"load\",0,1],[\"load\",1,1],[\"store\",1,1,5]],\n    [[\"store\",0,1,6],[\"load\",0,2]],\n]})\ncases.append({\"memory\":[0,0,0,0],\"threads\":[\n    [[\"store\",0,4,0x0B0C0D0E],[\"store\",1,2,0x0A0B],[\"load\",0,4],[\"fence\"]],\n    [[\"store\",2,2,0x0102],[\"load\",0,4],[\"xchg\",0,1,0xFF],[\"store\",3,1,7]],\n    [[\"load\",0,4],[\"store\",0,2,0x0909]],\n]})\ncases.append({\"memory\":[0],\"threads\":[\n    [[\"store\",0,1,1],[\"store\",0,1,2],[\"store\",0,1,3],[\"load\",0,1]],\n    [[\"load\",0,1],[\"load\",0,1],[\"load\",0,1],[\"load\",0,1]],\n    [[\"load\",0,1],[\"load\",0,1]],\n]})\n\ninp = \"\".join(json.dumps(c)+\"\\n\" for c in cases)\nt0=time.time()\np = subprocess.run([sys.executable,\"/app/main.py\"],input=inp,text=True,capture_output=True,cwd=\"/app\")\ndt=time.time()-t0\nassert p.returncode==0, p.stderr\nfor l in p.stdout.splitlines():\n    o=json.loads(l)[\"outcomes\"]\n    print(\"outcomes:\", len(o))\nprint(f\"total {dt:.2f}s\")\n\n# batch of 300 random max-size cases\nimport random\nrng=random.Random(3)\nbatch=[]\nfor _ in range(300):\n    memsize=rng.randint(1,8)\n    memory=[rng.randint(0,255) for _ in range(memsize)]\n    budget=10; threads=[]\n    for _ in range(3):\n        k=rng.randint(0,min(4,budget)); budget-=k; prog=[]\n        for _ in range(k):\n            op=rng.choice([\"store\",\"load\",\"fence\",\"xchg\"])\n            w=rng.choice([1,2,4])\n            if w>memsize:",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 11567,
+      "time": "2026-10-08T20:30:31.990802+00:00",
+      "tool_call_id": "call_ffc924f493ff40faa8781e52",
+      "command": "printf '%s\\n' '{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]}' | python3 /app/main.py | python3 -m json.tool | head -40",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 11569,
+      "time": "2026-10-08T20:30:32.348308+00:00",
+      "tool_call_id": "call_1ae09937639b4895b225c812",
+      "command": "python3 /tmp/t/fuzz.py 500 && python3 /app/smoke.py",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 43,
+      "time": "2026-10-08T20:24:55.574224+00:00",
+      "tool_call_id": "call_2a1e28d1c6354c51b09b809a",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:24 ..\n-rw-r--r-- 1 agent agent 2506 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\nimport json, sys\ndef solve(request):\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nif __name__ == '__main__':\n    for line in sys.stdin:\n        print(json.dumps(solve(json.loads(line))))\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:41 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 20:24 ..\n-rw-r--r-- 1 agent agent 2506 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  690 Oct  8 17:32 smoke.py\nimport json, sys\ndef solve(request):\n    raise NotImplementedError(\"Implement the contract in instruction.md\")\nif __name__ == '__main__':\n    for line in sys.stdin:\n        print(json.dumps(solve(json.loads(line))))\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('mixed-width-tso',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 8694,
+      "time": "2026-10-08T20:28:51.595801+00:00",
+      "tool_call_id": "call_d253d10580f444d190fff6a5",
+      "return_code": 1,
+      "stdout": "ok fence\nok xchg-blocked\nok drain-after-finish\nok forward-partial\nok racing-xchg\nok wide-load\nok empty-threads\nok drain-timing\nok self-forward\nFAIL xchg-then-load\n GOT:\n   {\"memory\": [5, 0], \"reads\": [[1, 5]]}\n WANT:\n   {\"memory\": [5], \"reads\": [[1, 5]]}\n",
+      "stderr": "",
+      "stdout_tail": "ok fence\nok xchg-blocked\nok drain-after-finish\nok forward-partial\nok racing-xchg\nok wide-load\nok empty-threads\nok drain-timing\nok self-forward\nFAIL xchg-then-load\n GOT:\n   {\"memory\": [5, 0], \"reads\": [[1, 5]]}\n WANT:\n   {\"memory\": [5], \"reads\": [[1, 5]]}\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 9231,
+      "time": "2026-10-08T20:29:07.921081+00:00",
+      "tool_call_id": "call_90c1746e3f7f4f97b91fd124",
+      "return_code": 1,
+      "stdout": "ok fence\nok xchg-blocked\nok drain-after-finish\nok forward-partial\nok racing-xchg\nok wide-load\nok empty-threads\nok drain-timing\nok self-forward\nFAIL xchg-then-load\n GOT:\n   {\"memory\": [5, 0], \"reads\": [[1, 5]]}\n WANT:\n   {\"memory\": [5], \"reads\": [[1, 5]]}\n",
+      "stderr": "",
+      "stdout_tail": "ok fence\nok xchg-blocked\nok drain-after-finish\nok forward-partial\nok racing-xchg\nok wide-load\nok empty-threads\nok drain-timing\nok self-forward\nFAIL xchg-then-load\n GOT:\n   {\"memory\": [5, 0], \"reads\": [[1, 5]]}\n WANT:\n   {\"memory\": [5], \"reads\": [[1, 5]]}\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 9390,
+      "time": "2026-10-08T20:29:21.215764+00:00",
+      "tool_call_id": "call_d108e2d3775046d3a589214d",
+      "return_code": 1,
+      "stdout": "ok fence\nok xchg-blocked\nok drain-after-finish\nok forward-partial\nok racing-xchg\nok wide-load\nok empty-threads\nok drain-timing\nok self-forward\nFAIL xchg-then-load\n GOT:\n   {\"memory\": [5, 0], \"reads\": [[1, 5]]}\n WANT:\n   {\"memory\": [5], \"reads\": [[1, 5]]}\n",
+      "stderr": "",
+      "stdout_tail": "ok fence\nok xchg-blocked\nok drain-after-finish\nok forward-partial\nok racing-xchg\nok wide-load\nok empty-threads\nok drain-timing\nok self-forward\nFAIL xchg-then-load\n GOT:\n   {\"memory\": [5, 0], \"reads\": [[1, 5]]}\n WANT:\n   {\"memory\": [5], \"reads\": [[1, 5]]}\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 10113,
+      "time": "2026-10-08T20:29:43.501339+00:00",
+      "tool_call_id": "call_c41c1adc735147139adf0cf7",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/t/perf.py\", line 30, in <module>\n    cases.append(heavy(rng, 2, [4,4], 2, [\"store\",\"load\"]))\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/t/perf.py\", line 12, in heavy\n    a = rng.randint(0, memsize-w)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 336, in randint\n    return self.randrange(a, b+1)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 319, in randrange\n    raise ValueError(f\"empty range in randrange({start}, {stop})\")\nValueError: empty range in randrange(0, -1)\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/tmp/t/perf.py\", line 30, in <module>\n    cases.append(heavy(rng, 2, [4,4], 2, [\"store\",\"load\"]))\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/t/perf.py\", line 12, in heavy\n    a = rng.randint(0, memsize-w)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 336, in randint\n    return self.randrange(a, b+1)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 319, in randrange\n    raise ValueError(f\"empty range in randrange({start}, {stop})\")\nValueError: empty range in randrange(0, -1)\n"
+    }
+  ],
+  "last_events": [
+    {
+      "step": 9519,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && grep -n 'xchg-then-load' targeted.py && python3 - <<'EOF'\nimport re\ns = open('targeted.py').read()\ns = s.replace('expect(\"xchg-then-load\", res[9], [{\"reads\":[[1,5]],\"memory\":[5]}])',\n              'expect(\"xchg-then-load\", res[9], [{\"reads\":[[1,5]],\"memory\":[5,0]}])')\nopen('targeted.py','w').write(s)\nEOF\npython3 targeted.py"
+    },
+    {
+      "step": 9520,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "64:expect(\"xchg-then-load\", res[9], [{\"reads\":[[1,5]],\"memory\":[5]}])\nok fence\nok xchg-blocked\nok drain-after-finish\nok forward-partial\nok racing-xchg\nok wide-load\nok empty-threads\nok drain-timing\nok self-forward\nok xchg-then-load\nall targeted ok\n"
+    },
+    {
+      "step": 10112,
+      "kind": "terminal_call",
+      "summary": "cat > /tmp/t/perf.py <<'EOF'\nimport json, random, subprocess, sys, time\n\ndef heavy(rng, nthreads, instrs, memsize, ops):\n    memory = [rng.randint(0,255) for _ in range(memsize)]\n    threads = []\n    for k in instrs:\n        prog = []\n        for _ in range(k):\n            op = rng.choice(ops)\n            w = rng.choice([1,2,4])\n            if op in (\"store\",\"xchg\"):\n                a = rng.randint(0, memsize-w)\n                prog.append([op,a,w,rng.randint(0,(1<<(8*w))-1)])\n            elif op == \"load\":\n                a = rng.randint(0, memsize-w)\n                prog.append([\"load\",a,w])\n            else:\n                prog.append([\"fence\"])\n        threads.append(prog)\n    return {\"memory\":memory,\"threads\":threads}\n\nrng = random.Random(7)\ncases = []\n# adversarial: max total instructions, narrow memory, overlapping widths, few fences\nfor _ in range(20):\n    cases.append(heavy(rng, 3, [4,4,2], 4, [\"store\",\"load\",\"xchg\"]))\nfor _ in range(20):\n    cases.append(heavy(rng, 3, [4,3,3"
+    },
+    {
+      "step": 10113,
+      "kind": "terminal_result",
+      "return_code": 1,
+      "summary": "Traceback (most recent call last):\n  File \"/tmp/t/perf.py\", line 30, in <module>\n    cases.append(heavy(rng, 2, [4,4], 2, [\"store\",\"load\"]))\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/t/perf.py\", line 12, in heavy\n    a = rng.randint(0, memsize-w)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 336, in randint\n    return self.randrange(a, b+1)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/random.py\", line 319, in randrange\n    raise ValueError(f\"empty range in randrange({start}, {stop})\")\nValueError: empty range in randrange(0, -1)\n"
+    },
+    {
+      "step": 10227,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/t && python3 - <<'EOF'\ns=open('perf.py').read()\ns=s.replace('''            w = rng.choice([1,2,4])\n            if op in (\"store\",\"xchg\"):''','''            w = rng.choice([1,2,4])\n            if w > memsize: w = 1\n            if op in (\"store\",\"xchg\"):''')\nopen('perf.py','w').write(s)\nEOF\npython3 perf.py"
+    },
+    {
+      "step": 10228,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "50 heavy cases in 0.50s; outcome counts min/avg/max: 5/465/2946\n"
+    },
+    {
+      "step": 11200,
+      "kind": "terminal_call",
+      "summary": "cat > /tmp/t/perf2.py <<'EOF'\nimport json, subprocess, time, sys\n\ncases = []\n# Adversarial: 3 threads, 10 instrs, tiny memory, many overlapping stores + loads\ncases.append({\"memory\":[0,0],\"threads\":[\n    [[\"store\",0,1,1],[\"store\",1,1,2],[\"load\",0,2],[\"load\",1,1]],\n    [[\"store\",0,2,0x0304],[\"load\",0,1],[\"load\",1,1],[\"store\",1,1,5]],\n    [[\"store\",0,1,6],[\"load\",0,2]],\n]})\ncases.append({\"memory\":[0,0,0,0],\"threads\":[\n    [[\"store\",0,4,0x0B0C0D0E],[\"store\",1,2,0x0A0B],[\"load\",0,4],[\"fence\"]],\n    [[\"store\",2,2,0x0102],[\"load\",0,4],[\"xchg\",0,1,0xFF],[\"store\",3,1,7]],\n    [[\"load\",0,4],[\"store\",0,2,0x0909]],\n]})\ncases.append({\"memory\":[0],\"threads\":[\n    [[\"store\",0,1,1],[\"store\",0,1,2],[\"store\",0,1,3],[\"load\",0,1]],\n    [[\"load\",0,1],[\"load\",0,1],[\"load\",0,1],[\"load\",0,1]],\n    [[\"load\",0,1],[\"load\",0,1]],\n]})\n\ninp = \"\".join(json.dumps(c)+\"\\n\" for c in cases)\nt0=time.time()\np = subprocess.run([sys.executable,\"/app/main.py\"],input=inp,text=True,capture_output=True,cwd=\"/app\")\ndt=time.time("
+    },
+    {
+      "step": 11201,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "outcomes: 480\noutcomes: 951\noutcomes: 350\ntotal 0.07s\n300-case batch in 0.12s\n"
+    },
+    {
+      "step": 11567,
+      "kind": "terminal_call",
+      "summary": "printf '%s\\n' '{\"memory\":[0,0],\"threads\":[[[\"store\",0,1,1],[\"load\",1,1]],[[\"store\",1,1,1],[\"load\",0,1]]]}' | python3 /app/main.py | python3 -m json.tool | head -40"
+    },
+    {
+      "step": 11568,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "{\n    \"outcomes\": [\n        {\n            \"reads\": [\n                [\n                    0\n                ],\n                [\n                    1\n                ]\n            ],\n            \"memory\": [\n                1,\n                1\n            ]\n        },\n        {\n            \"reads\": [\n                [\n                    1\n                ],\n                [\n                    1\n                ]\n            ],\n            \"memory\": [\n                1,\n                1\n            ]\n        },\n        {\n            \"reads\": [\n                [\n                    0\n                ],\n                [\n                    0\n                ]\n            ],\n            \"memory\": [\n"
+    },
+    {
+      "step": 11569,
+      "kind": "terminal_call",
+      "summary": "python3 /tmp/t/fuzz.py 500 && python3 /app/smoke.py"
+    },
+    {
+      "step": 11570,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "fuzz OK: 500 cases\nPassed 3 public examples\n"
+    }
+  ]
+}

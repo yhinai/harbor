@@ -1,0 +1,580 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-glm-atomic-range-history-6-a2-6a62bc3f",
+    "task": "atomic-range-history",
+    "model": "accounts/fireworks/models/glm-5p3",
+    "replicate": 6,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcomes/panel-glm-atomic-range-history-6-a2-6a62bc3f.json",
+    "tool_calls": 47,
+    "agent_elapsed_seconds": 1641.642986,
+    "input_tokens": 3270387,
+    "output_tokens": 87149,
+    "uncached_cost_estimate": 4.9619974,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "cb70a33b13225575975d6f2b0b7a957c68d26007bd2ee9a98dd304cab6fdd2ce",
+    "network_mode": "none",
+    "artifact_sha256": "2a61bd6f7b81a583c67d1d3cea014409492e1a569090b5cbd90b263bb1a90730",
+    "normalized_artifact_sha256": "e98921545b61aa30ee00dc2cedb7739be7709c366a7105350bfe978afdaf7a02",
+    "terminal_nonzero_or_error_text_events": 14,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [],
+    "final_artifact_literal_written_by_30_min": false,
+    "first_literal_final_artifact_seconds": null,
+    "event_counts": {
+      "initial": 1,
+      "request": 47,
+      "stream_chunk": 87290,
+      "response": 47,
+      "terminal_call": 47,
+      "terminal_result": 47,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 68,
+      "time": "2026-10-08T21:07:22.834652+00:00",
+      "tool_call_id": "chatcmpl-tool-b970102f526da9d9",
+      "command": "ls -la /app/ && cat /app/smoke.py 2>/dev/null",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 70,
+      "time": "2026-10-08T21:07:23.052822+00:00",
+      "tool_call_id": "chatcmpl-tool-8ef799c739d990e8",
+      "command": "python3 --version && ls /app/* 2>/dev/null",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 121,
+      "time": "2026-10-08T21:07:27.881530+00:00",
+      "tool_call_id": "chatcmpl-tool-90ad39b5ce2bd891",
+      "command": "cat /app/main.py; echo \"=====CONTRACT=====\"; cat /app/public_contract.py; echo \"=====EXAMPLES=====\"; cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 36617,
+      "time": "2026-10-08T21:18:18.438557+00:00",
+      "tool_call_id": "chatcmpl-tool-9a146c97ef083b94",
+      "command": "cd /app && python3 -c \"\nimport json\ncases=json.loads(open('examples.json').read())\nfor c in cases: print(c['id'], c['category'], json.dumps(c['request']))\nprint(len(cases))\n\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 40756,
+      "time": "2026-10-08T21:19:19.014670+00:00",
+      "tool_call_id": "chatcmpl-tool-ba3f913db34c46ba",
+      "command": "mkdir -p /tmp/work && cat > /app/main.py <<'PYEOF'\n#!/usr/bin/env python3\n\"\"\"Linearizability checker for histories of atomic range transactions.\n\nA witness is an order in which the finished transactions can be replayed as\nsingle atomic steps: it must extend the real-time partial order\n(``A.end <= B.start`` implies A before B), every recorded observation must\nmatch, and the map left behind must equal ``final``.\n\nStrategy\n--------\nThe search builds the witness *backwards*, from the last transaction to the\nfirst.  While walking backwards it keeps, for every key, the set of values that\nthe state in front of the already placed suffix is still allowed to hold.\nThat summary is exact rather than an over-approximation, because every\noperation observes and mutates one key at a time -- a get pins one key, a cas\npins one key, and a scan pins each key inside its range independently.  Hence\nthe set of workable states in front of a suffix is always a product of per-key\nsets, and merging states into sets loses nothing while pruning whole families\nof dead branches at once (a key whose allowed set empties out kills the branch).\n\nReal-time order is respected by only prepending a transaction once every\ntransaction that must follow it is already placed.  Failures are memoised on\n(remaining transactions, constraint vector), so the search is complete.\n\nAny order that comes out is re-checked with a literal replay of the request\n(the same semantics the reference checker uses), and anything outside the\ndocumented input shape falls back to a plain forward search that replays\noperations literally.\n\"\"\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 41154,
+      "time": "2026-10-08T21:19:27.443074+00:00",
+      "tool_call_id": "chatcmpl-tool-bce035bb5af97771",
+      "command": "cat > /tmp/work/reftest.py <<'PYEOF'\n\"\"\"Differential test: brute force over all permutations vs /app/main.py.\"\"\"\nimport itertools, json, random, subprocess, sys\n\nsys.path.insert(0, '/app')\nfrom public_contract import valid_history\n\n\ndef brute(req):\n    \"\"\"Ground truth: does any valid order exist? (any permutation)\"\"\"\n    txs = req['transactions']\n    n = len(txs)\n    for perm in itertools.permutations(range(n)):\n        order = [txs[i]['id'] for i in perm]\n        if valid_history(req, order):\n            return order\n    return None\n\n\ndef run(reqs):\n    p = subprocess.run([sys.executable, '/app/main.py'],\n                       input=''.join(json.dumps(r) + '\\n' for r in reqs),\n                       text=True, capture_output=True, cwd='/app')\n    if p.returncode:\n        raise SystemExit('solver crashed: ' + p.stderr)\n    if p.stderr.strip():\n        print('stderr:', p.stderr[:2000])\n    lines = p.stdout.splitlines()\n    assert len(lines) == len(reqs), (len(lines), len(reqs))\n    return [json.loads(l) for l in lines]\nPYEOF\necho written",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 42738,
+      "time": "2026-10-08T21:19:51.252713+00:00",
+      "tool_call_id": "chatcmpl-tool-b9d7a6bb0529e6ab",
+      "command": "cat > /tmp/work/gen.py <<'PYEOF'\n\"\"\"Random request generators: some guaranteed-satisfiable, some arbitrary.\"\"\"\nimport random\n\n\ndef rand_map(rng, keys, p=0.5):\n    return {k: rng.randint(-9, 9) for k in keys if rng.random() < p}\n\n\ndef rand_ops(rng, keys, state=None, truthful=0.0):\n    \"\"\"Build 1..5 ops.  With probability `truthful` an observation is taken\n    from `state` (as projected through the op sequence so far).\"\"\"\n    ops = []\n    for _ in range(rng.randint(1, 5)):\n        kind = rng.choice(['get', 'get', 'put', 'put', 'del', 'cas', 'scan'])\n        k = rng.choice(keys)\n        if kind == 'get':\n            exp = state.get(k) if (state is not None and rng.random() < truthful) else \\\n                rng.choice([None, 0, 1, -1, 2, 5, 9, -9, 3])\n            ops.append(['get', k, exp])\n        elif kind == 'put':\n            v = rng.randint(-9, 9)\n            ops.append(['put', k, v])\n            if state is not None:\n                state[k] = v\n        elif kind == 'del':\n            ops.append(['del', k])\n            if state is not None:\n                state.pop(k, None)\n        elif kind == 'cas':\n            old = state.get(k) if (state is not None and rng.random() < truthful) else \\\n                rng.choice([None, 0, 1, 4, 7])\n            new = rng.choice([None, 0, 1, -3, 6, 8])\n            if state is not None:\n                ok = (state.get(k) == old)\n                want = ok if rng.random() < truthful else rng.choice([True, False])\n                if want and state.get(k) == old:\n                    if new is None:\n                        state.pop(k, None)",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 42873,
+      "time": "2026-10-08T21:19:55.412937+00:00",
+      "tool_call_id": "chatcmpl-tool-a5e990cf327fbf51",
+      "command": "cd /tmp/work && sed -i 's/from reftest import brute, run/from reftest import brute, run\\nfrom public_contract import valid_history/' run_diff.py && python3 run_diff.py 1 150",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 43751,
+      "time": "2026-10-08T21:20:12.867029+00:00",
+      "tool_call_id": "chatcmpl-tool-87c4abacef0da2b4",
+      "command": "cd /tmp/work && for s in 2 3 4 5 6 7; do python3 run_diff.py $s 120; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 44519,
+      "time": "2026-10-08T21:20:28.424753+00:00",
+      "tool_call_id": "chatcmpl-tool-8b695f55af9d493f",
+      "command": "cat > /tmp/work/exhaust.py <<'PYEOF'\n\"\"\"Independent exhaustive checker: enumerate linear extensions with replay pruning.\"\"\"\nimport sys\nsys.path.insert(0, '/app')\nfrom main import literal_apply\n\n\ndef exhaustive(req):\n    txs = req['transactions']\n    n = len(txs)\n    ids = [t['id'] for t in txs]\n    final = req['final']\n    state0 = dict(req['initial'])\n    # must_follow[t]: transactions that must be ordered after t\n    must_follow = [sum(1 << u for u in range(n) if txs[t]['end'] <= txs[u]['start'])\n                   for t in range(n)]\n    nodes = [0]\n\n    def rec(placed_mask, state, order):\n        nodes[0] += 1\n        if placed_mask == (1 << n) - 1:\n            return order if state == final else None\n        for t in range(n):\n            if (placed_mask >> t) & 1:\n                continue\n            if must_follow[t] & ~placed_mask:\n                continue          # something must still come after t\n            nxt = literal_apply(state, txs[t]['ops'])\n            if nxt is None:\n                continue\n            order.append(ids[t])\n            got = rec(placed_mask | (1 << t), nxt, order)\n            if got is not None:\n                return got\n            order.pop()\n        return None\n\n    return rec(0, state0, [])\nPYEOF\ncat > /tmp/work/run_ex.py <<'PYEOF'\nimport json, random, sys, time\nsys.path.insert(0, '/tmp/work'); sys.path.insert(0, '/app')\nfrom exhaust import exhaustive\nfrom reftest import run\nfrom public_contract import valid_history\nfrom gen import gen_request\n\nseed = int(sys.argv[1]); N = int(sys.argv[2]); nmax = int(sys.argv[3]); span = int(sys.a",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 45590,
+      "time": "2026-10-08T21:20:46.007005+00:00",
+      "tool_call_id": "chatcmpl-tool-a3182a4b7068f8fd",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nimport re\nsrc = open('exhaust.py').read()\nsrc = src.replace(\n\"\"\"    # must_follow[t]: transactions that must be ordered after t\n    must_follow = [sum(1 << u for u in range(n) if txs[t]['end'] <= txs[u]['start'])\n                   for t in range(n)]\"\"\",\n\"\"\"    # preds[t]: transactions that must be ordered before t (u.end <= t.start)\n    preds = [sum(1 << u for u in range(n) if txs[u]['end'] <= txs[t]['start'])\n             for t in range(n)]\"\"\")\nsrc = src.replace(\n\"\"\"            if must_follow[t] & ~placed_mask:\n                continue          # something must still come after t\"\"\",\n\"\"\"            if preds[t] & ~placed_mask:\n                continue          # a transaction that must precede t is missing\"\"\")\nopen('exhaust.py','w').write(src)\nPYEOF\npython3 -c \"\nimport sys; sys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nimport json\nfrom exhaust import exhaustive\nfrom public_contract import valid_history\nreq = json.loads(open('/tmp/work/case1.json').read()) if False else None\n\" ; cd /tmp/work && python3 run_ex.py 11 40 10 6",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 45724,
+      "time": "2026-10-08T21:20:49.358139+00:00",
+      "tool_call_id": "chatcmpl-tool-80e733950e9c694b",
+      "command": "cd /tmp/work && for args in \"12 40 10 3\" \"13 40 10 4\" \"14 40 10 8\" \"15 40 10 12\" \"16 40 9 5\" \"17 40 8 2\"; do python3 run_ex.py $args; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 46793,
+      "time": "2026-10-08T21:21:09.134495+00:00",
+      "tool_call_id": "chatcmpl-tool-9623c8b8e8850b6d",
+      "command": "cat > /tmp/work/stress.py <<'PYEOF'\nimport json, random, sys, time\nsys.path.insert(0, '/tmp/work'); sys.path.insert(0, '/app')\n\ndef mk(rng, style, n=10, nkeys=6, nops=5):\n    keys = ['a','b','c','d','e','f'][:nkeys]\n    initial = {k: rng.randint(-9,9) for k in keys if rng.random()<0.5}\n    txs = []\n    for i in range(n):\n        ops = []\n        for _ in range(nops):\n            k = rng.choice(keys)\n            if style == 'writes':        # no observations at all\n                ops.append(['put', k, rng.randint(-9,9)])\n            elif style == 'casfail':     # failed cas chains: value must differ\n                ops.append(['cas', k, rng.randint(-9,9), None, False])\n            elif style == 'caschain':    # alternating successes/failures\n                if rng.random() < 0.5:\n                    ops.append(['cas', k, rng.randint(-9,9), rng.randint(-9,9), True])\n                else:\n                    ops.append(['cas', k, rng.randint(-9,9), rng.randint(-9,9), False])\n            elif style == 'scanonly':\n                lo = rng.choice(keys); hi = rng.choice(keys[1:] + ['zz'])\n                ops.append(['scan', lo, hi, []])\n            else:                        # reads of absent keys\n                ops.append(['get', k, None])\n        # all intervals identical => total overlap, no real-time order at all\n        txs.append({'id': 't%d' % i, 'start': 0, 'end': 1, 'ops': ops})\n    final = {k: rng.randint(-9,9) for k in keys if rng.random() < 0.7}\n    return {'initial': initial, 'final': final, 'transactions': txs}\n\nstyles = ['writes', 'casfail', 'caschain', 'scanonl",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 47784,
+      "time": "2026-10-08T21:21:25.332892+00:00",
+      "tool_call_id": "chatcmpl-tool-9e4f1935636f1274",
+      "command": "cat > /tmp/work/stress2.py <<'PYEOF'\nimport json, random, sys, time, subprocess\nsys.path.insert(0, '/tmp/work'); sys.path.insert(0, '/app')\nfrom main import literal_apply\nfrom public_contract import valid_history\n\ndef replay(req, order):\n    tx = {t['id']: t for t in req['transactions']}\n    st = dict(req['initial'])\n    for name in order:\n        st = literal_apply(st, tx[name]['ops'])\n        if st is None: return None\n    return st\n\ndef mk(rng, style, n=10, nkeys=6, nops=5, sat=False):\n    keys = ['a','b','c','d','e','f'][:nkeys]\n    initial = {k: rng.randint(-9,9) for k in keys if rng.random()<0.5}\n    txs = []\n    for i in range(n):\n        ops = []\n        for _ in range(nops):\n            k = rng.choice(keys)\n            if style == 'writes':\n                ops.append(['put', k, rng.randint(-9,9)])\n            elif style == 'casfail':\n                ops.append(['cas', k, rng.randint(-9,9), None, False])\n            elif style == 'caschain':\n                ops.append(['cas', k, rng.randint(-9,9), rng.randint(-9,9), rng.random()<0.5])\n            elif style == 'scanonly':\n                lo = rng.choice(keys); hi = rng.choice(keys[1:]+['zz'])\n                ops.append(['scan', lo, hi, []])\n            else:\n                ops.append(['get', k, None])\n        txs.append({'id': 't%d' % i, 'start': 0, 'end': 1, 'ops': ops})\n    req = {'initial': initial, 'final': {}, 'transactions': txs}\n    if sat:\n        order = [t['id'] for t in txs]; rng.shuffle(order)\n        st = replay(req, order)\n        req['final'] = st if st is not None else dict(initial)\n    else:\n      ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 48413,
+      "time": "2026-10-08T21:21:37.432624+00:00",
+      "tool_call_id": "chatcmpl-tool-8d3f0470e1badea3",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nimport json, random, sys, time, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nexec(open('stress2.py').read().split(\"rng = random.Random\")[0])\nrng = random.Random(21)\nstyles = ['writes','casfail','caschain','scanonly','getabsent']\nreqs = []; known = []\nfor s in styles:\n    for _ in range(50):\n        reqs.append(mk(rng, s, sat=False)); known.append(False)\n    for _ in range(50):\n        reqs.append(mk(rng, s, sat=True)); known.append(None)  # fill below\n# recompute known-witness flag for sat ones by replaying a random order\nfor i,(r,k) in enumerate(zip(reqs,known)):\n    if k is None:\n        order=[t['id'] for t in r['transactions']]; rng.shuffle(order)\n        st=replay(r,order)\n        known[i] = (st is not None and st == r['final'])\nt0=time.time()\np=subprocess.run([sys.executable,'/app/main.py'],input=''.join(json.dumps(r)+'\\n' for r in reqs),text=True,capture_output=True,cwd='/app')\nres=[json.loads(l)['order'] for l in p.stdout.splitlines()]\nmissed=sum(1 for r,g,k in zip(reqs,res,known) if k and g is None)\nwrongnull=sum(1 for r,g,k in zip(reqs,res,known) if not k and g is not None and not valid_history(r,g))\ninvalid=sum(1 for r,g in zip(reqs,res) if g is not None and not valid_history(r,g))\nprint('total %d, %.2fs; known-sat %d, missed %d; invalid %d' % (len(reqs), time.time()-t0, sum(known), missed, invalid))\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 49330,
+      "time": "2026-10-08T21:21:51.822157+00:00",
+      "tool_call_id": "chatcmpl-tool-9de5ea9cce45290d",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nimport json, random, sys, time, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nexec(open('stress2.py').read().split(\"rng = random.Random\")[0])   # defs only\n\ndef mk2(rng, style, n=10, nkeys=6, nops=5):\n    keys = ['a','b','c','d','e','f'][:nkeys]\n    initial = {k: rng.randint(-9,9) for k in keys if rng.random()<0.5}\n    txs=[]\n    for i in range(n):\n        ops=[]\n        for _ in range(nops):\n            k=rng.choice(keys)\n            if style=='writes': ops.append(['put',k,rng.randint(-9,9)])\n            elif style=='casfail': ops.append(['cas',k,rng.randint(-9,9),None,False])\n            elif style=='caschain': ops.append(['cas',k,rng.randint(-9,9),rng.randint(-9,9),rng.random()<0.5])\n            elif style=='scanonly':\n                lo=rng.choice(keys); hi=rng.choice(keys[1:]+['zz']); ops.append(['scan',lo,hi,[]])\n            else: ops.append(['get',k,None])\n        txs.append({'id':'t%d'%i,'start':0,'end':1,'ops':ops})\n    req={'initial':initial,'final':{},'transactions':txs}\n    order=[t['id'] for t in txs]; rng.shuffle(order)\n    st=replay(req,order)\n    if st is None:\n        return req, None           # replay itself inconsistent -> not a proven witness\n    req['final']=st\n    return req, order\n\nrng=random.Random(31)\nstyles=['writes','casfail','caschain','scanonly','getabsent']\nreqs=[]; wit=[]\nfor s in styles:\n    for _ in range(60):\n        r,w = mk2(rng,s); reqs.append(r); wit.append(w)\nprovoked=[i for i,w in enumerate(wit) if w is not None]\nprint('proven-satisfiable:', len(provoked))\nt0=time.time()\np=su",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 49988,
+      "time": "2026-10-08T21:22:01.900331+00:00",
+      "tool_call_id": "chatcmpl-tool-8ea0f1fc4ac7432c",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nimport json, random, sys, time, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nexec(open('stress2.py').read().split(\"rng = random.Random\")[0])\n\ndef mk2(rng, style, n=10, nkeys=6, nops=5):\n    keys = ['a','b','c','d','e','f'][:nkeys]\n    initial = {k: rng.randint(-9,9) for k in keys if rng.random()<0.5}\n    txs=[]\n    for i in range(n):\n        ops=[]\n        for _ in range(nops):\n            k=rng.choice(keys)\n            if style=='writes': ops.append(['put',k,rng.randint(-9,9)])\n            elif style=='casfail': ops.append(['cas',k,rng.randint(-9,9),None,False])\n            elif style=='caschain': ops.append(['cas',k,rng.randint(-9,9),rng.randint(-9,9),rng.random()<0.5])\n            elif style=='scanonly':\n                lo=rng.choice(keys); hi=rng.choice(keys[1:]+['zz']); ops.append(['scan',lo,hi,[]])\n            else: ops.append(['get',k,None])\n        txs.append({'id':'t%d'%i,'start':0,'end':1,'ops':ops})\n    req={'initial':initial,'final':{},'transactions':txs}\n    order=[t['id'] for t in txs]; rng.shuffle(order)\n    st=replay(req,order)\n    if st is None: return req, None\n    req['final']=st\n    return req, order\n\nfor seed in (31,32,33):\n    rng=random.Random(seed)\n    styles=['writes','casfail','caschain','scanonly','getabsent']\n    reqs=[]; wit=[]\n    for s in styles:\n        for _ in range(60):\n            r,w = mk2(rng,s); reqs.append(r); wit.append(w)\n    prov=[i for i,w in enumerate(wit) if w is not None]\n    t0=time.time()\n    p=subprocess.run([sys.executable,'/app/main.py'],input=''.join(json.dumps(r",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 52263,
+      "time": "2026-10-08T21:22:41.027666+00:00",
+      "tool_call_id": "chatcmpl-tool-98b375d63e180c89",
+      "command": "cat > /tmp/work/perf.py <<'PYEOF'\nimport json, random, sys, time, statistics\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom main import solve, literal_apply, backward_search, parse_request\nfrom public_contract import valid_history\n\ndef replay(req, order):\n    tx={t['id']:t for t in req['transactions']}\n    st=dict(req['initial'])\n    for name in order:\n        st=literal_apply(st,tx[name]['ops'])\n        if st is None: return None\n    return st\n\nKEYS=['a','b','c','d','e','f']\ndef gen(rng, n=10, nkeys=6, nops=5, overlap=True, span=12, finalmode='replay'):\n    keys=sorted(rng.sample(KEYS,nkeys))\n    initial={k:rng.randint(-9,9) for k in keys if rng.random()<0.6}\n    txs=[]\n    for i in range(n):\n        if overlap: s,e=0,1\n        else:\n            s=rng.randint(0,span-2); e=rng.randint(s+1,span)\n        ops=[]\n        for _ in range(nops):\n            k=rng.choice(keys)\n            c=rng.random()\n            if c<0.35: ops.append(['put',k,rng.randint(-9,9)])\n            elif c<0.55: ops.append(['del',k])\n            elif c<0.75:\n                ops.append(['cas',k,rng.randint(-9,9) if rng.random()<0.8 else None,\n                            rng.randint(-9,9) if rng.random()<0.8 else None, rng.random()<0.6])\n            elif c<0.9: ops.append(['get',k,rng.choice([None,0,1,-1,3,9,rng.randint(-9,9)])])\n            else:\n                lo=rng.choice(keys); hi=rng.choice([x for x in keys if x>lo] or ['zz'])\n                ops.append(['scan',lo,hi,[]])\n        txs.append({'id':'t%d'%i,'start':s,'end':e,'ops':ops})\n    req={'initial':initial,'final':{},'transaction",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 53470,
+      "time": "2026-10-08T21:23:00.241867+00:00",
+      "tool_call_id": "chatcmpl-tool-b92308299a4f9647",
+      "command": "cat > /tmp/work/perf2.py <<'PYEOF'\nimport json, random, sys, time\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom main import solve, literal_apply\nfrom public_contract import valid_history\n\nKEYS=['a','b','c','d','e','f','g','h'][:6]\n\ndef truthful(rng, n=10, nkeys=6, nops=5, overlap=True, span=12):\n    keys=sorted(rng.sample(['a','b','c','d','e','f','g','h','ab','bb'],nkeys))\n    initial={k:rng.randint(-9,9) for k in keys if rng.random()<0.6}\n    ivs=[(0,1) if overlap else (lambda s: (s, rng.randint(s+1,span)))(rng.randint(0,span-2)) for _ in range(n)]\n    # build a real order consistent with real-time\n    rem=list(range(n)); order=[]\n    while rem:\n        ready=[t for t in rem if all(not(ivs[t][1]<=ivs[u][0]) for u in rem if u!=t)]\n        t=rng.choice(ready); rem.remove(t); order.append(t)\n    state=dict(initial); txs={}\n    for t in order:\n        st=dict(state); ops=[]\n        for _ in range(nops):\n            k=rng.choice(keys); c=rng.random()\n            if c<0.3: ops.append(['put',k,rng.randint(-9,9)])\n            elif c<0.45: ops.append(['del',k])\n            elif c<0.7:\n                old=st.get(k); new=None if rng.random()<0.2 else rng.randint(-9,9)\n                ops.append(['cas',k,old,new,True])\n                st.pop(k,None) if new is None else st.__setitem__(k,new)\n            elif c<0.88: ops.append(['get',k,st.get(k)])\n            else:\n                lo=rng.choice(keys); hi=rng.choice([x for x in keys if x>lo] or ['zz'])\n                ops.append(['scan',lo,hi,sorted([[k2,v] for k2,v in st.items() if lo<=k2<hi])])\n        state=st\n      ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 54606,
+      "time": "2026-10-08T21:23:17.900616+00:00",
+      "tool_call_id": "chatcmpl-tool-864020e5eae61766",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nimport json, random, sys\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom public_contract import valid_history\nimport perf2  # noqa  - just to reuse? no, import runs the whole file\nPYEOF\necho \"---\"\ncd /tmp/work && python3 - <<'PYEOF'\nimport json, random, sys\nsys.path.insert(0,'/app')\nfrom public_contract import valid_history\nfrom main import solve\n\nrng=random.Random(5)\nKEYPOOL=['a','b','c','d','e','f','g','h','ab','bb']\ndef truthful(rng, n=10, nkeys=6, nops=5, overlap=True, span=12):\n    keys=sorted(rng.sample(KEYPOOL,nkeys))\n    initial={k:rng.randint(-9,9) for k in keys if rng.random()<0.6}\n    ivs=[(0,1) if overlap else (lambda s:(s,rng.randint(s+1,span)))(rng.randint(0,span-2)) for _ in range(n)]\n    rem=list(range(n)); order=[]\n    while rem:\n        ready=[t for t in rem if all(not(ivs[t][1]<=ivs[u][0]) for u in rem if u!=t)]\n        t=rng.choice(ready); rem.remove(t); order.append(t)\n    state=dict(initial); txs={}\n    for t in order:\n        st=dict(state); ops=[]\n        for _ in range(nops):\n            k=rng.choice(keys); c=rng.random()\n            if c<0.3: ops.append(['put',k,rng.randint(-9,9)])\n            elif c<0.45: ops.append(['del',k])\n            elif c<0.7:\n                old=st.get(k); new=None if rng.random()<0.2 else rng.randint(-9,9)\n                ops.append(['cas',k,old,new,True])\n                if new is None: st.pop(k,None)\n                else: st[k]=new\n            elif c<0.88: ops.append(['get',k,st.get(k)])\n            else:\n                lo=rng.choice(keys); hi=rng.choice([x for x in ke",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 55757,
+      "time": "2026-10-08T21:23:36.673906+00:00",
+      "tool_call_id": "chatcmpl-tool-b634e70d642bb80f",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nimport json, random, sys\nsys.path.insert(0,'/app')\nrng=random.Random(5)\nKEYPOOL=['a','b','c','d','e','f','g','h','ab','bb']\ndef truthful(rng, n=10, nkeys=6, nops=5, overlap=True, span=12):\n    keys=sorted(rng.sample(KEYPOOL,nkeys))\n    initial={k:rng.randint(-9,9) for k in keys if rng.random()<0.6}\n    ivs=[(0,1)]*n\n    rem=list(range(n)); order=[]\n    while rem:\n        ready=[t for t in rem if all(not(ivs[t][1]<=ivs[u][0]) for u in rem if u!=t)]\n        t=rng.choice(ready); rem.remove(t); order.append(t)\n    state=dict(initial); txs={}\n    for t in order:\n        st=dict(state); ops=[]\n        for _ in range(nops):\n            k=rng.choice(keys); c=rng.random()\n            if c<0.3: ops.append(['put',k,rng.randint(-9,9)])\n            elif c<0.45: ops.append(['del',k])\n            elif c<0.7:\n                old=st.get(k); new=None if rng.random()<0.2 else rng.randint(-9,9)\n                ops.append(['cas',k,old,new,True])\n                if new is None: st.pop(k,None)\n                else: st[k]=new\n            elif c<0.88: ops.append(['get',k,st.get(k)])\n            else:\n                lo=rng.choice(keys); hi=rng.choice([x for x in keys if x>lo] or ['zz'])\n                ops.append(['scan',lo,hi,sorted([[k2,v] for k2,v in st.items() if lo<=k2<hi])])\n        state=st\n        txs[t]={'id':'t%d'%t,'start':0,'end':1,'ops':ops}\n    return {'initial':initial,'final':dict(state),'transactions':[txs[t] for t in sorted(txs)]}, ['t%d'%t for t in order]\n\nreq,order=truthful(rng)\ntx={t['id']:t for t in req['transactions']}\nd=req['initial'].copy",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 57242,
+      "time": "2026-10-08T21:23:59.811515+00:00",
+      "tool_call_id": "chatcmpl-tool-8496ec87aa54ca07",
+      "command": "cat > /tmp/work/truth.py <<'PYEOF'\n\"\"\"Truthful history generator: records what a real concurrent run would see.\"\"\"\nKEYPOOL = ['a','b','c','d','e','f','g','h','ab','bb','ba','aa']\n\ndef truthful(rng, n=10, nkeys=6, nops=5, overlap=True, span=12, tight=False):\n    keys = sorted(rng.sample(KEYPOOL, nkeys))\n    initial = {k: rng.randint(-9, 9) for k in keys if rng.random() < 0.6}\n    if overlap:\n        ivs = [(0, 1)] * n\n    elif tight:\n        ivs = [(i, i + 2) for i in range(n)]\n    else:\n        ivs = [None] * n\n        for i in range(n):\n            s = rng.randint(0, span - 2); ivs[i] = (s, rng.randint(s + 1, span))\n    rem = list(range(n)); order = []\n    while rem:                       # a random real-time consistent order\n        ready = [t for t in rem if all(not (ivs[t][1] <= ivs[u][0]) for u in rem if u != t)]\n        t = rng.choice(ready); rem.remove(t); order.append(t)\n    state = dict(initial); txs = {}\n    for t in order:\n        st = dict(state); ops = []\n        for _ in range(nops):\n            k = rng.choice(keys); c = rng.random()\n            if c < 0.30:\n                v = rng.randint(-9, 9); ops.append(['put', k, v]); st[k] = v\n            elif c < 0.45:\n                ops.append(['del', k]); st.pop(k, None)\n            elif c < 0.70:\n                old = st.get(k)\n                new = None if rng.random() < 0.2 else rng.randint(-9, 9)\n                ops.append(['cas', k, old, new, True])\n                if new is None: st.pop(k, None)\n                else: st[k] = new\n            elif c < 0.88:\n                ops.append(['get', k, st.get(k)])\n     ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 58114,
+      "time": "2026-10-08T21:24:15.258843+00:00",
+      "tool_call_id": "chatcmpl-tool-ba3c3282e3a90d7f",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nsrc=open('truth.py').read()\nsrc=src.replace(\"\"\"        t = rng.choice(ready); rem.remove(t); order.append(t)\"\"\",\n\"\"\"        t = rng.choice(ready); rem.remove(t); order.insert(0, t)   # placed last first\"\"\")\nopen('truth.py','w').write(src)\nPYEOF\ncd /tmp/work && python3 - <<'PYEOF'\nimport json, random, sys, time\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom truth import truthful\nfrom main import solve\nfrom public_contract import valid_history\n\nrng = random.Random(5)\nfor overlap in (True, False):\n    for tight in (False, True):\n        if overlap and tight: continue\n        times=[]; sat=0; bad=0; n=300\n        for _ in range(n):\n            req, order = truthful(rng, overlap=overlap, tight=tight)\n            if not valid_history(req, order):\n                print('GENERATOR BUG'); raise SystemExit\n            t0=time.monotonic(); ans=solve(req); times.append(time.monotonic()-t0)\n            if ans['order'] is not None:\n                sat+=1\n                if not valid_history(req, ans['order']): bad+=1\n        times.sort()\n        print('truthful overlap=%-5s tight=%-5s n=%d sat=%3d invalid=%d total=%.2fs med=%.1fms p99=%.1fms max=%.1fms'\n              % (overlap,tight,n,sat,bad,sum(times),1000*times[n//2],1000*times[int(n*0.99)],1000*times[-1]))\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 59473,
+      "time": "2026-10-08T21:24:36.924318+00:00",
+      "tool_call_id": "chatcmpl-tool-bf4040af0976797e",
+      "command": "cat > /tmp/work/nearmiss.py <<'PYEOF'\nimport json, random, sys, time\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom truth import truthful\nfrom main import solve, literal_apply\nfrom public_contract import valid_history\nfrom exhaust import exhaustive\n\ndef reachable_values(req, key):\n    vals = {req['initial'].get(key), None}\n    for t in req['transactions']:\n        for op in t['ops']:\n            if op[0]=='put' and op[1]==key: vals.add(op[2])\n            if op[0]=='cas' and op[1]==key:\n                vals.add(op[2])\n                if op[3] is not None: vals.add(op[3])\n    return sorted(v for v in vals if v is not None) + [None]\n\ndef corrupt(rng, req):\n    \"\"\"Perturb a truthful history just enough to (usually) break it.\"\"\"\n    req = json.loads(json.dumps(req))\n    kind = rng.choice(['get','cas','scan','final','swap'])\n    ts = req['transactions']\n    if kind == 'get':\n        cands=[(ti,oi) for ti,t in enumerate(ts) for oi,op in enumerate(t['ops']) if op[0]=='get']\n        if not cands: return req, 'noop'\n        ti,oi = rng.choice(cands)\n        k = ts[ti]['ops'][oi][1]\n        ts[ti]['ops'][oi][2] = rng.choice(reachable_values(req,k))\n    elif kind == 'cas':\n        cands=[(ti,oi) for ti,t in enumerate(ts) for oi,op in enumerate(t['ops']) if op[0]=='cas']\n        if not cands: return req, 'noop'\n        ti,oi = rng.choice(cands)\n        op = ts[ti]['ops'][oi]\n        op[2] = rng.choice(reachable_values(req, op[1]))\n        if rng.random()<0.5: op[4] = not op[4]\n    elif kind == 'scan':\n        cands=[(ti,oi) for ti,t in enumerate(ts) for oi,op in enumerat",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 59635,
+      "time": "2026-10-08T21:24:41.337632+00:00",
+      "tool_call_id": "chatcmpl-tool-948959c22a6693aa",
+      "command": "cd /tmp/work && for s in 2 3 4 5; do timeout 900 python3 nearmiss.py $s 150 | tail -3; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 65339,
+      "time": "2026-10-08T21:26:27.587187+00:00",
+      "tool_call_id": "chatcmpl-tool-b02ace7be54a82e0",
+      "command": "cat > /tmp/work/adv.py <<'PYEOF'\n\"\"\"Adversarial families: plausible observations, maximum freedom, subtle conflicts.\"\"\"\nimport json, random, sys, time\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\nfrom exhaust import exhaustive\n\nKEYS=['a','b','c','d','e','f']\ndef adv(rng, family, n=10, nkeys=6, nops=5):\n    keys=KEYS[:nkeys]\n    pool=list(range(-9,10))\n    initial={k:rng.choice(pool) for k in keys if rng.random()<0.8}\n    txs=[]\n    for i in range(n):\n        ops=[]\n        for _ in range(nops):\n            k=rng.choice(keys)\n            if family=='casfail':          # exclusions only: F fragments as D minus old\n                ops.append(['cas',k,rng.choice(pool),None,False])\n            elif family=='plausible':      # plausible reads/writes, may conflict globally\n                c=rng.random()\n                if c<0.4: ops.append(['put',k,rng.choice(pool)])\n                elif c<0.7: ops.append(['get',k,rng.choice(pool)])\n                elif c<0.9: ops.append(['cas',k,rng.choice(pool),rng.choice(pool),rng.random()<0.5])\n                else:\n                    lo=rng.choice(keys); hi=rng.choice([x for x in keys if x>lo] or ['zz'])\n                    ops.append(['scan',lo,hi,[[x,rng.choice(pool)] for x in keys if lo<=x<hi and rng.random()<0.7]])\n            elif family=='depchain':       # cyclic dependency with several writers per value\n                j=rng.randrange(nkeys)\n                ops.append(['get',keys[j],rng.choice(pool)])\n                ops.append(['put',keys[(j+1)%nkeys],rng.",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 66016,
+      "time": "2026-10-08T21:26:41.854230+00:00",
+      "tool_call_id": "chatcmpl-tool-9ffe31092b056217",
+      "command": "cd /tmp/work && timeout 1200 python3 - <<'PYEOF'\nimport json, random, sys, time, signal\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nexec(open('adv.py').read().split(\"rng=random.Random\")[0])\nfrom exhaust import exhaustive\nfrom main import solve\nfrom public_contract import valid_history\n\nrng=random.Random(4242)\nclass TO(Exception): pass\ndef handler(s,f): raise TO()\nsignal.signal(signal.SIGALRM, handler)\n\nfor family in ('casfail','plausible','depchain','scanpin'):\n    agree=0; timeout=0; sat=0; slow=[]\n    for i in range(60):\n        req=adv(rng,family)\n        mine=solve(req)['order']\n        t0=time.monotonic()\n        signal.setitimer(signal.ITIMER_REAL, 30.0)\n        try:\n            truth=exhaustive(req); status='ok'\n        except TO:\n            truth=None; status='timeout'\n        finally:\n            signal.setitimer(signal.ITIMER_REAL, 0)\n        el=time.monotonic()-t0\n        if status=='timeout':\n            timeout+=1\n            # cannot verify; just check our answer is at least self-consistent\n            if mine is not None and not valid_history(req,mine): print('INVALID ORDER',family); sys.exit(1)\n            continue\n        if truth is None:\n            ok = mine is None\n        else:\n            ok = valid_history(req, mine); sat+=1\n        if not ok:\n            print('MISMATCH family',family, json.dumps(req)); sys.exit(1)\n        agree+=1\n        slow.append(el)\n    slow.sort()\n    print('%-10s verified=%d timeouts=%d (exhaustive sat=%d, max %.2fs)' % (family, agree, timeout, sat, slow[-1] if slow else 0))\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 67816,
+      "time": "2026-10-08T21:28:31.259245+00:00",
+      "tool_call_id": "chatcmpl-tool-80f9c7528457dafc",
+      "command": "cd /tmp/work && timeout 900 python3 - <<'PYEOF'\nimport json, random, sys, time\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom main import solve\nfrom public_contract import valid_history\n\nKEYS=['a','b','c','d','e','f']\n\ndef rw(rng, n=10, nkeys=6, nops=5, poolsize=6, putfrac=0.4, overlap=True):\n    keys=KEYS[:nkeys]\n    pool=list(range(-poolsize//2, poolsize//2+1))\n    initial={k:rng.choice(pool) for k in keys if rng.random()<0.9}\n    txs=[]\n    for i in range(n):\n        ops=[]; wkeys=set()\n        for _ in range(nops):\n            k=rng.choice(keys)\n            if k in wkeys: continue\n            if rng.random()<putfrac:\n                wkeys.add(k); ops.append(['put',k,rng.choice(pool)])\n            else:\n                ops.append(['get',k,rng.choice(pool)])\n        while len(ops)<nops:\n            k=rng.choice(keys)\n            if k not in wkeys: ops.append(['get',k,rng.choice(pool)])\n        ops=ops[:nops]\n        txs.append({'id':'t%d'%i,'start':0 if overlap else i,'end':1 if overlap else i+2,'ops':ops})\n    fin={k:rng.choice(pool) for k in keys if rng.random()<0.9}\n    return {'initial':initial,'final':fin,'transactions':txs}\n\nworst=[]\nrng=random.Random(31337)\nfor poolsize in (2,3,4,6,10):\n    for putfrac in (0.2,0.4,0.6,0.8):\n        for overlap in (True,False):\n            times=[]\n            for _ in range(300):\n                req=rw(rng,poolsize=poolsize,putfrac=putfrac,overlap=overlap)\n                t0=time.monotonic(); ans=solve(req); times.append(time.monotonic()-t0)\n                if ans['order'] is not None and not valid_history(req,ans['",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 70388,
+      "time": "2026-10-08T21:29:12.723853+00:00",
+      "tool_call_id": "chatcmpl-tool-aa97fc60b1f10d8f",
+      "command": "cat > /tmp/work/edge.py <<'PYEOF'\nimport json, sys, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom reftest import brute\nfrom public_contract import valid_history\n\ncases = []   # (request, expected_order_or_None_or_'any')\n\n# example from the statement\ncases.append(({\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]}, [\"t0\"]))\n# empty history, initial == final\ncases.append(({\"initial\":{},\"final\":{},\"transactions\":[]}, []))\n# empty history, initial != final\ncases.append(({\"initial\":{},\"final\":{\"a\":1},\"transactions\":[]}, None))\n# absent vs zero\ncases.append(({\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"get\",\"a\",0]]}]}, None))\ncases.append(({\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"get\",\"a\",None]]}]}, [\"t0\"]))\n# boundary real-time order: A.end == B.start  -> A must precede B\ncases.append(({\"initial\":{},\"final\":{\"a\":1},\n               \"transactions\":[{\"id\":\"tA\",\"start\":0,\"end\":5,\"ops\":[[\"put\",\"a\",1]]},\n                               {\"id\":\"tB\",\"start\":5,\"end\":9,\"ops\":[[\"get\",\"a\",1]]}]}, [\"tA\",\"tB\"]))\ncases.append(({\"initial\":{},\"final\":{\"a\":1},\n               \"transactions\":[{\"id\":\"tA\",\"start\":0,\"end\":5,\"ops\":[[\"put\",\"a\",1]]},\n                               {\"id\":\"tB\",\"start\":5,\"end\":9,\"ops\":[[\"get\",\"a\",None]]}]}, None))\n# overlapping -> both orders fine\ncases.append(({\"initial\":{},\"final\":{\"a\":1},\n               \"transactions\":[{\"id\":\"tA\",\"start\":0,\"end\":5,\"ops\":[[\"put\",\"a\",1]]},\n                               {\"id\":\"tB\",\"start\":3,\"end",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 71236,
+      "time": "2026-10-08T21:29:38.293681+00:00",
+      "tool_call_id": "chatcmpl-tool-9eea5697673758bd",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nimport json, sys, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nsrc=open('edge.py').read()\n# compare solver against brute-force truth for every case, no authoring assumptions\nsrc=src.replace(\"\"\"    truth = brute(req)\n    if (want is None) != (truth is None):\n        print('TEST AUTHORING ERROR: want=%r brute=%r' % (want, truth)); print(json.dumps(req)); bad+=1; continue\n\"\"\",\"\"\"    truth = brute(req)\n    if (truth is None) != (got.get('order') is None):\n        bad+=1; print('DISAGREE with brute: want=%r brute=%r got=%r' % (want,truth,got)); print(json.dumps(req)); continue\n\"\"\")\n# make the chain case satisfiable: final a == 10\nsrc=src.replace('req = {\"initial\":{\"a\":0},\"final\":{\"a\":9},','req = {\"initial\":{\"a\":0},\"final\":{\"a\":10},')\nopen('edge2.py','w').write(src)\nPYEOF\ncd /tmp/work && python3 edge2.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 72551,
+      "time": "2026-10-08T21:30:00.812152+00:00",
+      "tool_call_id": "chatcmpl-tool-b13047bfdd54c355",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nsrc=open('edge2.py').read()\nsrc=src.replace(\"\"\"cases.append(({\"initial\":{},\"final\":{\"a\":1},\n               \"transactions\":[{\"id\":\"tA\",\"start\":0,\"end\":5,\"ops\":[[\"put\",\"a\",1]]},\n                               {\"id\":\"tB\",\"start\":3,\"end\":9,\"ops\":[[\"get\",\"a\",None]]}]}, None))\"\"\",\n\"\"\"cases.append(({\"initial\":{},\"final\":{\"a\":1},\n               \"transactions\":[{\"id\":\"tA\",\"start\":0,\"end\":5,\"ops\":[[\"put\",\"a\",1]]},\n                               {\"id\":\"tB\",\"start\":3,\"end\":9,\"ops\":[[\"get\",\"a\",None]]}]}, \"any\"))\"\"\")\nsrc=src.replace(\"\"\"                               {\"id\":\"t3\",\"start\":0,\"end\":9,\"ops\":[[\"get\",\"a\",None]]}]}, None))\n# same but t3 reads first\"\"\",\"\"\"                               {\"id\":\"t3\",\"start\":0,\"end\":9,\"ops\":[[\"get\",\"a\",None]]}]}, \"any\"))\n# same but t3 reads first\"\"\")\nsrc=src.replace(\"\"\"                               {\"id\":\"t3\",\"start\":0,\"end\":9,\"ops\":[[\"get\",\"a\",None]]}]}, [\"t3\",\"t0\",\"t1\",\"t2\"]))\"\"\",\n\"\"\"                               {\"id\":\"t3\",\"start\":0,\"end\":9,\"ops\":[[\"get\",\"a\",None]]}]}, None))\"\"\")\nopen('edge2.py','w').write(src)\nPYEOF\ncd /tmp/work && python3 edge2.py && python3 edge.py 2>/dev/null | tail -1",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 72691,
+      "time": "2026-10-08T21:30:13.381470+00:00",
+      "tool_call_id": "chatcmpl-tool-a7ab2220c1a5c483",
+      "command": "cd /app && sed -n '160,300p' main.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 75337,
+      "time": "2026-10-08T21:30:57.166331+00:00",
+      "tool_call_id": "chatcmpl-tool-935ad1962a3700bd",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nimport json, sys, subprocess\nsys.path.insert(0,'/app')\nfrom public_contract import valid_history\n\nreqs = [\n  # put with null value (outside the documented shape) -> literal search path\n  {\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",None]]}]},\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",1]]}]},\n  # scan whose expected pairs are unsorted / out of range / duplicated -> impossible\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"b\",1],[\"a\",1]]]]}]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\",1],[\"a\",1]]]]}]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"b\",\"z\",[[\"a\",1]]]]}]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\"]]]]]}},\n  # cas whose expected_success is not a boolean -> literal path\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"cas\",\"a\",1,2,1]]}]},\n  # unknown op kind, read as a scan by the reference checker\n  {\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"bump\",\"a\",1]]}]},\n  {\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[]]]}]},\n  # float expectations compare like ints under the reference semantics\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 76237,
+      "time": "2026-10-08T21:31:09.641890+00:00",
+      "tool_call_id": "chatcmpl-tool-a2fd37b253264100",
+      "command": "cd /tmp/work && python3 - <<'PYEOF'\nimport json, sys, subprocess\nsys.path.insert(0,'/app')\nfrom public_contract import valid_history\n\nreqs = [\n  {\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",None]]}]},\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",1]]}]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"b\",1],[\"a\",1]]]]}]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\",1],[\"a\",1]]]]}]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"b\",\"z\",[[\"a\",1]]]]}]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\"]]]]]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"cas\",\"a\",1,2,1]]}]},\n  {\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"bump\",\"a\",1]]}]},\n  {\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[]]]}]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"get\",\"a\",1.0]]}]},\n  {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[]}]},\n  {\"initial\":{\"a\":-100},\"final\":{\"a\":1000},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"cas\",\"a\",-100,1000,True]]}]},\n  {\"initial\":{\"aa\":1,\"ab\":2,\"b\":3},\"final\":{\"aa\":1,\"ab\":2,\"b\":3},\n   \"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 77319,
+      "time": "2026-10-08T21:31:25.219488+00:00",
+      "tool_call_id": "chatcmpl-tool-88f98cec2d44bb37",
+      "command": "cat > /tmp/work/weird.jsonl <<'EOF'\n{\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",null]]}]}\n{\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",1]]}]}\n{\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"b\",1],[\"a\",1]]]]}]}\n{\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\",1],[\"a\",1]]]]}]}\n{\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"b\",\"z\",[[\"a\",1]]]]}]}\n{\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\"]]]]}]}\n{\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"cas\",\"a\",1,2,1]]}]}\n{\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"bump\",\"a\",1]]}]}\n{\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[]]]}]}\n{\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"get\",\"a\",1.0]]}]}\n{\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[]}]}\n{\"initial\":{\"a\":-100},\"final\":{\"a\":1000},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"cas\",\"a\",-100,1000,true]]}]}\n{\"initial\":{\"aa\":1,\"ab\":2,\"b\":3},\"final\":{\"aa\":1,\"ab\":2,\"b\":3},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"aa\",\"b\",[[\"aa\",1],[\"ab\",2]]]]}]}\n{\"initial\":{},\"final\":{},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"del\",\"a\"]]},{\"id\":\"t\",\"start\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 78511,
+      "time": "2026-10-08T21:31:56.503441+00:00",
+      "tool_call_id": "chatcmpl-tool-a39acb7b22cd769b",
+      "command": "cd /tmp/work && timeout 1500 python3 - <<'PYEOF'\nimport json, random, sys, time\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom gen import gen_request\nfrom reftest import brute, run\nfrom public_contract import valid_history\n\nt0=time.time()\ntot=0; mism=0\nfor seed in range(20,32):\n    rng=random.Random(seed)\n    reqs=[gen_request(rng, nmax=6, truthful=rng.random()<0.5) for _ in range(250)]\n    truths=[brute(r) for r in reqs]\n    got=run(reqs)\n    for req,want,g in zip(reqs,truths,got):\n        tot+=1\n        ok = (g.get('order') is None) if want is None else valid_history(req,g.get('order'))\n        if not ok:\n            mism+=1; print('MISMATCH',json.dumps(req),want,g)\n            if mism>3: sys.exit(1)\nprint('brute-force differential: %d requests, %d mismatches, %.1fs' % (tot,mism,time.time()-t0))\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 78720,
+      "time": "2026-10-08T21:32:03.427783+00:00",
+      "tool_call_id": "chatcmpl-tool-9de71d000765717e",
+      "command": "cd /tmp/work && for s in 10 11 12 13 14; do timeout 900 python3 nearmiss.py $s 120 2>&1 | head -2; done",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 79737,
+      "time": "2026-10-08T21:32:21.628547+00:00",
+      "tool_call_id": "chatcmpl-tool-a115d315a7dc92d5",
+      "command": "cd /tmp/work && timeout 1500 python3 - <<'PYEOF'\n\"\"\"Mega batch: every family through a single process, validated end to end.\"\"\"\nimport json, random, sys, time, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom truth import truthful\nfrom gen import gen_request\nfrom public_contract import valid_history\nfrom main import literal_apply\n\nrng = random.Random(2024)\nreqs = []\nknown_sat = []\n# 1. truthful histories (witness exists by construction)\nfor i in range(600):\n    overlap = rng.random() < 0.5\n    r, order = truthful(rng, n=rng.randint(1,10), nkeys=rng.randint(1,6),\n                        nops=rng.randint(1,5), overlap=overlap, tight=(not overlap and rng.random()<0.3))\n    assert valid_history(r, order)\n    reqs.append(r); known_sat.append(True)\n# 2. arbitrary random histories (either outcome)\nfor i in range(600):\n    reqs.append(gen_request(rng, nmax=10, truthful=False)); known_sat.append(None)\nfor i in range(400):\n    reqs.append(gen_request(rng, nmax=10, truthful=True)); known_sat.append(None)\n# 3. unsatisfiable by construction: a get expecting a value nobody can produce\ndef impossible(r):\n    r = json.loads(json.dumps(r))\n    tx = rng.choice(r['transactions']); ops = tx['ops']\n    cands = [i for i,o in enumerate(ops) if o[0]=='get']\n    if not cands: return None\n    i = rng.choice(cands); k = ops[i][1]\n    possible = {r['initial'].get(k), None}\n    for t in r['transactions']:\n        for o in t['ops']:\n            if o[0]=='put' and o[1]==k: possible.add(o[2])\n            if o[0]=='cas' and o[1]==k:\n                possible.add(o[2])\n              ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 81004,
+      "time": "2026-10-08T21:32:43.398353+00:00",
+      "tool_call_id": "chatcmpl-tool-8c2f88103055475b",
+      "command": "cd /tmp/work && timeout 900 python3 - <<'PYEOF'\nimport json, random, sys\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom truth import truthful\nfrom main import solve\nfrom public_contract import valid_history\nfrom reftest import brute\n\nrng=random.Random(555)\nbad=0; checked=0\nfor it in range(400):\n    overlap = rng.random()<0.5\n    r,_ = truthful(rng, n=rng.randint(0,8), nkeys=rng.randint(1,6),\n                   nops=rng.randint(1,5), overlap=overlap)\n    if rng.random()<0.5:   # perturb half of them\n        ts=r['transactions']\n        if ts:\n            ti=rng.randrange(len(ts)); ops=ts[ti]['ops']\n            gi=[i for i,o in enumerate(ops) if o[0]=='get']\n            if gi:\n                ops[rng.choice(gi)][2]=rng.randint(-9,9)\n    base = solve(r)['order']\n    base_sat = base is not None\n    if base_sat and not valid_history(r, base): print('INVALID'); bad+=1\n    for _ in range(3):\n        r2=json.loads(json.dumps(r))\n        rng.shuffle(r2['transactions'])\n        ans = solve(r2)['order']\n        if (ans is not None) != base_sat:\n            print('ORDER-DEPENDENT ANSWER'); print(json.dumps(r)); bad+=1; break\n        if ans is not None and not valid_history(r2, ans):\n            print('INVALID AFTER SHUFFLE'); print(json.dumps(r2)); bad+=1; break\n    # small ones: also compare with full brute force\n    if len(r['transactions'])<=6:\n        truth=brute(r)\n        if (truth is None)!=(base is None):\n            print('DISAGREE WITH BRUTE'); print(json.dumps(r)); bad+=1\n    checked+=1\n    if bad>3: break\nprint('shuffle-invariance + brute cross-check: %d his",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 81575,
+      "time": "2026-10-08T21:32:54.978539+00:00",
+      "tool_call_id": "chatcmpl-tool-b44d9ff7b462495b",
+      "command": "cd /app && sed -n '1,120p' main.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 84141,
+      "time": "2026-10-08T21:33:34.982110+00:00",
+      "tool_call_id": "chatcmpl-tool-be07a2d9a3261f66",
+      "command": "cd /app && python3 - <<'PYEOF'\nsrc = open('main.py').read()\nold = \"\"\"    for p in pairs:\n        if (not isinstance(p, list) or len(p) != 2\n                or not isinstance(p[0], str) or not _is_int(p[1])):\n            raise UnsatError\n        key = p[0]\n        # a replayed scan is always sorted, duplicate free and inside range\n        if not (low <= key < high) or (prev is not None and key <= prev):\n            raise UnsatError\n        seen[key] = p[1]\n        prev = key\n    return ('scan', low, high, seen)\"\"\"\nnew = \"\"\"    for p in pairs:\n        if not isinstance(p, list) or len(p) != 2 or not isinstance(p[0], str):\n            raise WeirdError                 # let the literal replay decide\n        if not _is_int(p[1]):\n            raise WeirdError                 # a value unlike anything it can store\n        key = p[0]\n        # a replayed scan is always sorted, duplicate free and inside its range\n        if not (low <= key < high) or (prev is not None and key <= prev):\n            raise UnsatError                 # no state can ever produce this\n        seen[key] = p[1]\n        prev = key\n    return ('scan', low, high, seen)\"\"\"\nassert old in src\nsrc = src.replace(old, new)\nopen('main.py','w').write(src)\nprint('patched')\nPYEOF\ncd /app && python3 smoke.py && cd /tmp/work && python3 edge2.py && python3 - <<'PYEOF'\nimport json,sys,subprocess\nreqs=[json.loads(l) for l in open('/tmp/work/weird.jsonl')]\np=subprocess.run([sys.executable,'/app/main.py'],input=''.join(json.dumps(r)+'\\n' for r in reqs),text=True,capture_output=True,cwd='/app')\nsys.path.insert(0,'/app')\nfrom pu",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 84302,
+      "time": "2026-10-08T21:33:39.680333+00:00",
+      "tool_call_id": "chatcmpl-tool-b429b23e1f847d24",
+      "command": "cd /tmp/work && for s in 41 42 43; do python3 run_diff.py $s 120 | tail -1; done && timeout 900 python3 nearmiss.py 20 120 | head -1 && timeout 600 python3 adv.py | tail -4",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 85042,
+      "time": "2026-10-08T21:33:52.631982+00:00",
+      "tool_call_id": "chatcmpl-tool-ae970bdac15d0f29",
+      "command": "cd /tmp/work && timeout 1500 python3 - <<'PYEOF'\n\"\"\"Final mega batch re-run after the patch.\"\"\"\nimport json, random, sys, time, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom truth import truthful\nfrom gen import gen_request\nfrom public_contract import valid_history\n\nrng = random.Random(987)\nreqs=[]; known=[]\nfor i in range(500):\n    r,_=truthful(rng,n=rng.randint(1,10),nkeys=rng.randint(1,6),nops=rng.randint(1,5),\n                 overlap=rng.random()<0.5,tight=rng.random()<0.2)\n    reqs.append(r); known.append(True)\nfor i in range(500):\n    reqs.append(gen_request(rng,nmax=10,truthful=False)); known.append(None)\n# provably impossible: get expects a value nothing can produce\ndef possible_vals(r,k):\n    vals={r['initial'].get(k), None}\n    for t in r['transactions']:\n        for o in t['ops']:\n            if o[0]=='put' and o[1]==k: vals.add(o[2])\n            if o[0]=='cas' and o[1]==k:\n                vals.add(o[2])\n                if o[3] is not None: vals.add(o[3])\n    return vals\nmade=0\nwhile made<300:\n    r,_=truthful(rng,n=rng.randint(1,10),nkeys=rng.randint(1,6),nops=rng.randint(1,5),overlap=True)\n    ts=r['transactions']; cands=[(ti,oi) for ti,t in enumerate(ts) for oi,o in enumerate(t['ops']) if o[0]=='get']\n    if not cands: continue\n    ti,oi=rng.choice(cands); k=ts[ti]['ops'][oi][1]\n    free=[v for v in range(-9,10) if v not in possible_vals(r,k)]\n    if not free: continue\n    ts[ti]['ops'][oi][2]=rng.choice(free); reqs.append(r); known.append(False); made+=1\nt0=time.time()\np=subprocess.run([sys.executable,'/app/main.py'],input=''.join",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 85753,
+      "time": "2026-10-08T21:34:04.881691+00:00",
+      "tool_call_id": "chatcmpl-tool-bf486a23b4825395",
+      "command": "cd /app && python3 - <<'PYEOF'\nsrc=open('main.py').read()\nassert \"if not (ticks[0] & 1023) and time.monotonic() > deadline:\" in src\nsrc=src.replace(\"if not (ticks[0] & 1023) and time.monotonic() > deadline:\",\n                \"if not (ticks[0] & 255) and time.monotonic() > deadline:\")\nsrc=src.replace(\"\"\"            ticks[0] += 1\n            if not (ticks[0] & 1023) and time.monotonic() > deadline:\"\"\",\n\"\"\"            ticks[0] += 1\n            if not (ticks[0] & 255) and time.monotonic() > deadline:\"\"\")\nopen('main.py','w').write(src)\nprint('ok')\nPYEOF\ncd /app && python3 smoke.py && printf '%s' '{\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]}' | python3 /app/main.py && echo \"(no trailing newline ok)\" && cd /tmp/work && python3 edge2.py && python3 run_diff.py 77 100 | tail -1",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 85894,
+      "time": "2026-10-08T21:34:09.380635+00:00",
+      "tool_call_id": "chatcmpl-tool-88d8b3743f5b2589",
+      "command": "cd /tmp/work && timeout 900 python3 nearmiss.py 30 150 | head -1 && timeout 600 python3 adv.py | tail -2 && python3 -c \"\nimport py_compile; py_compile.compile('/app/main.py', doraise=True); print('compiles clean')\n\" && cd /app && python3 -m pyflakes main.py 2>/dev/null || python3 - <<'PYEOF'\nimport ast, sys\nsrc=open('/app/main.py').read()\ntree=ast.parse(src)\nprint('AST ok; lines:', len(src.splitlines()))\nPYEOF",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 86065,
+      "time": "2026-10-08T21:34:14.491110+00:00",
+      "tool_call_id": "chatcmpl-tool-a8bbb847c346f7a1",
+      "command": "cd /app && sed -n '395,470p' main.py && echo \"--- files ---\" && ls -la /app && rm -rf /app/__pycache__ && ls /app",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 86716,
+      "time": "2026-10-08T21:34:25.958039+00:00",
+      "tool_call_id": "chatcmpl-tool-9b20c4802f0c7a3c",
+      "command": "cd /app && python3 smoke.py && cd /tmp/work && python3 run_diff.py 999 80 | tail -1 && timeout 300 python3 nearmiss.py 99 60 | head -1 && echo \"=== final: timing a 5000-request batch through one process ===\" && python3 - <<'PYEOF'\nimport json, random, sys, time, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom truth import truthful\nfrom gen import gen_request\nfrom public_contract import valid_history\nrng=random.Random(20250)\nreqs=[]\nfor i in range(2500):\n    r,_=truthful(rng,n=rng.randint(0,10),nkeys=rng.randint(1,6),nops=rng.randint(1,5),overlap=rng.random()<0.5)\n    reqs.append(r)\nfor i in range(2500):\n    reqs.append(gen_request(rng,nmax=10,truthful=False))\nt0=time.time()\np=subprocess.run([sys.executable,'/app/main.py'],input=''.join(json.dumps(r)+'\\n' for r in reqs),text=True,capture_output=True,cwd='/app')\nel=time.time()-t0\nlines=p.stdout.splitlines()\nok=sum(1 for r,l in zip(reqs,lines) if json.loads(l).get('order') is None or valid_history(r,json.loads(l)['order']))\nprint('5000 requests, %d lines out, %.2fs total (%.3f ms/req), all answers valid: %s, rc=%d, stderr=%r'\n      % (len(lines), el, 1000*el/len(reqs), ok==len(reqs), p.returncode, p.stderr[:100]))\nPYEOF",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 69,
+      "time": "2026-10-08T21:07:23.052669+00:00",
+      "tool_call_id": "chatcmpl-tool-b970102f526da9d9",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:42 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 21:07 ..\n-rw-r--r-- 1 agent agent 1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('atomic-range-history',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:42 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 21:07 ..\n-rw-r--r-- 1 agent agent 1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('atomic-range-history',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 42739,
+      "time": "2026-10-08T21:19:51.947527+00:00",
+      "tool_call_id": "chatcmpl-tool-b9d7a6bb0529e6ab",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/work/run_diff.py\", line 21, in <module>\n    ok = valid_history(req, g.get('order'))\n         ^^^^^^^^^^^^^\nNameError: name 'valid_history' is not defined\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"/tmp/work/run_diff.py\", line 21, in <module>\n    ok = valid_history(req, g.get('order'))\n         ^^^^^^^^^^^^^\nNameError: name 'valid_history' is not defined\n"
+    },
+    {
+      "step": 42874,
+      "time": "2026-10-08T21:19:56.605879+00:00",
+      "tool_call_id": "chatcmpl-tool-a5e990cf327fbf51",
+      "return_code": 0,
+      "stdout": "seed 1 checked 600 requests, mismatches: 0\n",
+      "stderr": "",
+      "stdout_tail": "seed 1 checked 600 requests, mismatches: 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 43752,
+      "time": "2026-10-08T21:20:15.616092+00:00",
+      "tool_call_id": "chatcmpl-tool-87c4abacef0da2b4",
+      "return_code": 0,
+      "stdout": "seed 2 checked 480 requests, mismatches: 0\nseed 3 checked 480 requests, mismatches: 0\nseed 4 checked 480 requests, mismatches: 0\nseed 5 checked 480 requests, mismatches: 0\nseed 6 checked 480 requests, mismatches: 0\nseed 7 checked 480 requests, mismatches: 0\n",
+      "stderr": "",
+      "stdout_tail": "seed 2 checked 480 requests, mismatches: 0\nseed 3 checked 480 requests, mismatches: 0\nseed 4 checked 480 requests, mismatches: 0\nseed 5 checked 480 requests, mismatches: 0\nseed 6 checked 480 requests, mismatches: 0\nseed 7 checked 480 requests, mismatches: 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 44520,
+      "time": "2026-10-08T21:20:28.792932+00:00",
+      "tool_call_id": "chatcmpl-tool-8b695f55af9d493f",
+      "return_code": 1,
+      "stdout": "MISMATCH {\"initial\": {\"ab\": -4, \"b\": 0, \"d\": 8}, \"final\": {\"b\": -9, \"d\": 0, \"e\": 6, \"ab\": 1}, \"transactions\": [{\"id\": \"t3\", \"start\": 4, \"end\": 5, \"ops\": [[\"put\", \"b\", 7], [\"get\", \"d\", 8], [\"cas\", \"ab\", -4, 1, true]]}, {\"id\": \"t7\", \"start\": 4, \"end\": 5, \"ops\": [[\"cas\", \"d\", 8, 0, true]]}, {\"id\": \"t0\", \"start\": 0, \"end\": 5, \"ops\": [[\"del\", \"ab\"]]}, {\"id\": \"t2\", \"start\": 4, \"end\": 5, \"ops\": [[\"scan\", \"e\", \"ez\", []]]}, {\"id\": \"t1\", \"start\": 3, \"end\": 5, \"ops\": [[\"get\", \"ab\", null], [\"cas\", \"e\", null, 6, true]]}, {\"id\": \"t4\", \"start\": 4, \"end\": 5, \"ops\": [[\"get\", \"d\", 0], [\"put\", \"ab\", -5], [\"get\", \"ab\", -5]]}, {\"id\": \"t6\", \"start\": 1, \"end\": 3, \"ops\": [[\"get\", \"b\", 7], [\"get\", \"b\", 7], [\"put\", \"ab\", 3], [\"put\", \"b\", -9]]}, {\"id\": \"t5\", \"start\": 0, \"end\": 1, \"ops\": [[\"put\", \"ab\", -3], [\"get\", \"e\", 6], [\"del\", \"ab\"], [\"get\", \"b\", -9], [\"put\", \"ab\", 1]]}]} \n truth: ['t3', 't7', 't0', 't2', 't1', 't4', 't6', 't5'] \n got: {'order': None}\nMISMATCH {\"initial\": {\"d\": -5}, \"final\": {}, \"transactions\": [{\"id\": \"t2\", \"start\": 3, \"end\": 4, \"ops\": [[\"get\", \"ab\", null]]}, {\"id\": \"t3\", \"start\": 3, \"end\": 6, \"ops\": [[\"put\", \"ab\", 1], [\"scan\", \"f\", \"fz\", []], [\"scan\", \"f\", \"fz\", []], [\"put\", \"f\", -9]]}, {\"id\": \"t1\", \"start\": 1, \"end\": 3, \"ops\": [[\"cas\", \"d\", -5, 0, true], [\"del\", \"f\"], [\"get\", \"d\", 0], [\"put\", \"d\", 5], [\"get\", \"f\", null]]}, {\"id\": \"t0\", \"start\": 1, \"end\": 3, \"ops\": [[\"scan\", \"f\", \"fz\", []], [\"del\", \"d\"], [\"del\", \"ab\"]]}]} \n truth: ['t2', 't3', 't1', 't0'] \n got: {'order': None}\nMISMATCH {\"initial\": {\"c\": -3, \"e\": 6}, \"final\": {\"e\": -9, \"f\": 4, \"d\": 9}, \"transactions\": [{\"id\": \"t2\", \"start\": 2, \"end\": 6, \"ops\": [[\"scan\", \"d\", \"f\", [[\"e\", 6]]]]}, {\"id\": \"t6\", \"start\": 4, \"end\": 6, \"ops\": [[\"scan\", \"c\", \"f\", [[\"c\", -3], [\"e\", 6]]], [\"get\", \"e\", 6], [\"get\", \"c\", -3]]}, {\"id\": \"t5\", \"start\": 4, \"end\": 5, \"ops\": [[\"del\", \"b\"], [\"get\", \"c\", -3], [\"get\", \"c\", -3], [\"get\", \"f\", null], [\"put\", \"f\", -5]]}, {\"id\": \"t3\", \"start\": 0, \"end\": 4, \"ops\": [[\"del\", \"d\"], [\"get\", \"b\", null]]}, {\"id\": \"t1\", \"start\": 0, \"end\": 3, \"ops\": [[\"put\", \"f\", -6], [\"put\", \"d\", 4], [\"del\", \"f\"], [\"scan\", \"d\", \"f\", [[\"d\", 4], [\"e\", 6]]]]}, {\"id\": \"t4\", \"start\": 1, \"end\": 3, \"ops\": [[\"scan\", \"b\", \"c\", []], [\"del\", \"d\"], [\"del\", \"f\"], [\"put\", \"e\", -9]]}, {\"id\": \"t7\", \"start\": 1, \"end\": 4, \"ops\": [[\"put\", \"f\", 4]]}, {\"id\": \"t0\", \"start\": 2, \"end\": 5, \"ops\": [[\"put\", \"d\", 9], [\"get\", \"c\", -3], [\"put\", \"c\", 7], [\"scan\", \"b\", \"f\", [[\"c\", 7], [\"d\", 9], [\"e\", -9]]], [\"del\", \"c\"]]}]} \n truth: ['t2', 't6', 't5', 't3', 't1', 't4', 't7', 't0'] \n got: {'order': None}\nMISMATCH {\"initial\": {}, \"final\": {\"ab\": -1}, \"transactions\": [{\"id\": \"t2\", \"start\": 0, \"end\": 6, \"ops\": [[\"put\", \"g\", 6], [\"put\", \"g\", -9], [\"get\", \"ab\", null], [\"put\", \"ab\", -2], [\"del\", \"ab\"]]}, {\"id\": \"t8\", \"start\": 3, \"end\": 5, \"ops\": [[\"get\", \"ab\", null], [\"scan\", \"g\", \"gz\", [[\"g\", -9]]], [\"get\", \"g\", -9], [\"get\", \"g\", -9]]}, {\"id\": \"t3\", \"start\": 0, \"end\": 5, \"ops\": [[\"get\", \"g\", -9], [\"put\", \"g\", 2]]}, {\"id\": \"t4\", \"start\": 4, \"end\": 6, \"ops\": [[\"put\", \"g\", -2], [\"cas\", \"ab\", null, 8, true], [\"del\", \"ab\"]]}, {\"id\": \"t1\", \"start\": 4, \"end\": 5, \"ops\": [[\"scan\", \"g\", \"gz\", [[\"g\", -2]]]]}, {\"id\": \"t5\", \"start\": 4, \"end\": 6, \"ops\": [[\"get\", \"g\", -2]]}, {\"id\": \"t7\", \"start\": 0, \"end\": 4, \"ops\": [[\"put\", \"g\", 7], [\"cas\", \"g\", 7, 8, true], [\"cas\", \"g\", 8, 0, true]]}, {\"id\": \"t9\", \"start\": 3, \"end\": 4, \"ops\": [[\"put\", \"ab\", -1], [\"scan\", \"ab\", \"g\", [[\"ab\", -1]]], [\"cas\", \"g\", 0, 0, true], [\"put\", \"ab\", -1], [\"cas\", \"g\", 0, 8, true]]}, {\"id\": \"t6\", \"start\": 0, \"end\": 3, \"ops\": [[\"get\", \"ab\", -1], [\"get\", \"ab\", -1]]}, {\"id\": \"t0\", \"start\": 2, \"end\": 3, \"ops\": [[\"scan\", \"g\", \"gz\", [[\"g\", 8]]], [\"scan\", \"ab\", \"g\", [[\"ab\", -1]]], [\"put\", \"g\", -2], [\"put\", \"g\", -5], [\"del\", \"g\"]]}]} \n truth: ['t2', 't8', 't3', 't4', 't1', 't5', 't7', 't9', 't6', 't0'] \n got: {'order': None}\n",
+      "stderr": "",
+      "stdout_tail": "b\", 1]]}]} \n truth: ['t3', 't7', 't0', 't2', 't1', 't4', 't6', 't5'] \n got: {'order': None}\nMISMATCH {\"initial\": {\"d\": -5}, \"final\": {}, \"transactions\": [{\"id\": \"t2\", \"start\": 3, \"end\": 4, \"ops\": [[\"get\", \"ab\", null]]}, {\"id\": \"t3\", \"start\": 3, \"end\": 6, \"ops\": [[\"put\", \"ab\", 1], [\"scan\", \"f\", \"fz\", []], [\"scan\", \"f\", \"fz\", []], [\"put\", \"f\", -9]]}, {\"id\": \"t1\", \"start\": 1, \"end\": 3, \"ops\": [[\"cas\", \"d\", -5, 0, true], [\"del\", \"f\"], [\"get\", \"d\", 0], [\"put\", \"d\", 5], [\"get\", \"f\", null]]}, {\"id\": \"t0\", \"start\": 1, \"end\": 3, \"ops\": [[\"scan\", \"f\", \"fz\", []], [\"del\", \"d\"], [\"del\", \"ab\"]]}]} \n truth: ['t2', 't3', 't1', 't0'] \n got: {'order': None}\nMISMATCH {\"initial\": {\"c\": -3, \"e\": 6}, \"final\": {\"e\": -9, \"f\": 4, \"d\": 9}, \"transactions\": [{\"id\": \"t2\", \"start\": 2, \"end\": 6, \"ops\": [[\"scan\", \"d\", \"f\", [[\"e\", 6]]]]}, {\"id\": \"t6\", \"start\": 4, \"end\": 6, \"ops\": [[\"scan\", \"c\", \"f\", [[\"c\", -3], [\"e\", 6]]], [\"get\", \"e\", 6], [\"get\", \"c\", -3]]}, {\"id\": \"t5\", \"start\": 4, \"end\": 5, \"ops\": [[\"del\", \"b\"], [\"get\", \"c\", -3], [\"get\", \"c\", -3], [\"get\", \"f\", null], [\"put\", \"f\", -5]]}, {\"id\": \"t3\", \"start\": 0, \"end\": 4, \"ops\": [[\"del\", \"d\"], [\"get\", \"b\", null]]}, {\"id\": \"t1\", \"start\": 0, \"end\": 3, \"ops\": [[\"put\", \"f\", -6], [\"put\", \"d\", 4], [\"del\", \"f\"], [\"scan\", \"d\", \"f\", [[\"d\", 4], [\"e\", 6]]]]}, {\"id\": \"t4\", \"start\": 1, \"end\": 3, \"ops\": [[\"scan\", \"b\", \"c\", []], [\"del\", \"d\"], [\"del\", \"f\"], [\"put\", \"e\", -9]]}, {\"id\": \"t7\", \"start\": 1, \"end\": 4, \"ops\": [[\"put\", \"f\", 4]]}, {\"id\": \"t0\", \"start\": 2, \"end\": 5, \"ops\": [[\"put\", \"d\", 9], [\"get\", \"c\", -3], [\"put\", \"c\", 7], [\"scan\", \"b\", \"f\", [[\"c\", 7], [\"d\", 9], [\"e\", -9]]], [\"del\", \"c\"]]}]} \n truth: ['t2', 't6', 't5', 't3', 't1', 't4', 't7', 't0'] \n got: {'order': None}\nMISMATCH {\"initial\": {}, \"final\": {\"ab\": -1}, \"transactions\": [{\"id\": \"t2\", \"start\": 0, \"end\": 6, \"ops\": [[\"put\", \"g\", 6], [\"put\", \"g\", -9], [\"get\", \"ab\", null], [\"put\", \"ab\", -2], [\"del\", \"ab\"]]}, {\"id\": \"t8\", \"start\": 3, \"end\": 5, \"ops\": [[\"get\", \"ab\", null], [\"scan\", \"g\", \"gz\", [[\"g\", -9]]], [\"get\", \"g\", -9], [\"get\", \"g\", -9]]}, {\"id\": \"t3\", \"start\": 0, \"end\": 5, \"ops\": [[\"get\", \"g\", -9], [\"put\", \"g\", 2]]}, {\"id\": \"t4\", \"start\": 4, \"end\": 6, \"ops\": [[\"put\", \"g\", -2], [\"cas\", \"ab\", null, 8, true], [\"del\", \"ab\"]]}, {\"id\": \"t1\", \"start\": 4, \"end\": 5, \"ops\": [[\"scan\", \"g\", \"gz\", [[\"g\", -2]]]]}, {\"id\": \"t5\", \"start\": 4, \"end\": 6, \"ops\": [[\"get\", \"g\", -2]]}, {\"id\": \"t7\", \"start\": 0, \"end\": 4, \"ops\": [[\"put\", \"g\", 7], [\"cas\", \"g\", 7, 8, true], [\"cas\", \"g\", 8, 0, true]]}, {\"id\": \"t9\", \"start\": 3, \"end\": 4, \"ops\": [[\"put\", \"ab\", -1], [\"scan\", \"ab\", \"g\", [[\"ab\", -1]]], [\"cas\", \"g\", 0, 0, true], [\"put\", \"ab\", -1], [\"cas\", \"g\", 0, 8, true]]}, {\"id\": \"t6\", \"start\": 0, \"end\": 3, \"ops\": [[\"get\", \"ab\", -1], [\"get\", \"ab\", -1]]}, {\"id\": \"t0\", \"start\": 2, \"end\": 3, \"ops\": [[\"scan\", \"g\", \"gz\", [[\"g\", 8]]], [\"scan\", \"ab\", \"g\", [[\"ab\", -1]]], [\"put\", \"g\", -2], [\"put\", \"g\", -5], [\"del\", \"g\"]]}]} \n truth: ['t2', 't8', 't3', 't4', 't1', 't5', 't7', 't9', 't6', 't0'] \n got: {'order': None}\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 45591,
+      "time": "2026-10-08T21:20:46.696270+00:00",
+      "tool_call_id": "chatcmpl-tool-a3182a4b7068f8fd",
+      "return_code": 0,
+      "stdout": "seed 11 n<=10 span=6 checked 40  exhaustive 0.01s  mismatches 0\n",
+      "stderr": "",
+      "stdout_tail": "seed 11 n<=10 span=6 checked 40  exhaustive 0.01s  mismatches 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 45725,
+      "time": "2026-10-08T21:20:51.299785+00:00",
+      "tool_call_id": "chatcmpl-tool-80e733950e9c694b",
+      "return_code": 0,
+      "stdout": "seed 12 n<=10 span=3 checked 40  exhaustive 0.00s  mismatches 0\nseed 13 n<=10 span=4 checked 40  exhaustive 0.00s  mismatches 0\nseed 14 n<=10 span=8 checked 40  exhaustive 0.01s  mismatches 0\nseed 15 n<=10 span=12 checked 40  exhaustive 0.00s  mismatches 0\nseed 16 n<=9 span=5 checked 40  exhaustive 0.00s  mismatches 0\nseed 17 n<=8 span=2 checked 40  exhaustive 0.00s  mismatches 0\n",
+      "stderr": "",
+      "stdout_tail": "seed 12 n<=10 span=3 checked 40  exhaustive 0.00s  mismatches 0\nseed 13 n<=10 span=4 checked 40  exhaustive 0.00s  mismatches 0\nseed 14 n<=10 span=8 checked 40  exhaustive 0.01s  mismatches 0\nseed 15 n<=10 span=12 checked 40  exhaustive 0.00s  mismatches 0\nseed 16 n<=9 span=5 checked 40  exhaustive 0.00s  mismatches 0\nseed 17 n<=8 span=2 checked 40  exhaustive 0.00s  mismatches 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 49331,
+      "time": "2026-10-08T21:21:53.246693+00:00",
+      "tool_call_id": "chatcmpl-tool-9de5ea9cce45290d",
+      "return_code": 1,
+      "stdout": "proven-satisfiable: 84\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 40, in <module>\nValueError: not enough values to unpack (expected 3, got 2)\n",
+      "stdout_tail": "proven-satisfiable: 84\n",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"<stdin>\", line 40, in <module>\nValueError: not enough values to unpack (expected 3, got 2)\n"
+    },
+    {
+      "step": 75338,
+      "time": "2026-10-08T21:30:57.460224+00:00",
+      "tool_call_id": "chatcmpl-tool-935ad1962a3700bd",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "  File \"<stdin>\", line 13\n    {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\"]]]]]}},\n                                                                                                                   ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{'\n",
+      "stdout_tail": "",
+      "stderr_tail": "  File \"<stdin>\", line 13\n    {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\"]]]]]}},\n                                                                                                                   ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{'\n"
+    },
+    {
+      "step": 76238,
+      "time": "2026-10-08T21:31:10.144791+00:00",
+      "tool_call_id": "chatcmpl-tool-a2fd37b253264100",
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "  File \"<stdin>\", line 11\n    {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\"]]]]]},\n                                                                                                                   ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{'\n",
+      "stdout_tail": "",
+      "stderr_tail": "  File \"<stdin>\", line 11\n    {\"initial\":{\"a\":1},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t\",\"start\":0,\"end\":1,\"ops\":[[\"scan\",\"a\",\"z\",[[\"a\"]]]]]},\n                                                                                                                   ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{'\n"
+    },
+    {
+      "step": 78512,
+      "time": "2026-10-08T21:31:58.467265+00:00",
+      "tool_call_id": "chatcmpl-tool-a39acb7b22cd769b",
+      "return_code": 0,
+      "stdout": "brute-force differential: 3000 requests, 0 mismatches, 1.6s\n",
+      "stderr": "",
+      "stdout_tail": "brute-force differential: 3000 requests, 0 mismatches, 1.6s\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 84303,
+      "time": "2026-10-08T21:33:41.672385+00:00",
+      "tool_call_id": "chatcmpl-tool-b429b23e1f847d24",
+      "return_code": 0,
+      "stdout": "seed 41 checked 480 requests, mismatches: 0\nseed 42 checked 480 requests, mismatches: 0\nseed 43 checked 480 requests, mismatches: 0\nchecked 120 corrupted histories, all agree with the exhaustive checker\ncasfail    n=600 sat=  0 total=0.10s med=0.1ms p99=3.2ms max=9.5ms\nplausible  n=600 sat=  0 total=0.07s med=0.1ms p99=0.3ms max=3.9ms\ndepchain   n=600 sat=  0 total=0.05s med=0.1ms p99=0.2ms max=3.1ms\nscanpin    n=600 sat=  0 total=0.06s med=0.1ms p99=0.2ms max=4.1ms\n",
+      "stderr": "",
+      "stdout_tail": "seed 41 checked 480 requests, mismatches: 0\nseed 42 checked 480 requests, mismatches: 0\nseed 43 checked 480 requests, mismatches: 0\nchecked 120 corrupted histories, all agree with the exhaustive checker\ncasfail    n=600 sat=  0 total=0.10s med=0.1ms p99=3.2ms max=9.5ms\nplausible  n=600 sat=  0 total=0.07s med=0.1ms p99=0.3ms max=3.9ms\ndepchain   n=600 sat=  0 total=0.05s med=0.1ms p99=0.2ms max=3.1ms\nscanpin    n=600 sat=  0 total=0.06s med=0.1ms p99=0.2ms max=4.1ms\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 85754,
+      "time": "2026-10-08T21:34:05.748668+00:00",
+      "tool_call_id": "chatcmpl-tool-bf486a23b4825395",
+      "return_code": 0,
+      "stdout": "ok\nPassed 3 public examples\n{\"order\": [\"t0\"]}\n(no trailing newline ok)\nedge cases: 23, failures 0\nseed 77 checked 400 requests, mismatches: 0\n",
+      "stderr": "",
+      "stdout_tail": "ok\nPassed 3 public examples\n{\"order\": [\"t0\"]}\n(no trailing newline ok)\nedge cases: 23, failures 0\nseed 77 checked 400 requests, mismatches: 0\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 86717,
+      "time": "2026-10-08T21:34:27.412610+00:00",
+      "tool_call_id": "chatcmpl-tool-9b20c4802f0c7a3c",
+      "return_code": 0,
+      "stdout": "Passed 3 public examples\nseed 999 checked 320 requests, mismatches: 0\nchecked 60 corrupted histories, all agree with the exhaustive checker\n=== final: timing a 5000-request batch through one process ===\n5000 requests, 5000 lines out, 0.39s total (0.079 ms/req), all answers valid: True, rc=0, stderr=''\n",
+      "stderr": "",
+      "stdout_tail": "Passed 3 public examples\nseed 999 checked 320 requests, mismatches: 0\nchecked 60 corrupted histories, all agree with the exhaustive checker\n=== final: timing a 5000-request batch through one process ===\n5000 requests, 5000 lines out, 0.39s total (0.079 ms/req), all answers valid: True, rc=0, stderr=''\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 84302,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/work && for s in 41 42 43; do python3 run_diff.py $s 120 | tail -1; done && timeout 900 python3 nearmiss.py 20 120 | head -1 && timeout 600 python3 adv.py | tail -4"
+    },
+    {
+      "step": 84303,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "seed 41 checked 480 requests, mismatches: 0\nseed 42 checked 480 requests, mismatches: 0\nseed 43 checked 480 requests, mismatches: 0\nchecked 120 corrupted histories, all agree with the exhaustive checker\ncasfail    n=600 sat=  0 total=0.10s med=0.1ms p99=3.2ms max=9.5ms\nplausible  n=600 sat=  0 total=0.07s med=0.1ms p99=0.3ms max=3.9ms\ndepchain   n=600 sat=  0 total=0.05s med=0.1ms p99=0.2ms max=3.1ms\nscanpin    n=600 sat=  0 total=0.06s med=0.1ms p99=0.2ms max=4.1ms\n"
+    },
+    {
+      "step": 85042,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/work && timeout 1500 python3 - <<'PYEOF'\n\"\"\"Final mega batch re-run after the patch.\"\"\"\nimport json, random, sys, time, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom truth import truthful\nfrom gen import gen_request\nfrom public_contract import valid_history\n\nrng = random.Random(987)\nreqs=[]; known=[]\nfor i in range(500):\n    r,_=truthful(rng,n=rng.randint(1,10),nkeys=rng.randint(1,6),nops=rng.randint(1,5),\n                 overlap=rng.random()<0.5,tight=rng.random()<0.2)\n    reqs.append(r); known.append(True)\nfor i in range(500):\n    reqs.append(gen_request(rng,nmax=10,truthful=False)); known.append(None)\n# provably impossible: get expects a value nothing can produce\ndef possible_vals(r,k):\n    vals={r['initial'].get(k), None}\n    for t in r['transactions']:\n        for o in t['ops']:\n            if o[0]=='put' and o[1]==k: vals.add(o[2])\n            if o[0]=='cas' and o[1]==k:\n                vals.add(o[2])\n                if o[3] is not None: vals."
+    },
+    {
+      "step": 85043,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "batch 1300 reqs in 0.17s (0.13ms/req) rc=0 stderr='' lines=1300\norders returned 502 | missing witnesses 0 | invalid orders 0 | claimed-sat on provably-unsat 0\n"
+    },
+    {
+      "step": 85753,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - <<'PYEOF'\nsrc=open('main.py').read()\nassert \"if not (ticks[0] & 1023) and time.monotonic() > deadline:\" in src\nsrc=src.replace(\"if not (ticks[0] & 1023) and time.monotonic() > deadline:\",\n                \"if not (ticks[0] & 255) and time.monotonic() > deadline:\")\nsrc=src.replace(\"\"\"            ticks[0] += 1\n            if not (ticks[0] & 1023) and time.monotonic() > deadline:\"\"\",\n\"\"\"            ticks[0] += 1\n            if not (ticks[0] & 255) and time.monotonic() > deadline:\"\"\")\nopen('main.py','w').write(src)\nprint('ok')\nPYEOF\ncd /app && python3 smoke.py && printf '%s' '{\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]}' | python3 /app/main.py && echo \"(no trailing newline ok)\" && cd /tmp/work && python3 edge2.py && python3 run_diff.py 77 100 | tail -1"
+    },
+    {
+      "step": 85754,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "ok\nPassed 3 public examples\n{\"order\": [\"t0\"]}\n(no trailing newline ok)\nedge cases: 23, failures 0\nseed 77 checked 400 requests, mismatches: 0\n"
+    },
+    {
+      "step": 85894,
+      "kind": "terminal_call",
+      "summary": "cd /tmp/work && timeout 900 python3 nearmiss.py 30 150 | head -1 && timeout 600 python3 adv.py | tail -2 && python3 -c \"\nimport py_compile; py_compile.compile('/app/main.py', doraise=True); print('compiles clean')\n\" && cd /app && python3 -m pyflakes main.py 2>/dev/null || python3 - <<'PYEOF'\nimport ast, sys\nsrc=open('/app/main.py').read()\ntree=ast.parse(src)\nprint('AST ok; lines:', len(src.splitlines()))\nPYEOF"
+    },
+    {
+      "step": 85895,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "checked 150 corrupted histories, all agree with the exhaustive checker\ndepchain   n=600 sat=  0 total=0.06s med=0.1ms p99=0.3ms max=0.8ms\nscanpin    n=600 sat=  0 total=0.04s med=0.1ms p99=0.1ms max=1.1ms\ncompiles clean\nAST ok; lines: 468\n"
+    },
+    {
+      "step": 86065,
+      "kind": "terminal_call",
+      "summary": "cd /app && sed -n '395,470p' main.py && echo \"--- files ---\" && ls -la /app && rm -rf /app/__pycache__ && ls /app"
+    },
+    {
+      "step": 86066,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "        chosen = []\n        ticks = [0]\n\n        def dfs(placed, state):\n            ticks[0] += 1\n            if not (ticks[0] & 255) and time.monotonic() > deadline:\n                raise OutOfTime\n            if placed == full:\n                return state == final\n            try:\n                mkey = (placed, frozenset(state.items()))\n            except TypeError:\n                mkey = None\n            if mkey is not None and mkey in memo:\n                return False\n            for t in range(n):\n                if not ((placed >> t) & 1) and (preds[t] & placed) == preds[t]:\n                    nxt = literal_apply(state, txs[t]['ops'])\n                    if nxt is None:\n                        continue\n                    chosen.append(t)\n                    if dfs(placed | (1 << t), nxt):\n                        return True\n                    chosen.pop()\n            if mkey is not None:\n                memo.add(mkey)\n            return False\n\n        if dfs(0, dict(initial)):\n            return [ids[t] for t in chosen]\n        return None\n    except OutOfTime:\n        return None\n    except Exception:\n        return None\n\n\n# -------------------------------------------"
+    },
+    {
+      "step": 86716,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 smoke.py && cd /tmp/work && python3 run_diff.py 999 80 | tail -1 && timeout 300 python3 nearmiss.py 99 60 | head -1 && echo \"=== final: timing a 5000-request batch through one process ===\" && python3 - <<'PYEOF'\nimport json, random, sys, time, subprocess\nsys.path.insert(0,'/tmp/work'); sys.path.insert(0,'/app')\nfrom truth import truthful\nfrom gen import gen_request\nfrom public_contract import valid_history\nrng=random.Random(20250)\nreqs=[]\nfor i in range(2500):\n    r,_=truthful(rng,n=rng.randint(0,10),nkeys=rng.randint(1,6),nops=rng.randint(1,5),overlap=rng.random()<0.5)\n    reqs.append(r)\nfor i in range(2500):\n    reqs.append(gen_request(rng,nmax=10,truthful=False))\nt0=time.time()\np=subprocess.run([sys.executable,'/app/main.py'],input=''.join(json.dumps(r)+'\\n' for r in reqs),text=True,capture_output=True,cwd='/app')\nel=time.time()-t0\nlines=p.stdout.splitlines()\nok=sum(1 for r,l in zip(reqs,lines) if json.loads(l).get('order') is None or valid_history(r,json.loads(l)"
+    },
+    {
+      "step": 86717,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\nseed 999 checked 320 requests, mismatches: 0\nchecked 60 corrupted histories, all agree with the exhaustive checker\n=== final: timing a 5000-request batch through one process ===\n5000 requests, 5000 lines out, 0.39s total (0.079 ms/req), all answers valid: True, rc=0, stderr=''\n"
+    }
+  ]
+}

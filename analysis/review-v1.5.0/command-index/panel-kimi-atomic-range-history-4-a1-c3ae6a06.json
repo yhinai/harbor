@@ -1,0 +1,252 @@
+{
+  "label": "verified command/result excerpts; error text is a screening signal, not adjudicated failure",
+  "metric": {
+    "attempt_id": "panel-kimi-atomic-range-history-4-a1-c3ae6a06",
+    "task": "atomic-range-history",
+    "model": "accounts/fireworks/models/kimi-k3",
+    "replicate": 4,
+    "source_record": "analysis/followup-v1.4.0/studies/mini-panel-20261008-v140/outcome-corrections/v1.4.3/panel-kimi-atomic-range-history-4-a1-c3ae6a06.json",
+    "tool_calls": 12,
+    "agent_elapsed_seconds": 553.946275,
+    "input_tokens": 156800,
+    "output_tokens": 15942,
+    "uncached_cost_estimate": 0.7095300000000001,
+    "fresh_two_message_start_verified": true,
+    "unique_container_id": "37cca9abddef360b4294aeb7e6d4dcbecb13430c13c96503114ce6bf02c4ac4a",
+    "network_mode": "none",
+    "artifact_sha256": "b2741558f2284a7726c0b6675da33f0cfaf07814baad9e0a4243d1af19db8772",
+    "normalized_artifact_sha256": "183e17e8d864facc012b21c9a704f2f12c3dcb2bf3ce74a12f557d7808c70f0b",
+    "terminal_nonzero_or_error_text_events": 5,
+    "protected_path_command_mentions": [],
+    "finished_by_30_min": true,
+    "final_artifact_literal_writes": [
+      {
+        "step": 5027,
+        "time": "2026-10-08T18:46:59.751624+00:00",
+        "artifact_sha256": "b2741558f2284a7726c0b6675da33f0cfaf07814baad9e0a4243d1af19db8772",
+        "method": "exact bytes in a literal cat here-document"
+      }
+    ],
+    "final_artifact_literal_written_by_30_min": true,
+    "first_literal_final_artifact_seconds": 170.590968,
+    "event_counts": {
+      "initial": 1,
+      "request": 13,
+      "stream_chunk": 15438,
+      "response": 13,
+      "terminal_call": 12,
+      "terminal_result": 12,
+      "finished": 1
+    },
+    "request_settings": {
+      "all_max_tokens_full_context": true,
+      "all_reasoning_effort_max": true
+    }
+  },
+  "commands": [
+    {
+      "step": 3929,
+      "time": "2026-10-08T18:46:24.353912+00:00",
+      "tool_call_id": "call_35057a85cb664246b92c921f",
+      "command": "ls -la /app && cat /app/smoke.py 2>/dev/null || echo \"no smoke.py\"",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 3986,
+      "time": "2026-10-08T18:46:28.626353+00:00",
+      "tool_call_id": "call_2bf6d3a5fe604b4399d7f3d7",
+      "command": "cat /app/main.py; echo ---; cat /app/public_contract.py; echo ---; cat /app/examples.json",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 5027,
+      "time": "2026-10-08T18:46:59.751624+00:00",
+      "tool_call_id": "call_026c1f8e11814b6e88c8dac3",
+      "command": "cat > /app/main.py << 'EOF'\nimport json\nimport sys\n\n\ndef _simulate(ops, state):\n    \"\"\"Apply one transaction atomically to `state` (dict key->int).\n\n    Returns the new state dict, or None if any observation fails.\"\"\"\n    st = dict(state)\n    for op in ops:\n        kind = op[0]\n        if kind == \"get\":\n            if st.get(op[1]) != op[2]:\n                return None\n        elif kind == \"put\":\n            st[op[1]] = op[2]\n        elif kind == \"del\":\n            st.pop(op[1], None)\n        elif kind == \"cas\":\n            ok = st.get(op[1]) == op[2]\n            if ok is not op[4]:\n                return None\n            if ok:\n                new = op[3]\n                if new is None:\n                    st.pop(op[1], None)\n                else:\n                    st[op[1]] = new\n        elif kind == \"scan\":\n            pairs = sorted([[k, v] for k, v in st.items() if op[1] <= k < op[2]])\n            if pairs != [list(p) for p in op[3]]:\n                return None\n        else:\n            return None\n    return st\n\n\ndef _enc(state):\n    return tuple(sorted(state.items()))\n\n\ndef solve(request):\n    initial = request.get(\"initial\") or {}\n    final = request.get(\"final\") or {}\n    txns = request.get(\"transactions\") or []\n    n = len(txns)\n    ids = [t[\"id\"] for t in txns]\n\n    # pred[i]: bitmask of transactions that must precede i (j.end <= i.start)\n    pred = [0] * n\n    for i in range(n):\n        si = txns[i][\"start\"]\n        m = 0\n        for j in range(n):\n            if i != j and txns[j][\"end\"] <= si:\n                m |= 1 << j\n        pred[i] = m\n\n    ops_list = ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 6917,
+      "time": "2026-10-08T18:48:22.355260+00:00",
+      "tool_call_id": "call_c9ea342f0b714585b7714ff1",
+      "command": "cat > /app/test_diff.py << 'EOF'\nimport itertools, json, random, subprocess, sys\nsys.path.insert(0, '/app')\nfrom public_contract import valid_history\nfrom main import solve\n\ndef brute_exists(r):\n    tx = r['transactions']\n    n = len(tx)\n    ids = [t['id'] for t in tx]\n    for perm in itertools.permutations(range(n)):\n        order = [ids[i] for i in perm]\n        # precedence check\n        ranks = {x: i for i, x in enumerate(order)}\n        ok = True\n        for a in tx:\n            for b in tx:\n                if a['end'] <= b['start'] and ranks[a['id']] >= ranks[b['id']]:\n                    ok = False; break\n            if not ok: break\n        if not ok: continue\n        if valid_history(r, order):\n            return True\n    return False\n\nKEYS = ['a', 'b', 'c', 'd', 'e', 'f']\n\ndef rand_op(rng, keys):\n    kind = rng.choice(['get', 'put', 'del', 'cas', 'scan', 'get', 'put', 'cas'])\n    k = rng.choice(keys)\n    if kind == 'get':\n        return ['get', k, rng.choice([None, -1, 0, 1, 2])]\n    if kind == 'put':\n        return ['put', k, rng.randint(-2, 2)]\n    if kind == 'del':\n        return ['del', k]\n    if kind == 'cas':\n        old = rng.choice([None, -1, 0, 1, 2])\n        new = rng.choice([None, -2, -1, 0, 1, 2])\n        return ['cas', k, old, new, rng.choice([True, False])]\n    # scan\n    lo, hi = sorted(rng.sample(keys + ['', 'zz'], 2)) if rng.random() < 0.5 else (rng.choice(['', 'a', 'b']), rng.choice(['c', 'f', 'zz']))\n    if lo >= hi: lo, hi = '', 'zz'\n    return ['scan', lo, hi, rng.choice([[], [[k, 0]], [[k, 1] for k in keys[:2]]])]\n\ndef rand_request(rng, n):\n ",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 7515,
+      "time": "2026-10-08T18:48:45.564696+00:00",
+      "tool_call_id": "call_62e9e088548345e1addb0aea",
+      "command": "cat > /app/test_perf.py << 'EOF'\nimport json, random, subprocess, sys, time\nsys.path.insert(0, '/app')\nfrom test_diff import make_solvable, rand_request\nfrom main import solve\n\nrng = random.Random(999)\nlines = []\n# 60 solvable 10-txn, all fully overlapping (no precedence help)\nfor _ in range(60):\n    r = make_solvable(rng, 10)\n    for t in r['transactions']:\n        t['start'] = 0; t['end'] = 100\n    lines.append(r)\n# 30 random 10-txn (mostly unsat)\nfor _ in range(30):\n    r = rand_request(rng, 10)\n    for t in r['transactions']:\n        t['start'] = 0; t['end'] = 100\n    lines.append(r)\n# adversarial: 10 txns, each cas on 6 shared keys, unsat final\nadv = {'initial': {}, 'final': {k: 9 for k in 'abcdef'}, 'transactions': []}\nfor i in range(10):\n    ops = []\n    for k in 'abcdef':\n        ops.append(['cas', k, rng.choice([None,0,1]), rng.randint(-3,3), rng.choice([True,False])])\n        ops.append(['scan', '', 'zz', []])\n    adv['transactions'].append({'id': f't{i}', 'start': 0, 'end': 100, 'ops': ops[:5]})\nlines.append(adv)\n\ndata = ''.join(json.dumps(r) + '\\n' for r in lines)\nt0 = time.time()\np = subprocess.run([sys.executable, '/app/main.py'], input=data, text=True, capture_output=True, timeout=55)\ndt = time.time() - t0\nassert p.returncode == 0, p.stderr\nout = p.stdout.splitlines()\nassert len(out) == len(lines), (len(out), len(lines))\nsat = sum(1 for l in out if json.loads(l)['order'] is not None)\nprint(f'{len(lines)} requests in {dt:.2f}s, {sat} satisfiable, rc=0')\nEOF\ncd /app && time python3 test_perf.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 7867,
+      "time": "2026-10-08T18:49:03.793009+00:00",
+      "tool_call_id": "call_6b9fceffdcd64c5dbe81f2a6",
+      "command": "cd /app && python3 - << 'EOF'\nimport re\nsrc = open('test_diff.py').read()\nhead, tail = src.split(\"rng = random.Random(12345)\", 1)\ntail = \"rng = random.Random(12345)\" + tail\ntail = \"\\n\".join(\"    \" + l if l.strip() else l for l in tail.splitlines())\nopen('test_diff.py','w').write(head + \"if __name__ == '__main__':\\n\" + tail + \"\\n\")\nEOF\ntime python3 test_perf.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 9504,
+      "time": "2026-10-08T18:50:09.537319+00:00",
+      "tool_call_id": "call_588deb61a739493fb99d05e3",
+      "command": "cat > /app/test_worst.py << 'EOF'\nimport json, random, subprocess, sys, time\nrng = random.Random(7)\nkeys = list('abcdef')\nlines = []\nfor trial in range(5):\n    txns = []\n    for i in range(10):\n        ops = []\n        for _ in range(5):\n            k = rng.choice(keys)\n            if rng.random() < 0.25:\n                ops.append(['del', k])\n            else:\n                ops.append(['put', k, rng.randint(0, 3)])\n        txns.append({'id': f't{i}', 'start': 0, 'end': 100, 'ops': ops})\n    # unreachable final (value 7 never written, absent from initial)\n    r = {'initial': {}, 'final': {'a': 7}, 'transactions': txns}\n    lines.append(r)\ndata = ''.join(json.dumps(r) + '\\n' for r in lines)\nt0 = time.time()\np = subprocess.run([sys.executable, '/app/main.py'], input=data, text=True, capture_output=True, timeout=58)\ndt = time.time() - t0\nprint('rc', p.returncode, 'time %.2fs' % dt)\nprint(p.stdout)\nif p.stderr: print('stderr:', p.stderr[:500])\nEOF\ncd /app && time python3 test_worst.py",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 10634,
+      "time": "2026-10-08T18:50:45.188323+00:00",
+      "tool_call_id": "call_75240be696fc40328c91739b",
+      "command": "cat > /app/test_worst2.py << 'EOF'\nimport json, random, subprocess, sys, time\nrng = random.Random(7)\nkeys = list('abcdef')\nlines = []\n# maximize reachable states: values from 0..8, mostly puts, unreachable final\nfor trial in range(3):\n    txns = []\n    for i in range(10):\n        ops = []\n        for _ in range(5):\n            k = rng.choice(keys)\n            r = rng.random()\n            if r < 0.15:\n                ops.append(['del', k])\n            elif r < 0.85:\n                ops.append(['put', k, rng.randint(0, 8)])\n            else:\n                ops.append(['get', k, None] if rng.random()<0.5 else ['scan','','zz',[]])\n        txns.append({'id': f't{i}', 'start': 0, 'end': 100, 'ops': ops})\n    lines.append({'initial': {}, 'final': {'a': 7, 'b': 7}, 'transactions': txns})\n# satisfiable giant: random order applied, all overlap -> must find one of 10!\nfor trial in range(3):\n    state = {}\n    txns = []\n    order = list(range(10)); rng.shuffle(order)\n    per = {}\n    for pos, i in enumerate(order):\n        ops = []\n        for _ in range(5):\n            k = rng.choice(keys); r = rng.random()\n            if r < 0.2:\n                ops.append(['get', k, state.get(k)])\n            elif r < 0.6:\n                v = rng.randint(-9, 9); state[k] = v; ops.append(['put', k, v])\n            elif r < 0.75:\n                state.pop(k, None); ops.append(['del', k])\n            elif r < 0.9:\n                old = state.get(k); nv = rng.choice([None, rng.randint(-9,9)])\n                if nv is None: state.pop(k, None)\n                else: state[k] = nv\n                ops.appen",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 12552,
+      "time": "2026-10-08T18:51:51.286794+00:00",
+      "tool_call_id": "call_5b9a1d5468c8447fb91efea5",
+      "command": "cat > /app/test_diff2.py << 'EOF'\nimport itertools, json, random, sys\nsys.path.insert(0, '/app')\nfrom public_contract import valid_history\nfrom main import solve\n\ndef brute_exists(r):\n    tx = r['transactions']; ids = [t['id'] for t in tx]\n    for perm in itertools.permutations(range(len(tx))):\n        ranks = {ids[i]: p for p, i in enumerate(perm)}\n        if any(a['end'] <= b['start'] and ranks[a['id']] >= ranks[b['id']]\n               for a in tx for b in tx):\n            continue\n        if valid_history(r, [ids[i] for i in perm]):\n            return True\n    return False\n\nKEYS = ['a', 'b', 'c', 'd', 'e', 'f']\n\ndef rand_op(rng, keys, nops):\n    kind = rng.choices(['get','put','del','cas','scan'], weights=[3,3,2,3,3])[0]\n    k = rng.choice(keys)\n    if kind == 'get':\n        return ['get', k, rng.choice([None, None, -2, -1, 0, 1, 2])]\n    if kind == 'put':\n        return ['put', k, rng.randint(-3, 3)]\n    if kind == 'del':\n        return ['del', k]\n    if kind == 'cas':\n        return ['cas', k, rng.choice([None, -1, 0, 1, 2]),\n                rng.choice([None, -2, 0, 2]), rng.choice([True, False])]\n    pool = ['', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'zz', 'aa']\n    lo, hi = rng.choice(pool), rng.choice(pool)\n    if lo >= hi: lo, hi = sorted([lo, hi]) if lo != hi else ('', 'zz')\n    exp = []\n    for _ in range(rng.randint(0, 3)):\n        exp.append([rng.choice(keys), rng.randint(-2, 2)])\n    exp.sort()\n    exp = [p for i, p in enumerate(exp) if i == 0 or p[0] != exp[i-1][0]]\n    return ['scan', lo, hi, exp]\n\ndef rand_request(rng, n, tight):\n    keys = rng.sample(KEYS, rng",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 13713,
+      "time": "2026-10-08T18:52:27.374491+00:00",
+      "tool_call_id": "call_25ddb99ec32649dbaa30a7a7",
+      "command": "cd /app && python3 - << 'EOF' > /tmp/in.ndjson\nimport json\ncases = [\n  # the prompt example\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]},\n  # real-time contradiction: t0 before t1 forced, but t1 expects absent\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[\n    {\"id\":\"w\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",1]]},\n    {\"id\":\"r\",\"start\":1,\"end\":2,\"ops\":[[\"get\",\"a\",None]]}]},\n  # overlapping: reader must go after writer\n  {\"initial\":{},\"final\":{\"a\":5},\"transactions\":[\n    {\"id\":\"r\",\"start\":0,\"end\":10,\"ops\":[[\"get\",\"a\",5]]},\n    {\"id\":\"w\",\"start\":1,\"end\":2,\"ops\":[[\"put\",\"a\",5]]}]},\n  # cas to null deletes; later get null inside another txn\n  {\"initial\":{\"x\":3},\"final\":{},\"transactions\":[\n    {\"id\":\"c\",\"start\":0,\"end\":5,\"ops\":[[\"cas\",\"x\",3,None,true]]},\n    {\"id\":\"g\",\"start\":0,\"end\":5,\"ops\":[[\"get\",\"x\",None]]}]},\n  # failed cas observed, makes no change\n  {\"initial\":{\"x\":3},\"final\":{\"x\":3},\"transactions\":[\n    {\"id\":\"c\",\"start\":0,\"end\":5,\"ops\":[[\"cas\",\"x\",4,9,false],[\"get\",\"x\",3]]}]},\n  # scan sees earlier writes in same txn; final state filter bounds\n  {\"initial\":{\"b\":2},\"final\":{\"a\":1,\"b\":2},\"transactions\":[\n    {\"id\":\"s\",\"start\":0,\"end\":5,\"ops\":[[\"put\",\"a\",1],[\"scan\",\"a\",\"c\",[[\"a\",1],[\"b\",2]]],[\"scan\",\"b\",\"c\",[[\"b\",2]]],[\"scan\",\"\",\"b\",[[\"a\",1]]]]}]},\n  # impossible scan observation\n  {\"initial\":{\"b\":2},\"final\":{\"b\":2},\"transactions\":[\n    {\"id\":\"s\",\"start\":0,\"end\":5,\"ops\":[[\"scan\",\"a\",\"c\",[[\"b\",3]]]]}]},\n  # del absent key is fine; zero vs absent distinction\n  {\"initial\":{},\"final\":{},\"transactions\":[\n    {\"id\":\"d\",\"sta",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 14540,
+      "time": "2026-10-08T18:52:45.675275+00:00",
+      "tool_call_id": "call_72e7b5c820e549efaefbef45",
+      "command": "cd /app && sed -i 's/,true\\]/,True]/; s/,false\\]/,False]/g' /dev/null; python3 - << 'EOF' > /tmp/in.ndjson\nimport json\ncases = [\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]},\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[\n    {\"id\":\"w\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",1]]},\n    {\"id\":\"r\",\"start\":1,\"end\":2,\"ops\":[[\"get\",\"a\",None]]}]},\n  {\"initial\":{},\"final\":{\"a\":5},\"transactions\":[\n    {\"id\":\"r\",\"start\":0,\"end\":10,\"ops\":[[\"get\",\"a\",5]]},\n    {\"id\":\"w\",\"start\":1,\"end\":2,\"ops\":[[\"put\",\"a\",5]]}]},\n  {\"initial\":{\"x\":3},\"final\":{},\"transactions\":[\n    {\"id\":\"c\",\"start\":0,\"end\":5,\"ops\":[[\"cas\",\"x\",3,None,True]]},\n    {\"id\":\"g\",\"start\":0,\"end\":5,\"ops\":[[\"get\",\"x\",None]]}]},\n  {\"initial\":{\"x\":3},\"final\":{\"x\":3},\"transactions\":[\n    {\"id\":\"c\",\"start\":0,\"end\":5,\"ops\":[[\"cas\",\"x\",4,9,False],[\"get\",\"x\",3]]}]},\n  {\"initial\":{\"b\":2},\"final\":{\"a\":1,\"b\":2},\"transactions\":[\n    {\"id\":\"s\",\"start\":0,\"end\":5,\"ops\":[[\"put\",\"a\",1],[\"scan\",\"a\",\"c\",[[\"a\",1],[\"b\",2]]],[\"scan\",\"b\",\"c\",[[\"b\",2]]],[\"scan\",\"\",\"b\",[[\"a\",1]]]]}]},\n  {\"initial\":{\"b\":2},\"final\":{\"b\":2},\"transactions\":[\n    {\"id\":\"s\",\"start\":0,\"end\":5,\"ops\":[[\"scan\",\"a\",\"c\",[[\"b\",3]]]]}]},\n  {\"initial\":{},\"final\":{},\"transactions\":[\n    {\"id\":\"d\",\"start\":0,\"end\":1,\"ops\":[[\"del\",\"a\"],[\"put\",\"a\",0],[\"del\",\"a\"],[\"get\",\"a\",None]]}]},\n  {\"initial\":{\"k\":0},\"final\":{\"k\":0},\"transactions\":[]},\n  {\"initial\":{},\"final\":{\"k\":0},\"transactions\":[]},\n  {\"initial\":{},\"final\":{\"v\":3},\"transactions\":[\n    {\"id\":\"a\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"v\",1]]},\n    {\"id\":\"b\",\"start\":1,\"end\":2,\"ops\":[[",
+      "protected_path_mentions": false
+    },
+    {
+      "step": 15136,
+      "time": "2026-10-08T18:53:05.633961+00:00",
+      "tool_call_id": "call_508f4a72db974aef965c2610",
+      "command": "cd /app && python3 smoke.py && python3 test_diff.py && python3 test_diff2.py && python3 test_perf.py && python3 test_worst.py && python3 test_worst2.py",
+      "protected_path_mentions": false
+    }
+  ],
+  "errors": [
+    {
+      "step": 3930,
+      "time": "2026-10-08T18:46:25.317016+00:00",
+      "tool_call_id": "call_35057a85cb664246b92c921f",
+      "return_code": 0,
+      "stdout": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:42 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:44 ..\n-rw-r--r-- 1 agent agent 1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('atomic-range-history',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr": "",
+      "stdout_tail": "total 24\ndrwxr-xr-x 1 agent agent 4096 Oct  8 17:42 .\ndrwxr-xr-x 1 root  root  4096 Oct  8 18:44 ..\n-rw-r--r-- 1 agent agent 1025 Oct  8 17:32 examples.json\n-rw-r--r-- 1 agent agent  216 Oct  8 17:32 main.py\n-rw-r--r-- 1 agent agent 3214 Oct  8 17:32 public_contract.py\n-rw-r--r-- 1 agent agent  695 Oct  8 17:32 smoke.py\nimport json,pathlib,subprocess,sys\nfrom public_contract import check\nHERE=pathlib.Path(__file__).resolve().parent\ncases=json.loads((HERE/'examples.json').read_text())\np=subprocess.run([sys.executable,str(HERE/'main.py')],input=''.join(json.dumps(x['request'])+'\\n' for x in cases),text=True,capture_output=True,cwd=HERE)\nif p.returncode: print(p.stderr); sys.exit(1)\nlines=p.stdout.splitlines()\nif len(lines)!=len(cases): print('Wrong number of response lines'); sys.exit(1)\nfor case,line in zip(cases,lines):\n    if not check('atomic-range-history',case['request'],case['expected'],json.loads(line)):\n        print('FAILED',case['id']); sys.exit(1)\nprint('Passed',len(cases),'public examples')\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 6918,
+      "time": "2026-10-08T18:48:23.243377+00:00",
+      "tool_call_id": "call_c9ea342f0b714585b7714ff1",
+      "return_code": 0,
+      "stdout": "random-small: 800 cases, 0 bad\nrandom-med: 200 cases, 0 bad\nsolvable: 500 cases, 0 bad\nempty-mismatch: 1 cases, 0 bad\nempty-match: 1 cases, 0 bad\n",
+      "stderr": "",
+      "stdout_tail": "random-small: 800 cases, 0 bad\nrandom-med: 200 cases, 0 bad\nsolvable: 500 cases, 0 bad\nempty-mismatch: 1 cases, 0 bad\nempty-match: 1 cases, 0 bad\n",
+      "stderr_tail": ""
+    },
+    {
+      "step": 7516,
+      "time": "2026-10-08T18:48:46.547726+00:00",
+      "tool_call_id": "call_62e9e088548345e1addb0aea",
+      "return_code": 0,
+      "stdout": "random-small: 800 cases, 0 bad\nrandom-med: 200 cases, 0 bad\nsolvable: 500 cases, 0 bad\nempty-mismatch: 1 cases, 0 bad\nempty-match: 1 cases, 0 bad\n",
+      "stderr": "\nreal\t0m0.668s\nuser\t0m0.661s\nsys\t0m0.001s\n",
+      "stdout_tail": "random-small: 800 cases, 0 bad\nrandom-med: 200 cases, 0 bad\nsolvable: 500 cases, 0 bad\nempty-mismatch: 1 cases, 0 bad\nempty-match: 1 cases, 0 bad\n",
+      "stderr_tail": "\nreal\t0m0.668s\nuser\t0m0.661s\nsys\t0m0.001s\n"
+    },
+    {
+      "step": 13714,
+      "time": "2026-10-08T18:52:27.631699+00:00",
+      "tool_call_id": "call_25ddb99ec32649dbaa30a7a7",
+      "return_code": 0,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 15, in <module>\nNameError: name 'true' is not defined. Did you mean: 'True'?\n",
+      "stdout_tail": "",
+      "stderr_tail": "Traceback (most recent call last):\n  File \"<stdin>\", line 15, in <module>\nNameError: name 'true' is not defined. Did you mean: 'True'?\n"
+    },
+    {
+      "step": 15137,
+      "time": "2026-10-08T18:53:09.615770+00:00",
+      "tool_call_id": "call_508f4a72db974aef965c2610",
+      "return_code": 0,
+      "stdout": "Passed 3 public examples\nrandom-small: 800 cases, 0 bad\nrandom-med: 200 cases, 0 bad\nsolvable: 500 cases, 0 bad\nempty-mismatch: 1 cases, 0 bad\nempty-match: 1 cases, 0 bad\ndone, bad = 0\n91 requests in 0.05s, 60 satisfiable, rc=0\nrc 0 time 0.25s\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n\nrc 0 time 0.04s\nunsat\nunsat\nunsat\nsat\nsat\nsat\n",
+      "stderr": "",
+      "stdout_tail": "Passed 3 public examples\nrandom-small: 800 cases, 0 bad\nrandom-med: 200 cases, 0 bad\nsolvable: 500 cases, 0 bad\nempty-mismatch: 1 cases, 0 bad\nempty-match: 1 cases, 0 bad\ndone, bad = 0\n91 requests in 0.05s, 60 satisfiable, rc=0\nrc 0 time 0.25s\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n\nrc 0 time 0.04s\nunsat\nunsat\nunsat\nsat\nsat\nsat\n",
+      "stderr_tail": ""
+    }
+  ],
+  "last_events": [
+    {
+      "step": 9504,
+      "kind": "terminal_call",
+      "summary": "cat > /app/test_worst.py << 'EOF'\nimport json, random, subprocess, sys, time\nrng = random.Random(7)\nkeys = list('abcdef')\nlines = []\nfor trial in range(5):\n    txns = []\n    for i in range(10):\n        ops = []\n        for _ in range(5):\n            k = rng.choice(keys)\n            if rng.random() < 0.25:\n                ops.append(['del', k])\n            else:\n                ops.append(['put', k, rng.randint(0, 3)])\n        txns.append({'id': f't{i}', 'start': 0, 'end': 100, 'ops': ops})\n    # unreachable final (value 7 never written, absent from initial)\n    r = {'initial': {}, 'final': {'a': 7}, 'transactions': txns}\n    lines.append(r)\ndata = ''.join(json.dumps(r) + '\\n' for r in lines)\nt0 = time.time()\np = subprocess.run([sys.executable, '/app/main.py'], input=data, text=True, capture_output=True, timeout=58)\ndt = time.time() - t0\nprint('rc', p.returncode, 'time %.2fs' % dt)\nprint(p.stdout)\nif p.stderr: print('stderr:', p.stderr[:500])\nEOF\ncd /app && time python3 test_worst.py"
+    },
+    {
+      "step": 9505,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "rc 0 time 0.22s\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n\n\nreal\t0m0.262s\nuser\t0m0.249s\nsys\t0m0.009s\n"
+    },
+    {
+      "step": 10634,
+      "kind": "terminal_call",
+      "summary": "cat > /app/test_worst2.py << 'EOF'\nimport json, random, subprocess, sys, time\nrng = random.Random(7)\nkeys = list('abcdef')\nlines = []\n# maximize reachable states: values from 0..8, mostly puts, unreachable final\nfor trial in range(3):\n    txns = []\n    for i in range(10):\n        ops = []\n        for _ in range(5):\n            k = rng.choice(keys)\n            r = rng.random()\n            if r < 0.15:\n                ops.append(['del', k])\n            elif r < 0.85:\n                ops.append(['put', k, rng.randint(0, 8)])\n            else:\n                ops.append(['get', k, None] if rng.random()<0.5 else ['scan','','zz',[]])\n        txns.append({'id': f't{i}', 'start': 0, 'end': 100, 'ops': ops})\n    lines.append({'initial': {}, 'final': {'a': 7, 'b': 7}, 'transactions': txns})\n# satisfiable giant: random order applied, all overlap -> must find one of 10!\nfor trial in range(3):\n    state = {}\n    txns = []\n    order = list(range(10)); rng.shuffle(order)\n    per = {}\n    for pos, i i"
+    },
+    {
+      "step": 10635,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "rc 0 time 0.03s\nunsat\nunsat\nunsat\nsat\nsat\nsat\n\nreal\t0m0.082s\nuser\t0m0.080s\nsys\t0m0.002s\n"
+    },
+    {
+      "step": 12552,
+      "kind": "terminal_call",
+      "summary": "cat > /app/test_diff2.py << 'EOF'\nimport itertools, json, random, sys\nsys.path.insert(0, '/app')\nfrom public_contract import valid_history\nfrom main import solve\n\ndef brute_exists(r):\n    tx = r['transactions']; ids = [t['id'] for t in tx]\n    for perm in itertools.permutations(range(len(tx))):\n        ranks = {ids[i]: p for p, i in enumerate(perm)}\n        if any(a['end'] <= b['start'] and ranks[a['id']] >= ranks[b['id']]\n               for a in tx for b in tx):\n            continue\n        if valid_history(r, [ids[i] for i in perm]):\n            return True\n    return False\n\nKEYS = ['a', 'b', 'c', 'd', 'e', 'f']\n\ndef rand_op(rng, keys, nops):\n    kind = rng.choices(['get','put','del','cas','scan'], weights=[3,3,2,3,3])[0]\n    k = rng.choice(keys)\n    if kind == 'get':\n        return ['get', k, rng.choice([None, None, -2, -1, 0, 1, 2])]\n    if kind == 'put':\n        return ['put', k, rng.randint(-3, 3)]\n    if kind == 'del':\n        return ['del', k]\n    if kind == 'cas':\n        retu"
+    },
+    {
+      "step": 12553,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "done, bad = 0\n\nreal\t0m2.464s\nuser\t0m2.394s\nsys\t0m0.005s\n"
+    },
+    {
+      "step": 13713,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 - << 'EOF' > /tmp/in.ndjson\nimport json\ncases = [\n  # the prompt example\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]},\n  # real-time contradiction: t0 before t1 forced, but t1 expects absent\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[\n    {\"id\":\"w\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",1]]},\n    {\"id\":\"r\",\"start\":1,\"end\":2,\"ops\":[[\"get\",\"a\",None]]}]},\n  # overlapping: reader must go after writer\n  {\"initial\":{},\"final\":{\"a\":5},\"transactions\":[\n    {\"id\":\"r\",\"start\":0,\"end\":10,\"ops\":[[\"get\",\"a\",5]]},\n    {\"id\":\"w\",\"start\":1,\"end\":2,\"ops\":[[\"put\",\"a\",5]]}]},\n  # cas to null deletes; later get null inside another txn\n  {\"initial\":{\"x\":3},\"final\":{},\"transactions\":[\n    {\"id\":\"c\",\"start\":0,\"end\":5,\"ops\":[[\"cas\",\"x\",3,None,true]]},\n    {\"id\":\"g\",\"start\":0,\"end\":5,\"ops\":[[\"get\",\"x\",None]]}]},\n  # failed cas observed, makes no change\n  {\"initial\":{\"x\":3},\"final\":{\"x\":3},\"transactions\":[\n    {\"id\":\"c\",\"start\":0,\"end"
+    },
+    {
+      "step": 13714,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Traceback (most recent call last):\n  File \"<stdin>\", line 15, in <module>\nNameError: name 'true' is not defined. Did you mean: 'True'?\n"
+    },
+    {
+      "step": 14540,
+      "kind": "terminal_call",
+      "summary": "cd /app && sed -i 's/,true\\]/,True]/; s/,false\\]/,False]/g' /dev/null; python3 - << 'EOF' > /tmp/in.ndjson\nimport json\ncases = [\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[{\"id\":\"t0\",\"start\":0,\"end\":2,\"ops\":[[\"put\",\"a\",1]]}]},\n  {\"initial\":{},\"final\":{\"a\":1},\"transactions\":[\n    {\"id\":\"w\",\"start\":0,\"end\":1,\"ops\":[[\"put\",\"a\",1]]},\n    {\"id\":\"r\",\"start\":1,\"end\":2,\"ops\":[[\"get\",\"a\",None]]}]},\n  {\"initial\":{},\"final\":{\"a\":5},\"transactions\":[\n    {\"id\":\"r\",\"start\":0,\"end\":10,\"ops\":[[\"get\",\"a\",5]]},\n    {\"id\":\"w\",\"start\":1,\"end\":2,\"ops\":[[\"put\",\"a\",5]]}]},\n  {\"initial\":{\"x\":3},\"final\":{},\"transactions\":[\n    {\"id\":\"c\",\"start\":0,\"end\":5,\"ops\":[[\"cas\",\"x\",3,None,True]]},\n    {\"id\":\"g\",\"start\":0,\"end\":5,\"ops\":[[\"get\",\"x\",None]]}]},\n  {\"initial\":{\"x\":3},\"final\":{\"x\":3},\"transactions\":[\n    {\"id\":\"c\",\"start\":0,\"end\":5,\"ops\":[[\"cas\",\"x\",4,9,False],[\"get\",\"x\",3]]}]},\n  {\"initial\":{\"b\":2},\"final\":{\"a\":1,\"b\":2},\"transactions\":[\n    {\"id\":\"s\",\"start\":0,\"end\":5,\"ops\":[[\"put\",\"a\",1],[\"scan\",\"a\",\"c\""
+    },
+    {
+      "step": 14541,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "{\"order\": [\"t0\"]}\n{\"order\": null}\n{\"order\": [\"w\", \"r\"]}\n{\"order\": [\"c\", \"g\"]}\n{\"order\": [\"c\"]}\n{\"order\": [\"s\"]}\n{\"order\": null}\n{\"order\": [\"d\"]}\n{\"order\": []}\n{\"order\": null}\n{\"order\": [\"a\", \"b\", \"c\"]}\n{\"order\": null}\nsed: couldn't edit /dev/null: not a regular file\n"
+    },
+    {
+      "step": 15136,
+      "kind": "terminal_call",
+      "summary": "cd /app && python3 smoke.py && python3 test_diff.py && python3 test_diff2.py && python3 test_perf.py && python3 test_worst.py && python3 test_worst2.py"
+    },
+    {
+      "step": 15137,
+      "kind": "terminal_result",
+      "return_code": 0,
+      "summary": "Passed 3 public examples\nrandom-small: 800 cases, 0 bad\nrandom-med: 200 cases, 0 bad\nsolvable: 500 cases, 0 bad\nempty-mismatch: 1 cases, 0 bad\nempty-match: 1 cases, 0 bad\ndone, bad = 0\n91 requests in 0.05s, 60 satisfiable, rc=0\nrc 0 time 0.25s\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n{\"order\": null}\n\nrc 0 time 0.04s\nunsat\nunsat\nunsat\nsat\nsat\nsat\n"
+    }
+  ]
+}
